@@ -19,7 +19,7 @@ MAX_TEXT = 6000
 from .paths import CLAUDE_HOME, CODEX_HOME
 
 SKIP_USER_PREFIX = ("<system-reminder", "<command-", "<local-command", "# AGENTS.md instructions", "<environment_context",
-                    "<app-context", "<user_instructions", "<INSTRUCTIONS", "Caveat:", "<task-notification", "<permissions",
+                    "<app-context", "<user_instructions", "<INSTRUCTIONS", "Caveat:", "<task-notification", "<permissions", "<turn_aborted", "<user_shell_command",
                     "[SYSTEM NOTIFICATION")
 
 

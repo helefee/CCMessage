@@ -554,8 +554,15 @@ def sessions(root: Path) -> list[dict]:
         x.update(roles.get(f"{x.get('agent')}-{x.get('sid')}", {}))
         if not x.get("role") and x.get("owner_name"):        # 被认领的 Codex 对话：没活时也算辅
             x["role"], x["role_note"] = "aux", "归 " + str(x["owner_name"]).rsplit(" [", 1)[0] + " 用"
+        if x.get("role_set") in ("main", "aux"):            # 用户手动设的优先
+            auto_note = x.get("role_note") or ""
+            x["role"] = x["role_set"]
+            x["role_note"] = ("手动设为主会话" if x["role_set"] == "main" else "手动设为辅会话") + \
+                (f"（{auto_note}）" if auto_note else "")
+            x["role_manual"] = True
     return [{k: v for k, v in x.items() if k in ("agent", "sid", "short", "name", "title", "alias", "age", "originator",
-                                                  "listening", "owner_name", "managed", "role", "role_note")}
+                                                  "listening", "owner_name", "managed", "role", "role_note",
+                                                  "role_manual", "role_set")}
             for x in rows if x.get("agent") != "user"]
 
 
@@ -815,7 +822,7 @@ PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
 PHONE_GET = {"/", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
              "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout"}
-PHONE_POST = {"/api/send", "/api/reply", "/api/export"}
+PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role"}
 
 
 def lan_ip() -> str:
@@ -1085,6 +1092,14 @@ class Handler(BaseHTTPRequestHandler):
                 if r.returncode != 0:
                     raise ValueError((out + r.stderr.decode("utf-8", "replace")).strip()[-400:])
                 self._json(json.loads(out.splitlines()[-1]))
+            elif path == "/api/role":
+                who = "phone" if getattr(self, "device", None) else "ui"
+                r = run_bus(norm_root(body["root"]), ["--as", f"user:{who}", "set-role",
+                                                      f"{body['agent']}:{body['sid']}", body.get("role") or "auto"])
+                out = (r.stdout + r.stderr).decode("utf-8", "replace").strip()
+                if r.returncode != 0:
+                    raise ValueError(out or "设置失败")
+                self._json({"ok": True, "output": out})
             elif path == "/api/reply":
                 text = (body.get("text") or "").strip()
                 if not text:

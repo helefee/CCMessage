@@ -569,6 +569,41 @@ def cmd_release(args) -> None:
     print(f"已放开：{display_name(rec)}")
 
 
+ROLE_TEXT = {
+    "main": "你被用户设为【主会话】：负责统筹这条线的活 —— 拆分、判断哪些该派出去、把适合的活用 task 派给辅会话 / Codex、"
+            "收结果核对后再往下走。自己也能动手，但别把能并行的活都自己揽着。",
+    "aux": "你被用户设为【辅会话】：负责接活干活 —— 优先处理别的会话派来的【任务 …】，做完用 done 交回；"
+           "没活时待命，别主动去开新的大块工作、也别往别的会话派活，除非用户直接要求。",
+    "auto": "你的主 / 辅 身份改回【自动】：按派活关系自动判断，照常工作即可。",
+}
+
+
+def cmd_set_role(args) -> None:
+    """用户手动设某个会话是主还是辅（auto = 回到按派活关系自动判断），并告诉那个会话。"""
+    agent, sid = detect_self(args.as_)
+    me = touch_presence(agent, sid, os.getcwd(), None, force=True)
+    role = {"主": "main", "辅": "aux", "自动": "auto"}.get(args.role, args.role)
+    if role not in ROLE_TEXT:
+        sys.exit("角色只能是 主 / 辅 / 自动（main / aux / auto）")
+    hits = [r for r in all_sessions() if r["agent"] in ("claude", "codex") and
+            (f"{r['agent']}:{r['sid']}" == args.target or match_target(args.target, r))]
+    if len(hits) != 1:
+        sys.exit(f"「{args.target}」对上了 {len(hits)} 个会话，写具体些（claude:前6位 / codex:末6位）")
+    r = hits[0]
+    p = SESS / f"{key_of(r['agent'], r['sid'])}.json"
+    rec = load_json(p)
+    if role == "auto":
+        rec.pop("role_set", None)
+    else:
+        rec["role_set"] = role
+    rec["role_set_at"] = now_ts()
+    save_json(p, rec)
+    label = {"main": "主会话", "aux": "辅会话", "auto": "自动"}[role]
+    print(f"已设：{display_name(rec)} → {label}")
+    if not args.quiet:
+        post(agent, sid, me, f"{r['agent']}:{short_id(r)}", ROLE_TEXT[role], to_keys=[key_of(r["agent"], r["sid"])])
+
+
 def task_prompt(msg: dict) -> str:
     return (f"你是被消息总线派活的 Codex 对话，这个对话归「{msg['from']['name']}」使用。\n"
             f"任务 #{msg['id']}：\n{msg['text']}\n\n"
@@ -919,6 +954,10 @@ def cmd_who(args) -> None:
             mark += f"  〔归 {owner_name(r['owner'])}〕"
         if r.get("managed"):
             mark += "  〔总线新开〕"
+        if r.get("role_set") == "main":
+            mark += "  〔主〕"
+        elif r.get("role_set") == "aux":
+            mark += "  〔辅〕"
         print(f"{display_name(r):<50} 上次活动 {int(age // 60):>4} 分钟前{mark}")
         shown += 1
     if not shown:
@@ -1098,6 +1137,8 @@ def cmd_hook(args) -> None:
         mem = memory_hint(agent)
         if mem:
             ctx.append(mem)
+        if me.get("role_set") in ("main", "aux"):
+            ctx.append(ROLE_TEXT[me["role_set"]])
     if msgs:
         ctx.append(f"📨 收到 {len(msgs)} 条其他会话的消息：\n\n" + render(msgs))
     if not ctx:
@@ -1136,6 +1177,10 @@ def main() -> None:
     ts.add_argument("--limit", type=int, default=30)
     cs = sub.add_parser("codex-status", help="Codex 开没开、本项目各 Codex 对话忙不忙 / 归谁、派活会交给谁")
     cs.add_argument("--json", action="store_true")
+    sr = sub.add_parser("set-role", help="手动设某个会话是主还是辅（自动 = 按派活关系判断），并通知它")
+    sr.add_argument("target")
+    sr.add_argument("role", help="主 / 辅 / 自动（main / aux / auto）")
+    sr.add_argument("--quiet", action="store_true", help="只改标记，不给那个会话发消息")
     rl = sub.add_parser("release", help="放开一个 Codex 对话的归属，别的会话就能派了")
     rl.add_argument("target")
     cw = sub.add_parser("codex-worker", help="（内部）后台跑一件派给 Codex 的活")
@@ -1175,7 +1220,7 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     {"send": cmd_send, "inbox": cmd_inbox, "who": cmd_who, "name": cmd_name, "show": cmd_show,
      "task": cmd_task, "done": cmd_done, "tasks": cmd_tasks, "wait": cmd_wait,
-     "listen": cmd_listen, "codex-status": cmd_codex_status, "release": cmd_release,
+     "listen": cmd_listen, "codex-status": cmd_codex_status, "release": cmd_release, "set-role": cmd_set_role,
      "codex-worker": cmd_codex_worker}[args.cmd](args)
 
 
