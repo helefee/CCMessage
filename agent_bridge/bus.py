@@ -302,7 +302,8 @@ def wake_codex(rec: dict, msg: dict) -> str:
     import subprocess
     try:
         r = subprocess.run([exe, "queue", "--thread", rec["sid"], "--message", note],
-                           capture_output=True, timeout=30, stdin=subprocess.DEVNULL)
+                           capture_output=True, timeout=30, stdin=subprocess.DEVNULL,
+                           creationflags=0x08000000 if os.name == "nt" else 0)
     except Exception as e:
         return f"失败（{e!r}）"
     if r.returncode != 0:
@@ -440,7 +441,7 @@ def codex_app_running() -> bool:
         if os.name == "nt":
             r = subprocess.run(["powershell", "-NoProfile", "-Command",
                                 "Get-CimInstance Win32_Process -Filter \"Name='codex.exe'\" | ForEach-Object CommandLine"],
-                               capture_output=True, timeout=20)
+                               capture_output=True, timeout=20, creationflags=0x08000000)
         else:
             r = subprocess.run(["pgrep", "-af", "codex"], capture_output=True, timeout=10)
         return b"app-server" in r.stdout
@@ -663,7 +664,8 @@ def cmd_codex_worker(args) -> None:
     thread = args.thread
     try:
         p = subprocess.Popen(cmd, cwd=str(ROOT), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT)
+                             stderr=subprocess.STDOUT,
+                             creationflags=0x08000000 if os.name == "nt" else 0)   # CREATE_NO_WINDOW：别弹控制台窗口
         p.stdin.write(task_prompt(task).encode("utf-8"))
         p.stdin.close()
         deadline = now_ts() + WORKER_TIMEOUT
