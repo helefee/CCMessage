@@ -562,7 +562,7 @@ def sessions(root: Path) -> list[dict]:
             x["role_manual"] = True
     return [{k: v for k, v in x.items() if k in ("agent", "sid", "short", "name", "title", "alias", "age", "originator",
                                                   "listening", "owner_name", "managed", "role", "role_note",
-                                                  "role_manual", "role_set")}
+                                                  "role_manual", "role_set", "ignore")}
             for x in rows if x.get("agent") != "user"]
 
 
@@ -822,7 +822,7 @@ PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
 PHONE_GET = {"/", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
              "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout"}
-PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role"}
+PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role", "/api/codex/resume"}
 
 
 def lan_ip() -> str:
@@ -1092,6 +1092,9 @@ class Handler(BaseHTTPRequestHandler):
                 if r.returncode != 0:
                     raise ValueError((out + r.stderr.decode("utf-8", "replace")).strip()[-400:])
                 self._json(json.loads(out.splitlines()[-1]))
+            elif path == "/api/codex/resume":
+                r = run_bus(norm_root(body["root"]), ["codex-resume"])
+                self._json({"ok": r.returncode == 0, "output": (r.stdout + r.stderr).decode("utf-8", "replace").strip()})
             elif path == "/api/role":
                 who = "phone" if getattr(self, "device", None) else "ui"
                 r = run_bus(norm_root(body["root"]), ["--as", f"user:{who}", "set-role",
