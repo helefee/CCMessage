@@ -267,6 +267,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
         <div class="list">
           <button id="mPhone" class="admin">📱 手机端（扫码）…</button>
           <button id="mAdd" class="admin">＋ 添加项目…</button>
+          <button id="mCSync" class="admin">🔄 同步 Claude 会话到当前账号…</button>
           <button id="mInst" class="admin">安装 / 升级 / 修复</button>
           <button id="mTest" class="admin">自检</button>
           <button id="mRm" class="admin">从列表移除</button>
@@ -524,6 +525,24 @@ async function openPhone(){
   }, 1500);
 }
 $("#mPhone").onclick = openPhone;
+$("#mCSync").onclick = async () => {
+  let p; try { p = await api("/api/claude-sync"); } catch(e){ return toast("❌ " + e.message, 5000); }
+  if (!p.ok) return openDlg("同步 Claude 会话", `<div>${esc(p.error)}</div>`);
+  const rows = p.add.slice(0, 60).map(a => `<div class="devrow"><div class="grow"><b>${esc(a.title)}</b>${a.archived?' <span class="badge b-wait">已归档</span>':''}
+      <div style="color:var(--muted);font-size:12px">${a.last?fmtDay(a.last):""} · ${esc(a.cwd||"")}</div></div></div>`).join("");
+  openDlg("🔄 同步 Claude 会话到当前账号", `
+    <div style="font-size:13px;color:var(--muted)">Claude 桌面端的会话列表按「账号 / 组织」分开记，切换账号后旧会话只是不显示，对话记录一直在本机。
+      这里把别的账号里的会话补进当前账号的列表：只补缺的，不覆盖、不删除，写之前整个目录先备份。</div>
+    <div style="margin:10px 0 4px">当前账号 / 组织：<code>${esc(p.target.key.split("/").map(x=>x.slice(0,8)).join(" / "))}</code>（已有 ${p.target.count} 个）</div>
+    <div style="font-weight:600;margin:8px 0 4px">可以补进来 ${p.add.length} 个${p.skip_missing?`（另有 ${p.skip_missing} 个对话记录已不在，跳过）`:""}：</div>
+    ${rows || '<div style="color:var(--muted)">没有要补的，别的账号里的会话都已经在了。</div>'}${p.add.length>60?`<div style="color:var(--muted)">… 还有 ${p.add.length-60} 个</div>`:""}
+    <div style="margin-top:10px;color:var(--warn);font-size:13px">补完要<b>重启 Claude 桌面端</b>才会出现在列表里（它只在启动时读一次）。</div>`,
+    p.add.length ? `<button onclick="closeDlg()">取消</button><button class="primary" id="csGo">补齐 ${p.add.length} 个</button>` : `<button onclick="closeDlg()">关闭</button>`);
+  if ($("#csGo")) $("#csGo").onclick = async () => {
+    try { const r = await api("/api/claude-sync", {}); openDlg("✅ 已补齐", `<div>补进来 ${r.done} 个会话。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
+      <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到。</div>`); }
+    catch(e){ toast("❌ " + e.message, 5000); } };
+};
 
 // ---------- 手机：底部导航 ----------
 let mview = "bus", mUnseen = 0;
