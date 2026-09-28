@@ -96,6 +96,16 @@ Codex 开着才交给 Codex（`task --to codex` 没开会拒绝、退出码 3）
   导出交接 Markdown 到 `<项目>/.msgbus/exports/`：接手说明、导出时现查的 git 状态、最后几轮、完整对话与命令。
   `to-claude` 能转成 Claude Code 会话记录（实验性：只有登录的命令行 Claude Code 能 `--resume`，桌面端列表看不到，且会被 Codex 反导回去）。
 
+## 记忆互通
+
+Claude Code 的记忆按项目存在 `~/.claude/projects/<项目>/memory/`（不分账号，切账号不会丢）；Codex 的记忆是全局的，在 `~/.codex/memories/`。
+两套互相看不到，Codex 自动导入 Claude 会话时也不带记忆。所以装了总线的项目，开会话时会顺带注入对方记忆的位置：
+
+- **Codex 开会话**：「本项目还有 Claude Code 积累的记忆（N 条），索引在 …/MEMORY.md，开工前先读索引，相关条目再读正文」
+- **Claude 开会话**：「Codex 那边的记忆在 …/memory_summary.md、…/MEMORY.md，接手 Codex 做过的活时先翻一眼」
+
+只给位置和提示，不把整份记忆塞进上下文；都叮嘱了「冲突以代码 / 文件现状为准、别改对方的记忆」。
+
 ## 切换 Claude 账号后会话「不见了」
 
 Claude 桌面端的会话列表按「账号 / 组织」分文件夹记（`<Claude 数据目录>/claude-code-sessions/<账号>/<组织>/local_*.json`），

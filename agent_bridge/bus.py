@@ -797,6 +797,42 @@ def rewake_listen(agent: str, sid: str, cwd: str, max_secs: float) -> None:
         time.sleep(1.5)
 
 
+# ---------- 记忆互通：开会话时告诉对方另一边的记忆在哪 ----------
+
+CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
+
+
+def claude_memory_index() -> Path | None:
+    """本项目 Claude Code 的记忆索引：~/.claude/projects/<项目路径换成 - >/memory/MEMORY.md。"""
+    import re
+    p = CLAUDE_HOME / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(ROOT)) / "memory" / "MEMORY.md"
+    return p if p.exists() else None
+
+
+def codex_memory_files() -> list[Path]:
+    d = CODEX_HOME / "memories"
+    return [p for p in (d / "memory_summary.md", d / "MEMORY.md") if p.exists()]
+
+
+def memory_hint(agent: str) -> str | None:
+    """只给位置和一句提示，不把整份记忆塞进上下文（索引动辄上百行）。"""
+    if agent == "codex":
+        idx = claude_memory_index()
+        if not idx:
+            return None
+        n = sum(1 for p in idx.parent.glob("*.md") if p.name != "MEMORY.md")
+        return (f"🧠 本项目还有 Claude Code 积累的记忆（{n} 条踩坑记录与约定），索引在 {idx.as_posix()} 。"
+                f"开工前先读这个索引，跟手上任务相关的条目再打开同目录下对应的 .md 读正文；"
+                f"它和你自己的记忆互补，冲突时以代码 / 文件现状为准。别去改这些文件（那是 Claude 的记忆）。")
+    if agent == "claude":
+        fs = codex_memory_files()
+        if not fs:
+            return None
+        return ("🧠 Codex 那边也有自己的记忆（全局，不分项目）：" + "、".join(p.as_posix() for p in fs) +
+                " 。接手 Codex 做过的活、或碰到 Codex 可能踩过的坑时，先翻一眼；冲突时以代码 / 文件现状为准。别去改这些文件（那是 Codex 的记忆）。")
+    return None
+
+
 def cmd_hook(args) -> None:
     agent = args.agent
     try:
@@ -829,6 +865,9 @@ def cmd_hook(args) -> None:
             except Exception:
                 pass
         ctx.append(usage)
+        mem = memory_hint(agent)
+        if mem:
+            ctx.append(mem)
     if msgs:
         ctx.append(f"📨 收到 {len(msgs)} 条其他会话的消息：\n\n" + render(msgs))
     if not ctx:
