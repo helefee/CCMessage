@@ -1,0 +1,4 @@
+# 统一 LF（start.sh 在 Linux / macOS 上遇到 CRLF 会跑不起来）；Windows 批处理用 CRLF
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
