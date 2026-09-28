@@ -70,7 +70,20 @@
     python .msgbus/bus.py tasks / wait <任务号> / inbox       # 看任务 / 等结果 / 手动收
     python .msgbus/bus.py codex-status                      # Codex 开没开（开着才交给 Codex）
 
-`--to`：`all` | `claude` | `codex`（派活时自动挑一个开着的）| 会话名片段 | `claude:前6位` | `codex:末6位`。
+`--to`：`all` | `claude` | `codex`（派活时总线挑，见下）| `codex:new`（强制新开）| 会话名片段 | `claude:前6位` | `codex:末6位`。
+
+**多个 Claude 会话同时往 Codex 派活不会乱**：
+
+- **谁派的活归谁用**：Codex 对话第一次接了哪个 Claude 会话的活，就记在它名下；别的会话不会往里派
+  （原主 6 小时没动静、或 `bus.py release codex:<末6位>` 后放开）。
+- **手上有活没交的不接新活**（避免两件活挤一个对话、或半路插进正在做的活）。
+- `task --to codex` 挑的顺序：自己名下空闲的 → 没人认领的空闲对话 → **新开一个 Codex 对话**。
+  新开的用后台 `codex exec` 跑（派来的活就是它的第一句），之后派给它的活用 `codex exec resume` 接着做，上下文接得上；
+  没用 `done` 交活就拿它最后一句回复兜底交回。同时最多 4 个（`MSGBUS_MAX_NEW_CODEX`）。
+  沙箱：项目 `.codex/config.toml` 配了 `sandbox_mode` 就照项目的，没配给「工作区可写」（`MSGBUS_CODEX_SANDBOX` 可改）。
+- 每件活开头都带一段隔离说明（这件活独立、先核工作目录 / 分支 / worktree、做完 `done`）。
+- `bus.py codex-status` 列出各 Codex 对话忙闲 / 归谁、这次会交给谁；网页会话列表里也标「归 X」「总线新开」。
+- 硬指定别人名下或正忙的对话会被拒；确实要插队加 `--force`。
 Codex 会话号前几位是时间戳，所以用**末** 6 位。
 
 **项目自己的派活规则**：写在 `<项目>/.msgbus/rules.md`，会话开始时注入它代替缺省规则。

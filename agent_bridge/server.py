@@ -478,7 +478,8 @@ def sessions(root: Path) -> list[dict]:
     now = time.time()
     for x in rows:
         x["listening"] = now - x.get("listening", 0) <= 150
-    return [{k: v for k, v in x.items() if k in ("agent", "sid", "short", "name", "title", "alias", "age", "originator", "listening")}
+    return [{k: v for k, v in x.items() if k in ("agent", "sid", "short", "name", "title", "alias", "age", "originator",
+                                                  "listening", "owner_name", "managed")}
             for x in rows if x.get("agent") != "user"]
 
 
