@@ -902,6 +902,9 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/me":
                 d = getattr(self, "device", None)
                 self._json({"local": self._local(), "device": d and {"id": d["id"], "name": d["name"]}})
+            elif u.path == "/api/claude-sync":
+                from . import claude_sync
+                self._json(claude_sync.plan())
             elif u.path == "/api/transcript":
                 self._json(transcript(norm_root(q["root"]), q["agent"], q["sid"], int(q.get("since", -1))))
             elif u.path == "/api/lan":
@@ -975,6 +978,9 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("缺少会话")
                 self._json(reply(norm_root(body["root"]), body["agent"], body["sid"], text, body.get("kind") or "msg",
                                  "phone" if getattr(self, "device", None) else "ui"))
+            elif path == "/api/claude-sync":
+                from . import claude_sync
+                self._json(claude_sync.run())
             elif path == "/api/pair/new":
                 self._json(new_pair())
             elif path == "/api/lan/stop":

@@ -96,6 +96,19 @@ Codex 开着才交给 Codex（`task --to codex` 没开会拒绝、退出码 3）
   导出交接 Markdown 到 `<项目>/.msgbus/exports/`：接手说明、导出时现查的 git 状态、最后几轮、完整对话与命令。
   `to-claude` 能转成 Claude Code 会话记录（实验性：只有登录的命令行 Claude Code 能 `--resume`，桌面端列表看不到，且会被 Codex 反导回去）。
 
+## 切换 Claude 账号后会话「不见了」
+
+Claude 桌面端的会话列表按「账号 / 组织」分文件夹记（`<Claude 数据目录>/claude-code-sessions/<账号>/<组织>/local_*.json`），
+只显示当前登录的那个；对话内容本身在 `~/.claude/projects/`，本地、不分账号，切账号不会丢。
+
+    python -m agent_bridge claude-sync --list      # 各账号 / 组织下有多少会话
+    python -m agent_bridge claude-sync --dry-run   # 看看会补进来哪些
+    python -m agent_bridge claude-sync             # 补齐到当前账号（最近有会话在写的那个文件夹）
+
+或界面 ⋯ →「🔄 同步 Claude 会话到当前账号」。只补缺的，不覆盖、不删除；对话记录已不在的跳过；写之前整个目录备份到
+`~/.agent-bridge/claude-sync-bak/`。**补完要重启 Claude 桌面端**才会出现在列表里（它只在启动时读一次）。
+会话里绑过的 PR、远程控制等是跟原账号走的，换账号后可能不可用；对话本身能接着聊。
+
 ## 数据放哪
 
 - 程序本体：本仓目录。
