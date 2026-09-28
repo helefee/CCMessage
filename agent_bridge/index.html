@@ -690,7 +690,7 @@ async function pollSessions(){
     const row = x => { const [st, label] = sessState(x), key = keyOf(x.agent, x.short);
       return `<div class="srow" data-key="${esc(key)}" data-sid="${esc(x.sid)}" data-agent="${esc(x.agent)}" title="点击：打开它的会话记录">
         <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${esc(x.alias||x.title||"未命名")}</div>
-        <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.originator==="codex_exec"?" · 无界面":""}</div></div>
+        <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div>
         <button class="to ghost" data-focus="${esc(key)}" title="总线消息里只看和它有关的">筛选</button></div>`; };
     navBadge("sNav", 0);
     const g = a => sessList.filter(x => x.agent === a);

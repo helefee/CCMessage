@@ -448,56 +448,280 @@ def codex_app_running() -> bool:
         return False
 
 
-def codex_availability() -> dict:
-    """能不能把活交给 Codex：桌面端开着 + 这个项目 6 小时内有用户自己开的 Codex 会话。选最近活动的那个。"""
+# ---------- Codex 对话的归属：谁派的活归谁用，忙的不再派，没空闲的就新开一个 ----------
+
+WORKERS = BUS / "workers"                 # 新开 / 续跑的 Codex 对话：<任务号>.json（对话号、进程号、状态）
+MAX_NEW_CODEX = int(os.environ.get("MSGBUS_MAX_NEW_CODEX") or 4)
+WORKER_TIMEOUT = int(os.environ.get("MSGBUS_CODEX_TIMEOUT") or 4 * 3600)
+NO_CODEX_EXIT = 3
+
+
+def results_by_task() -> set[str]:
+    return {m.get("reply_to") for m in iter_log() if m.get("kind") == "result"}
+
+
+def worker_recs() -> list[dict]:
+    WORKERS.mkdir(exist_ok=True)
+    return [r for r in (load_json(p) for p in WORKERS.glob("*.json")) if r.get("task")]
+
+
+def pending_for(codex_sid: str, done: set[str] | None = None) -> list[str]:
+    """这个 Codex 对话手上还没交的活（任务号）。"""
+    done = results_by_task() if done is None else done
+    key = key_of("codex", codex_sid)
+    ids = [m["id"] for m in iter_log() if m.get("kind") == "task" and key in (m.get("to_keys") or [])]
+    ids += [w["task"] for w in worker_recs() if w.get("thread") == codex_sid]
+    return [i for i in dict.fromkeys(ids) if i not in done]
+
+
+def owner_alive(owner_key: str | None) -> bool:
+    if not owner_key:
+        return False
+    rec = load_json(SESS / f"{owner_key}.json")
+    return bool(rec) and now_ts() - rec.get("last_seen", 0) <= ONLINE_WINDOW
+
+
+def codex_slots(me_key: str | None) -> dict:
+    """列出本项目能用的 Codex 对话和各自状态，并替 me_key 挑一个：
+    自己名下空闲的 > 没人认领的空闲对话 > 新开。别人名下（且那个会话还活着）的、手上有活的都不挑。"""
     discover_codex()
-    t = now_ts()
-    sess = sorted((r for r in all_sessions()
-                   if r["agent"] == "codex" and codex_originator(r) not in (None, "codex_exec")
-                   and t - r.get("last_seen", 0) <= ONLINE_WINDOW),
-                  key=lambda r: -r.get("last_seen", 0))
-    app = codex_app_running()
-    pick = sess[0] if (app and sess) else None
-    if pick:
-        reason = f"Codex 开着，交给 {display_name(pick)}"
-    elif not app:
-        reason = "Codex 桌面端没开"
-    else:
-        reason = "Codex 开着，但这个项目 6 小时内没有 Codex 会话"
-    return {"available": bool(pick), "app_running": app, "session": pick, "reason": reason,
-            "candidates": [display_name(r) for r in sess]}
+    t, done = now_ts(), results_by_task()
+    rows = []
+    for r in sorted((r for r in all_sessions() if r["agent"] == "codex"), key=lambda r: -r.get("last_seen", 0)):
+        orig = r.get("originator") or codex_originator(r)
+        managed = bool(r.get("managed"))
+        if orig in (None,) and not managed:
+            continue
+        if orig == "codex_exec" and not managed:
+            continue                      # 不是总线开的无界面对话：没人续跑它，不派
+        if not managed and t - r.get("last_seen", 0) > ONLINE_WINDOW:
+            continue
+        owner = r.get("owner") if owner_alive(r.get("owner")) else None
+        busy = pending_for(r["sid"], done)
+        state = ("忙" if busy else "空闲")
+        rows.append({"rec": r, "owner": owner, "busy": busy, "state": state, "managed": managed,
+                     "mine": bool(me_key and owner == me_key)})
+    pick = next((x for x in rows if x["mine"] and not x["busy"]), None) \
+        or next((x for x in rows if not x["owner"] and not x["busy"]), None)
+    running_new = sum(1 for w in worker_recs() if w.get("state") == "running" and pid_alive(w.get("pid", 0)))
+    return {"rows": rows, "pick": pick, "running_new": running_new}
+
+
+def claim(rec: dict, owner_key: str) -> None:
+    p = SESS / f"{key_of('codex', rec['sid'])}.json"
+    cur = load_json(p) or rec
+    cur.update({"owner": owner_key, "owner_since": now_ts()})
+    save_json(p, cur)
+
+
+def owner_name(owner_key: str | None) -> str:
+    if not owner_key:
+        return ""
+    return display_name(load_json(SESS / f"{owner_key}.json") or {"agent": owner_key.split("-", 1)[0],
+                                                                   "sid": owner_key.split("-", 1)[1]})
 
 
 def cmd_codex_status(args) -> None:
-    a = codex_availability()
+    app = codex_app_running()
+    try:
+        me_key = key_of(*detect_self(args.as_))
+    except SystemExit:
+        me_key = None
+    s = codex_slots(me_key)
     if args.json:
-        s = a["session"]
-        print(json.dumps(dict(a, session=(display_name(s) if s else None),
-                              target=(f"codex:{short_id(s)}" if s else None)), ensure_ascii=False))
+        print(json.dumps({"available": app, "app_running": app,
+                          "reason": "Codex 开着" if app else "Codex 桌面端没开",
+                          "pick": s["pick"] and display_name(s["pick"]["rec"]),
+                          "will": ("不派（Codex 没开）" if not app else
+                                   f"交给 {display_name(s['pick']['rec'])}" if s["pick"] else
+                                   ("新开一个 Codex 对话" if s["running_new"] < MAX_NEW_CODEX else "新开的对话已满，留给 Claude")),
+                          "rows": [{"name": display_name(x["rec"]), "short": short_id(x["rec"]), "state": x["state"],
+                                    "busy": x["busy"], "owner": owner_name(x["owner"]), "mine": x["mine"],
+                                    "managed": x["managed"]} for x in s["rows"]],
+                          "running_new": s["running_new"], "max_new": MAX_NEW_CODEX}, ensure_ascii=False))
         return
-    print(("✓ 可以交给 Codex：" if a["available"] else "✗ 不交给 Codex：") + a["reason"])
-    if not a["available"]:
-        print("  → 这件活留给 Claude：用自带子代理，或 task --to claude:<会话> 派给别的 Claude 会话。")
+    if not app:
+        print("✗ Codex 桌面端没开：不交给 Codex，这件活留给 Claude（自带子代理，或 task --to claude:<会话>）。")
+        return
+    print("✓ Codex 开着。本项目的 Codex 对话：" if s["rows"] else "✓ Codex 开着，本项目还没有 Codex 对话（派活时会新开一个）。")
+    for x in s["rows"]:
+        who = f"归 {owner_name(x['owner'])}" + ("（就是你）" if x["mine"] else "") if x["owner"] else "没人认领"
+        print(f"  {display_name(x['rec'])}  {x['state']}{'（' + '、'.join('#' + i for i in x['busy']) + '）' if x['busy'] else ''}"
+              f"  ·  {who}{'  ·  总线新开' if x['managed'] else ''}")
+    if s["pick"]:
+        print(f"→ 现在派活会交给：{display_name(s['pick']['rec'])}")
+    elif s["running_new"] < MAX_NEW_CODEX:
+        print("→ 没有你能用的空闲对话，现在派活会新开一个 Codex 对话")
+    else:
+        print(f"→ 新开的 Codex 对话已经有 {s['running_new']} 个在跑（上限 {MAX_NEW_CODEX}），这件活留给 Claude")
 
 
-NO_CODEX_EXIT = 3
+def cmd_release(args) -> None:
+    """放掉一个 Codex 对话的归属，别的会话就能派了。"""
+    hits = [r for r in all_sessions() if r["agent"] == "codex" and match_target(args.target, r)]
+    if len(hits) != 1:
+        sys.exit(f"「{args.target}」对上了 {len(hits)} 个 Codex 对话，写具体些（codex:末6位）")
+    p = SESS / f"{key_of('codex', hits[0]['sid'])}.json"
+    rec = load_json(p)
+    rec.pop("owner", None)
+    rec.pop("owner_since", None)
+    save_json(p, rec)
+    print(f"已放开：{display_name(rec)}")
+
+
+def task_prompt(msg: dict) -> str:
+    return (f"你是被消息总线派活的 Codex 对话，这个对话归「{msg['from']['name']}」使用。\n"
+            f"任务 #{msg['id']}：\n{msg['text']}\n\n"
+            f"规矩：这件活和本对话里之前的活是**独立**的 —— 先确认工作目录、分支、worktree 再动手，别沿用上一件活的假设；"
+            f"遵守项目的 AGENTS.md / CLAUDE.md；会动共享资源（生产 / 测试服、主干分支、别人的分支、共享配置）的，先用 --fail 说明原因，别硬做。\n"
+            f"做完必须运行：python {REL} done {msg['id']} \"结果摘要（交回什么：PR 号 / 测试结果 / 结论+出处）\"；"
+            f"做不了就 python {REL} done {msg['id']} --fail \"原因\"。然后结束这一轮。")
+
+
+def start_worker(msg: dict, owner_key: str, thread: str | None) -> str:
+    """后台起一个进程跑这件活：thread=None 新开对话，否则接着那个对话（codex exec resume）。"""
+    import subprocess
+    WORKERS.mkdir(exist_ok=True)
+    save_json(WORKERS / f"{msg['id']}.json", {"task": msg["id"], "owner": owner_key, "thread": thread,
+                                              "state": "starting", "created": now_ts()})
+    flags = 0
+    if os.name == "nt":
+        flags = 0x00000008 | 0x00000200 | 0x08000000     # DETACHED_PROCESS | NEW_PROCESS_GROUP | NO_WINDOW
+    env = dict(os.environ, PYTHONUTF8="1")
+    for k in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"):
+        env.pop(k, None)
+    args = [sys.executable, str(BUS / "bus.py"), "codex-worker", msg["id"], "--owner", owner_key]
+    if thread:
+        args += ["--thread", thread]
+    subprocess.Popen(args, cwd=str(ROOT), env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                     stderr=subprocess.DEVNULL, creationflags=flags, close_fds=True)
+    return "已接着这个对话跑（codex exec resume）" if thread else "已新开一个 Codex 对话来做"
+
+
+def cmd_codex_worker(args) -> None:
+    """后台进程：跑 codex exec / exec resume；拿到新对话号立刻登记归属；结束后没交活就兜底交回。"""
+    import subprocess
+    task = find_task(args.id)
+    wp = WORKERS / f"{args.id}.json"
+    w = load_json(wp)
+    exe = codex_exe()
+    if not task or not exe:
+        return
+    last = WORKERS / f"{args.id}.last.txt"
+    log = WORKERS / f"{args.id}.log"
+    # 沙箱：项目 .codex/config.toml 自己配了 sandbox_mode 就照项目的；没配时 codex exec 缺省只读，
+    # 连 done 都写不进信箱，所以给「工作区可写」。MSGBUS_CODEX_SANDBOX 可强制指定。
+    sb = os.environ.get("MSGBUS_CODEX_SANDBOX")
+    if not sb:
+        try:
+            cfg = (ROOT / ".codex" / "config.toml").read_text(encoding="utf-8")
+        except Exception:
+            cfg = ""
+        sb = None if "sandbox_mode" in cfg else "workspace-write"
+    sbx = ["-c", f'sandbox_mode="{sb}"'] if sb else []     # exec resume 不认 -s，-c 两边都认
+    if args.thread:
+        cmd = [exe, "exec", "resume", args.thread, "--skip-git-repo-check", *sbx, "--json", "-o", str(last), "-"]
+    else:
+        cmd = [exe, "exec", "--skip-git-repo-check", "-C", str(ROOT), *sbx, "--json", "-o", str(last), "-"]
+    w.update({"state": "running", "pid": os.getpid(), "started": now_ts()})
+    save_json(wp, w)
+    thread = args.thread
+    try:
+        p = subprocess.Popen(cmd, cwd=str(ROOT), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT)
+        p.stdin.write(task_prompt(task).encode("utf-8"))
+        p.stdin.close()
+        deadline = now_ts() + WORKER_TIMEOUT
+        with open(log, "wb") as lf:
+            for line in p.stdout:
+                lf.write(line)
+                if not thread and b'"thread_id"' in line:
+                    try:
+                        thread = json.loads(line).get("thread_id")
+                    except Exception:
+                        thread = None
+                    if thread:
+                        # 新对话一建好就登记：归派活的会话、标成总线开的
+                        rp = SESS / f"{key_of('codex', thread)}.json"
+                        rec = load_json(rp)
+                        rec.update({"agent": "codex", "sid": thread, "cwd": str(ROOT), "originator": "codex_exec",
+                                    "managed": True, "owner": args.owner, "owner_since": now_ts(),
+                                    "title": rec.get("title") or f"（总线新开）{task['text'].splitlines()[0][:24]}",
+                                    "last_seen": now_ts(), "first_seen": now_ts()})
+                        save_json(rp, rec)
+                        w.update({"thread": thread})
+                        save_json(wp, w)
+                if now_ts() > deadline:
+                    p.kill()
+                    break
+        code = p.wait()
+    except Exception as e:
+        code = f"起不来：{e!r}"
+    if thread:
+        touch_presence("codex", thread, str(ROOT), None, force=True)
+    w.update({"state": "finished", "exit": code, "ended": now_ts(), "thread": thread})
+    save_json(wp, w)
+    if task["id"] in results_by_task():
+        return
+    # 没用 done 交活：拿它最后一句回复兜底交回；连这个都没有就报没做成
+    me = {"agent": "codex", "sid": thread or f"worker-{task['id']}"}
+    me["name"] = display_name(load_json(SESS / f"{key_of('codex', me['sid'])}.json") or me)
+    text = last.read_text(encoding="utf-8", errors="replace").strip() if last.exists() else ""
+    if code == 0 and text:
+        body = "（Codex 没用 done 交活，以下是它这一轮最后的回复）\n" + text
+    else:
+        body = f"【没做成】Codex 进程退出码 {code}，没交活。日志：{log}"
+    f = task["from"]
+    post(me["agent"], me["sid"], me, f"{f['agent']}:{short_id(f)}", body, kind="result", reply_to=task["id"],
+         to_keys=[key_of(f["agent"], f["sid"])])
 
 
 def cmd_task(args) -> None:
     agent, sid = detect_self(args.as_)
     me = touch_presence(agent, sid, os.getcwd(), None, force=True)
-    to, to_keys = args.to, None
-    if to.lower() == "codex" or to.lower().startswith("codex:"):
+    me_key = key_of(agent, sid)
+    to, to_keys, how = args.to, None, None
+    tl = to.lower()
+    if tl in ("codex", "codex:new") or tl.startswith("codex:"):
         # 交给 Codex 前先看它开没开：没开就不交，退出码 3，调用方改交给 Claude
-        a = codex_availability()
-        if not a["available"]:
-            print(f"✗ 没派：{a['reason']}。这件活留给 Claude 做（自带子代理，或 task --to claude:<会话>）。")
+        if not codex_app_running():
+            print("✗ 没派：Codex 桌面端没开。这件活留给 Claude 做（自带子代理，或 task --to claude:<会话>）。")
             sys.exit(NO_CODEX_EXIT)
-        if to.lower() == "codex":       # 派活只给一个：这个项目最近活动的 Codex 会话
-            s = a["session"]
-            to, to_keys = f"codex:{short_id(s)}", [key_of("codex", s["sid"])]
-    msg = post(agent, sid, me, to, read_text(args.text), kind="task",
-               multi=args.multi, no_wake=args.no_wake, to_keys=to_keys)
+        s = codex_slots(me_key)
+        if tl == "codex" and s["pick"]:
+            how = ("existing", s["pick"]["rec"])
+        elif tl in ("codex", "codex:new"):
+            if s["running_new"] >= MAX_NEW_CODEX:
+                print(f"✗ 没派：没有你能用的空闲 Codex 对话，新开的也已经有 {s['running_new']} 个在跑（上限 {MAX_NEW_CODEX}）。"
+                      f"这件活留给 Claude，或等一个交完再派。")
+                sys.exit(NO_CODEX_EXIT)
+            how = ("new", None)
+        else:
+            hit = next((x for x in s["rows"] if match_target(to, x["rec"])), None)
+            if not hit:
+                sys.exit(f"没找到 Codex 对话「{to}」。先跑 python {REL} codex-status 看看。")
+            if hit["owner"] and not hit["mine"] and not args.force:
+                sys.exit(f"✗ 没派：{display_name(hit['rec'])} 归「{owner_name(hit['owner'])}」在用。"
+                         f"用 task --to codex 让总线挑一个（没有就新开）；确实要插队加 --force。")
+            if hit["busy"] and not args.force:
+                sys.exit(f"✗ 没派：{display_name(hit['rec'])} 手上还有没交的活（{'、'.join('#' + i for i in hit['busy'])}）。"
+                         f"用 task --to codex 让总线挑一个空闲的或新开；确实要排在后面加 --force。")
+            how = ("existing", hit["rec"])
+        if how[0] == "existing":
+            to, to_keys = f"codex:{short_id(how[1])}", [key_of("codex", how[1]["sid"])]
+        else:
+            to, to_keys = "codex:new", []
+    text = read_text(args.text)
+    managed_target = how and how[0] == "existing" and how[1].get("managed")
+    msg = post(agent, sid, me, to, text, kind="task", multi=args.multi,
+               no_wake=args.no_wake or bool(managed_target) or bool(how and how[0] == "new"), to_keys=to_keys)
+    if how:
+        if how[0] == "existing":
+            claim(how[1], me_key)
+            if managed_target:           # 总线开的对话没有界面，靠续跑把活交给它
+                print("  " + start_worker(msg, me_key, how[1]["sid"]))
+        else:
+            print("  " + start_worker(msg, me_key, None))
     print(f"任务编号：{msg['id']}。对方做完会用 done 回报；等结果：python {REL} wait {msg['id']}")
     if args.wait:
         wait_result(msg["id"], args.wait)
@@ -678,7 +902,8 @@ def cmd_who(args) -> None:
     except SystemExit:
         agent = sid = None
     if args.json:
-        live = [dict(r, short=short_id(r), name=display_name(r), age=int(t - r.get("last_seen", 0)))
+        live = [dict(r, short=short_id(r), name=display_name(r), age=int(t - r.get("last_seen", 0)),
+                     owner_name=owner_name(r.get("owner")) if r["agent"] == "codex" and owner_alive(r.get("owner")) else "")
                 for r in rows if args.all or t - r.get("last_seen", 0) <= ONLINE_WINDOW]
         print(json.dumps(live, ensure_ascii=False))
         return
@@ -690,6 +915,10 @@ def cmd_who(args) -> None:
         mark = "  ← 你" if (r["agent"], r["sid"]) == (agent, sid) else ""
         if t - r.get("listening", 0) <= LISTEN_FRESH:
             mark += "  〔待命中〕"
+        if r["agent"] == "codex" and owner_alive(r.get("owner")):
+            mark += f"  〔归 {owner_name(r['owner'])}〕"
+        if r.get("managed"):
+            mark += "  〔总线新开〕"
         print(f"{display_name(r):<50} 上次活动 {int(age // 60):>4} 分钟前{mark}")
         shown += 1
     if not shown:
@@ -726,8 +955,9 @@ USAGE = (
     "看任务：python {rel} tasks；等结果：python {rel} wait <任务号>；交活：python {rel} done <任务号> \"结果\"（--fail 表示没做成）。\n"
     "当干活的一方：Claude 会话一闲下来就由 Stop 钩子自动在后台待命，有消息会把你叫醒（没装 Stop 钩子的项目，"
     "可以用后台命令挂 python {rel} listen --once 代替）；Codex 会话会被 codex queue 自动叫醒。\n"
-    "交给 Codex 前先看它开没开：python {rel} codex-status —— 开着就用 task --to codex（自动挑本项目最近的 Codex 会话）；"
-    "没开 task 会拒绝（退出码 3），这件活就留给 Claude（自带子代理，或派给别的 Claude 会话），不要等 Codex。\n"
+    "派给 Codex 用 task --to codex：总线先挑你名下空闲的 Codex 对话，再挑没人认领的空闲对话，都没有就新开一个 Codex 对话；"
+    "派过你活的对话归你用，别的会话不会往里派，手上有活没交的也不会再接新活。python {rel} codex-status 看各对话忙闲 / 归属；"
+    "Codex 桌面端没开时 task 会拒绝（退出码 3），这件活就留给 Claude（自带子代理，或派给别的 Claude 会话）。\n"
     "什么时候派活（项目 AGENTS.md 里有「什么时候派活」就以它为准）：适合派 —— 可并行、不改同一批文件的独立单元；"
     "换一个模型交叉复核 diff；耗时的验证（全量测试、长探针）；调研（交回结论+出处）。不派 —— 动共享资源（生产 / 测试服、主干分支、别人的分支、共享配置）、"
     "两边会改同一批文件、要用户拍板的、几分钟能自己做完的。派活写清：做什么、在哪个分支/目录、交回什么、不许碰什么。\n"
@@ -893,6 +1123,7 @@ def main() -> None:
     tk.add_argument("--multi", action="store_true")
     tk.add_argument("--no-wake", action="store_true")
     tk.add_argument("--wait", type=float, default=0, help="原地等结果最多多少秒")
+    tk.add_argument("--force", action="store_true", help="指定的 Codex 对话归别人 / 正忙时也硬派")
     tk.add_argument("text")
     dn = sub.add_parser("done", help="交活：回报任务结果")
     dn.add_argument("id")
@@ -903,8 +1134,14 @@ def main() -> None:
     ts.add_argument("--all", action="store_true", help="含一天前已结束的")
     ts.add_argument("--json", action="store_true")
     ts.add_argument("--limit", type=int, default=30)
-    cs = sub.add_parser("codex-status", help="看现在能不能把活交给 Codex（桌面端开着 + 本项目有 Codex 会话）")
+    cs = sub.add_parser("codex-status", help="Codex 开没开、本项目各 Codex 对话忙不忙 / 归谁、派活会交给谁")
     cs.add_argument("--json", action="store_true")
+    rl = sub.add_parser("release", help="放开一个 Codex 对话的归属，别的会话就能派了")
+    rl.add_argument("target")
+    cw = sub.add_parser("codex-worker", help="（内部）后台跑一件派给 Codex 的活")
+    cw.add_argument("id")
+    cw.add_argument("--owner", required=True)
+    cw.add_argument("--thread")
     wt = sub.add_parser("wait", help="等某个任务的结果")
     wt.add_argument("id")
     wt.add_argument("--timeout", type=float, default=1800)
@@ -938,7 +1175,8 @@ def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     {"send": cmd_send, "inbox": cmd_inbox, "who": cmd_who, "name": cmd_name, "show": cmd_show,
      "task": cmd_task, "done": cmd_done, "tasks": cmd_tasks, "wait": cmd_wait,
-     "listen": cmd_listen, "codex-status": cmd_codex_status}[args.cmd](args)
+     "listen": cmd_listen, "codex-status": cmd_codex_status, "release": cmd_release,
+     "codex-worker": cmd_codex_worker}[args.cmd](args)
 
 
 if __name__ == "__main__":
