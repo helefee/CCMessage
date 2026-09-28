@@ -1,6 +1,6 @@
 # CCMessage（agent-bridge）
 
-仓库：https://github.com/helefee/CCMessage ・ 许可证：[MIT](LICENSE)
+仓库：https://github.com/helefee/CCMessage ・ 许可证：[MIT](LICENSE) ・ **部署到自己的项目：看 [DEPLOY.md](DEPLOY.md)**
 
 让同一个项目里同时开着的 **Claude Code** 会话和 **Codex** 会话互相发消息、互相派活、互相交接，
 带一个本地网页管理界面（手机扫码也能用）。
