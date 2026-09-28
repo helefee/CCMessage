@@ -52,7 +52,19 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .banner{grid-column:1/-1;padding:6px 14px;font-size:13px;background:var(--warn-weak);color:var(--warn);border-bottom:1px solid var(--line)}
 
 /* 主体 */
-.body{display:grid;grid-template-columns:1fr 300px;min-height:0}
+.body{display:grid;grid-template-columns:250px 1fr 280px;min-height:0}
+.sideL{border-left:0!important;border-right:1px solid var(--line)}
+.winpos{font-weight:400;font-size:11.5px;color:var(--faint)}
+/* 网页里的信件动画 */
+.fly{position:fixed;left:0;top:0;z-index:60;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px;will-change:transform,opacity}
+.fly .env{width:44px;height:30px;border-radius:5px;background:#fffdf7;border:2px solid #b9b0a0;position:relative;box-shadow:0 4px 12px rgba(0,0,0,.25);overflow:hidden}
+.fly .env::before{content:"";position:absolute;left:-2px;right:-2px;top:-2px;height:22px;background:#f3ede1;border:2px solid #b9b0a0;
+  clip-path:polygon(0 0,100% 0,50% 100%)}
+.fly .seal{position:absolute;left:50%;top:9px;width:13px;height:13px;margin-left:-6.5px;border-radius:50%;z-index:1;color:#fff;font-size:8px;line-height:13px;text-align:center;font-weight:700}
+.fly .lbl{font-size:11px;font-weight:700;padding:1px 7px;border-radius:9px;color:#fff;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.srow.landed,.card.landed h3{animation:landed 1.3s ease-out}
+@keyframes landed{0%{background:var(--accent-weak);box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:0 0 0 0 transparent}}
+@media (max-width:1150px) and (min-width:861px){.body{grid-template-columns:205px 1fr 235px}}
 .center{display:grid;grid-template-rows:auto 1fr auto;min-height:0;position:relative}
 .filters{display:flex;gap:6px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--line2);flex-wrap:wrap}
 .chip{font-size:12.5px;padding:2px 10px;border-radius:20px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
@@ -195,7 +207,8 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
   .side{border:0;display:none;min-height:0}
   body.m-sess .side,body.m-tasks .side{display:block}
   body.m-sess .center,body.m-tasks .center{display:none}
-  body.m-sess #cardTasks,body.m-tasks #cardSess{display:none}
+  body.m-sess #cardTasks,body.m-tasks .sesscard{display:none}
+  .sideL{display:none!important}
   .card{border:0;padding:12px 14px}
   .card h3{font-size:14px}
   .srow{padding:11px 8px}
@@ -273,8 +286,9 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
           <button id="mRm" class="admin">从列表移除</button>
           <button id="mUninst" class="danger admin">卸载…</button>
           <hr style="border:0;border-top:1px solid var(--line);margin:4px 0">
-          <button id="mFx" class="admin">信件动画：…</button>
+          <button id="mFx" class="admin">桌面信件动画：…</button>
           <button id="mFxTest" class="admin">试放信件动画</button>
+          <button id="mWebFx">网页信件动画：开 ✓</button>
           <button id="mTheme">切换深浅色</button>
         </div>
       </div>
@@ -282,6 +296,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
   </header>
 
   <div class="body">
+    <aside class="side sideL" id="colL"></aside>
     <section class="center">
       <div>
         <div class="vtabs" id="vtabs"></div>
@@ -315,11 +330,16 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
       </div>
     </section>
 
-    <aside class="side">
-      <div class="card" id="cardSess">
-        <h3>会话 <span id="sessCount"></span><span class="sp"></span></h3>
+    <aside class="side" id="colR">
+      <div class="card sesscard" id="cardClaude">
+        <h3><span class="a-claude">Claude</span> 会话 <span id="nClaude"></span><span class="sp winpos" id="posClaude"></span></h3>
+        <div id="sessClaude"><div class="grp">加载中…</div></div>
+        <div class="legend"><span><i class="dot d-stand"></i>待命</span><span><i class="dot d-active"></i>活跃</span><span><i class="dot d-idle"></i>空闲</span></div>
+      </div>
+      <div class="card sesscard" id="cardCodex">
+        <h3><span class="a-codex">Codex</span> 会话 <span id="nCodex"></span><span class="sp winpos" id="posCodex"></span></h3>
         <div id="codexSt" class="grp" style="margin:0 0 4px"></div>
-        <div id="sess"><div class="grp">加载中…</div></div>
+        <div id="sessCodex"><div class="grp">加载中…</div></div>
         <div class="legend"><span><i class="dot d-stand"></i>待命</span><span><i class="dot d-active"></i>活跃</span><span><i class="dot d-idle"></i>空闲</span></div>
       </div>
       <div class="card" id="cardTasks">
@@ -469,9 +489,13 @@ $("#mTheme").onclick = () => { const r=document.documentElement; const dark = r.
   r.dataset.theme = dark ? "light" : "dark"; store.set("msgbus.theme", r.dataset.theme); };
 { const t = store.get("msgbus.theme"); if (t) document.documentElement.dataset.theme = t; }
 let fxOn = true;
-async function loadFx(){ try { fxOn = (await api("/api/settings")).fx; } catch(e) {} $("#mFx").textContent = "信件动画：" + (fxOn ? "开 ✓" : "关"); }
+async function loadFx(){ try { fxOn = (await api("/api/settings")).fx; } catch(e) {} $("#mFx").textContent = "桌面信件动画：" + (fxOn ? "开 ✓" : "关"); }
 $("#mFx").onclick = async () => { try { fxOn = (await api("/api/settings", {fx: !fxOn})).fx; toast("信件动画已" + (fxOn ? "打开" : "关闭")); } catch(e){ toast("❌ " + e.message); } loadFx(); };
-$("#mFxTest").onclick = async () => { await api("/api/fx/test", {dir:"c2x", kind:"task"}); setTimeout(() => api("/api/fx/test", {dir:"x2c", kind:"result"}), 300); toast("看桌面：Claude → Codex，再 Codex → Claude"); };
+$("#mFxTest").onclick = async () => { await api("/api/fx/test", {dir:"c2x", kind:"task"}); setTimeout(() => api("/api/fx/test", {dir:"x2c", kind:"result"}), 300);
+  const c = sessList.find(s => s.agent === "claude"), x = sessList.find(s => s.agent === "codex");
+  if (c && x) { flyMail({from:{agent:"claude", sid:c.sid}, to_keys:["codex-" + x.sid], kind:"task"});
+    setTimeout(() => flyMail({from:{agent:"codex", sid:x.sid}, to_keys:["claude-" + c.sid], kind:"result"}), 1400); }
+  toast("看桌面和网页：Claude → Codex，再 Codex → Claude"); };
 loadFx();
 
 // ---------- 手机端 ----------
@@ -525,6 +549,8 @@ async function openPhone(){
   }, 1500);
 }
 $("#mPhone").onclick = openPhone;
+$("#mWebFx").onclick = () => { setWebFx(!webFx); toast("网页信件动画已" + (webFx ? "打开" : "关闭")); };
+setTimeout(() => setWebFx(webFx), 0);
 $("#mCSync").onclick = async () => {
   let p; try { p = await api("/api/claude-sync"); } catch(e){ return toast("❌ " + e.message, 5000); }
   if (!p.ok) return openDlg("同步 Claude 会话", `<div>${esc(p.error)}</div>`);
@@ -644,6 +670,7 @@ async function pollMessages(){
     if (r.reset) msgs = [];
     if (r.reset || r.messages.length) {
       msgs = msgs.concat(r.messages).slice(-400);
+      if (!r.reset) r.messages.forEach(flyMail);
       if (!r.reset && mview !== "bus") { mUnseen += r.messages.length; navBadge("bNav", mUnseen); }
       if (!r.reset && !atBottom) unseen += r.messages.length;
       renderStream(!r.reset);
@@ -667,8 +694,10 @@ async function pollSessions(){
         <button class="to ghost" data-focus="${esc(key)}" title="总线消息里只看和它有关的">筛选</button></div>`; };
     navBadge("sNav", 0);
     const g = a => sessList.filter(x => x.agent === a);
-    $("#sess").innerHTML = ["claude","codex"].map(a => `<div class="grp">${a==="claude"?"Claude":"Codex"} · ${g(a).length}</div>${g(a).map(row).join("") || '<div class="grp">无</div>'}`).join("");
-    $("#sessCount").textContent = sessList.length ? `（${sessList.length}）` : "";
+    $("#sessClaude").innerHTML = g("claude").map(row).join("") || '<div class="grp">没有在线的 Claude 会话</div>';
+    $("#sessCodex").innerHTML = g("codex").map(row).join("") || '<div class="grp">没有在线的 Codex 会话</div>';
+    $("#nClaude").textContent = g("claude").length ? `（${g("claude").length}）` : "";
+    $("#nCodex").textContent = g("codex").length ? `（${g("codex").length}）` : "";
     $$(".srow").forEach(el => el.onclick = e => {
       if (e.target.dataset.focus) { showBus(); if (isMobile()) setM("bus"); focusKey = focusKey === el.dataset.key ? null : el.dataset.key; renderFocus(); renderStream(); return; }
       const x = sessList.find(s => s.sid === el.dataset.sid && s.agent === el.dataset.agent); if (x) openSession(x);
@@ -693,6 +722,79 @@ function fillTo(){
   if ([...$("#to").options].some(o => o.value === keep)) $("#to").value = keep;
 }
 function setTo(v){ if (![...$("#to").options].some(o => o.value === v)) $("#to").insertAdjacentHTML("beforeend", `<option value="${esc(v)}">${esc(v)}</option>`); $("#to").value = v; }
+
+// ---------- 按两个桌面窗口的左右位置摆放会话列表 ----------
+let claudeSide = store.get("msgbus.claudeSide") || "left", layoutSrc = "default";
+function placeCards(){
+  const cl = $("#cardClaude"), cx = $("#cardCodex"), L = $("#colL"), R = $("#colR"), tasks = $("#cardTasks");
+  if (isMobile()) { R.insertBefore(cl, tasks); R.insertBefore(cx, tasks); }
+  else if (claudeSide === "left") { L.appendChild(cl); R.insertBefore(cx, R.firstChild); }
+  else { L.appendChild(cx); R.insertBefore(cl, R.firstChild); }
+  const tip = layoutSrc === "windows" ? "跟着窗口：" : "缺省：";
+  $("#posClaude").textContent = isMobile() ? "" : (layoutSrc === "windows" ? "🖥 窗口在" + (claudeSide==="left"?"左":"右") : "");
+  $("#posCodex").textContent = isMobile() ? "" : (layoutSrc === "windows" ? "🖥 窗口在" + (claudeSide==="left"?"右":"左") : "");
+}
+async function pollLayout(){
+  try { const l = await api("/api/layout");
+    if (l.claude_side !== claudeSide || l.source !== layoutSrc) { claudeSide = l.claude_side; layoutSrc = l.source; store.set("msgbus.claudeSide", claudeSide); placeCards(); }
+  } catch(e) {}
+}
+matchMedia("(max-width:860px)").addEventListener("change", placeCards);
+placeCards(); pollLayout(); setInterval(pollLayout, 4000);
+
+// ---------- 网页里的信件动画：从发件会话那一栏飞到收件会话那一栏 ----------
+let webFx = store.get("msgbus.webfx") !== "0", flying = 0;
+const FX_COLOR = {claude:"#d97757", codex:"#10a37f", user:"#6b5bd2"};
+const FX_KIND = {task:"任", result:"结", msg:"信"};
+function shortOfSid(agent, sid){ return agent === "codex" ? String(sid).slice(-6) : String(sid).slice(0,6); }
+function visibleEl(el){ if (!el) return null; const r = el.getBoundingClientRect(); return (r.width && r.height && el.offsetParent !== null) ? el : null; }
+function edgePoint(agent){        // 那一栏看不见（手机）时：按它在哪一侧，从屏幕边上进出
+  const left = (agent === "claude") === (claudeSide === "left");
+  return {x: left ? 26 : innerWidth - 26, y: innerHeight * 0.45};
+}
+function pointOf(el, agent){
+  if (!el) return edgePoint(agent);
+  const r = el.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2};
+}
+function rowFor(agent, sid){ return visibleEl($(`.srow[data-agent="${agent}"][data-sid="${CSS.escape(sid)}"]`)); }
+function cardFor(agent){ return visibleEl($(agent === "claude" ? "#cardClaude h3" : "#cardCodex h3")); }
+function mailTargets(m){
+  // 收件：[agent, sid|null]；群发 / 按类别发的落在那一栏的标题上
+  if (m.to_keys && m.to_keys.length) return m.to_keys.map(k => { const i = k.indexOf("-"); return [k.slice(0, i), k.slice(i + 1)]; });
+  const to = String(m.to || "").toLowerCase();
+  if (to === "all") return [["claude", null], ["codex", null]];
+  if (to === "claude" || to === "codex") return [[to, null]];
+  return [];
+}
+function flyMail(m){
+  if (!webFx || flying > 5 || String(m.from.sid).startsWith("selftest-")) return;
+  const fa = m.from.agent, kind = m.kind || "msg";
+  const src = fa === "user" ? (visibleEl($("#sendBtn")) || null) : (rowFor(fa, m.from.sid) || cardFor(fa));
+  const p0 = fa === "user" && !src ? {x: innerWidth / 2, y: innerHeight - 40} : pointOf(src, fa);
+  mailTargets(m).filter(([a]) => a === "claude" || a === "codex").filter(([a, s]) => !(a === fa && s === m.from.sid)).slice(0, 4)
+    .forEach(([a, s], i) => setTimeout(() => {
+      const dstEl = (s && rowFor(a, s)) || cardFor(a), p2 = pointOf(dstEl, a);
+      if (Math.hypot(p2.x - p0.x, p2.y - p0.y) < 30) return;
+      const color = FX_COLOR[fa] || FX_COLOR.user;
+      const who = fa === "user" ? "你" : (fa === "claude" ? "Claude" : "Codex");
+      const el = document.createElement("div"); el.className = "fly";
+      el.innerHTML = `<div class="env"><div class="seal" style="background:${color}">${FX_KIND[kind]||"信"}</div></div>
+        <div class="lbl" style="background:${color}">${who} → ${a === "claude" ? "Claude" : "Codex"}${kind==="task"?" · 任务":kind==="result"?" · 结果":""}</div>`;
+      document.body.appendChild(el); flying++;
+      const w = el.offsetWidth, h = el.offsetHeight;
+      const p1 = {x: (p0.x + p2.x) / 2, y: Math.max(h + 30, Math.min(p0.y, p2.y) - Math.max(60, Math.hypot(p2.x - p0.x, p2.y - p0.y) * 0.3))};   // 弧顶别冲出页面
+      const frames = [];
+      for (let k = 0; k <= 24; k++) { const t = k / 24, u = 1 - t;
+        const x = u*u*p0.x + 2*u*t*p1.x + t*t*p2.x - w / 2, y = u*u*p0.y + 2*u*t*p1.y + t*t*p2.y - h / 2;
+        frames.push({transform: `translate(${x}px,${y}px) rotate(${(t - .5) * 16}deg) scale(${.85 + Math.sin(t * Math.PI) * .25})`,
+          opacity: t < .08 ? t / .08 : (t > .9 ? (1 - t) / .1 : 1)}); }
+      const an = el.animate(frames, {duration: 1150, easing: "cubic-bezier(.45,.05,.35,1)"});
+      an.onfinish = () => { el.remove(); flying--;
+        const land = dstEl && (dstEl.classList.contains("srow") ? dstEl : dstEl.closest(".card"));
+        if (land) { land.classList.remove("landed"); void land.offsetWidth; land.classList.add("landed"); setTimeout(() => land.classList.remove("landed"), 1400); } };
+    }, i * 180));
+}
+function setWebFx(on){ webFx = on; store.set("msgbus.webfx", on ? "1" : "0"); $("#mWebFx").textContent = "网页信件动画：" + (on ? "开 ✓" : "关"); }
 
 // ---------- 会话视图（看记录、直接回复、派活） ----------
 let view = null, openTabs = [], trOffset = -1, trEntries = [], trBusy = false;

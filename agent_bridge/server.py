@@ -686,6 +686,42 @@ def reply(root: Path, agent: str, sid: str, text: str, kind: str, who: str) -> d
             "name": rec.get("title") or target}
 
 
+# ---------- 两个桌面窗口在屏幕上的左右位置（网页据此把会话列表摆在同一侧） ----------
+
+_layout_cache = {"t": 0.0, "v": None}
+
+
+def window_layout() -> dict:
+    """{claude_side: left|right, source: windows|default, claude/codex: 窗口矩形或 None}，缓存 2 秒。"""
+    now = time.time()
+    if _layout_cache["v"] and now - _layout_cache["t"] < 2:
+        return _layout_cache["v"]
+    v = {"claude_side": "left", "source": "default", "claude": None, "codex": None}
+    if sys.platform == "win32":
+        try:
+            from . import fx
+            fx._dpi_aware()
+            w = fx.find_windows()
+            v["claude"], v["codex"] = w.get("claude"), w.get("codex")
+            cx = lambda r: (r[0] + r[2]) / 2
+            if v["claude"] and v["codex"]:
+                v["claude_side"] = "left" if cx(v["claude"]) <= cx(v["codex"]) else "right"
+                v["source"] = "windows"
+            elif v["claude"] or v["codex"]:
+                # 只开了一个：它在屏幕哪半边，它的列表就放哪边
+                sl, _, sr, _ = fx.screen_rect()
+                mid = (sl + sr) / 2
+                if v["claude"]:
+                    v["claude_side"] = "left" if cx(v["claude"]) <= mid else "right"
+                else:
+                    v["claude_side"] = "right" if cx(v["codex"]) <= mid else "left"
+                v["source"] = "windows"
+        except Exception:
+            pass
+    _layout_cache.update(t=now, v=v)
+    return v
+
+
 # ---------- 手机端：局域网监听 + 扫码配对 ----------
 
 import secrets
@@ -701,7 +737,7 @@ LAN = {"srv": None, "ip": None, "port": None}
 PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
 PHONE_GET = {"/", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
-             "/api/settings", "/api/codex", "/api/tasks", "/api/transcript"}
+             "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout"}
 PHONE_POST = {"/api/send", "/api/reply", "/api/export"}
 
 
@@ -905,6 +941,8 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/claude-sync":
                 from . import claude_sync
                 self._json(claude_sync.plan())
+            elif u.path == "/api/layout":
+                self._json(window_layout())
             elif u.path == "/api/transcript":
                 self._json(transcript(norm_root(q["root"]), q["agent"], q["sid"], int(q.get("since", -1))))
             elif u.path == "/api/lan":
