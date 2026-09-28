@@ -469,6 +469,78 @@ def read_messages(root: Path, since: int) -> dict:
     return {"messages": out, "offset": start + consumed, "reset": since < 0 or since > size}
 
 
+ROLE_WINDOW = 24 * 3600
+
+
+def session_roles(root: Path) -> dict:
+    """按最近 24 小时的派活关系给每个会话定「主 / 辅」：
+    主 = 往外派活的一方（指挥）；辅 = 接别人派的活的一方（干活），或被某个会话认领的 Codex 对话。
+    两样都有时按「现在还没回来的活」判：有派出去没回的 → 主；有手上没交的 → 辅。"""
+    bus_rel = find_bus_dir(root)
+    if not bus_rel:
+        return {}
+    p = root / bus_rel / "messages.jsonl"
+    try:
+        lines = p.read_bytes().splitlines()
+    except FileNotFoundError:
+        return {}
+    now = time.time()
+    tasks, done = {}, set()
+    for raw in lines:
+        try:
+            m = json.loads(raw)
+        except Exception:
+            continue
+        if now - m.get("ts", 0) > ROLE_WINDOW or str(m.get("from", {}).get("sid", "")).startswith("selftest-"):
+            continue
+        if m.get("kind") == "task":
+            tasks[m["id"]] = m
+        elif m.get("kind") == "result" and m.get("reply_to"):
+            done.add(m["reply_to"])
+    # 总线新开的 Codex 对话：任务记在 workers/<任务号>.json 里的对话号上
+    workers = {}
+    for w in (root / bus_rel / "workers").glob("*.json") if (root / bus_rel / "workers").exists() else []:
+        d = read_json(w, {})
+        if d.get("task") and d.get("thread"):
+            workers.setdefault(d["task"], []).append("codex-" + d["thread"])
+    st: dict[str, dict] = {}
+
+    def s(k):
+        return st.setdefault(k, {"out": 0, "out_open": 0, "in": 0, "in_open": 0, "boss": None, "helpers": set()})
+    for tid, m in tasks.items():
+        f = m["from"]
+        fk = f"{f['agent']}-{f['sid']}"
+        tos = list(m.get("to_keys") or []) + workers.get(tid, [])
+        open_ = tid not in done
+        s(fk)["out"] += 1
+        s(fk)["out_open"] += open_
+        for tk in tos:
+            s(tk)["in"] += 1
+            s(tk)["in_open"] += open_
+            if open_ or not s(tk)["boss"]:
+                s(tk)["boss"] = f.get("name")
+            s(fk)["helpers"].add(tk)
+    out = {}
+    for k, v in st.items():
+        if v["out_open"] and not v["in_open"]:
+            role = "main"
+        elif v["in_open"] and not v["out_open"]:
+            role = "aux"
+        elif v["out_open"] and v["in_open"]:
+            role = "main" if v["out_open"] >= v["in_open"] else "aux"
+        else:
+            role = "main" if v["out"] >= v["in"] and v["out"] else ("aux" if v["in"] else "")
+        if role == "main":
+            note = f"派出 {v['out_open']} 件在做" if v["out_open"] else f"24 小时内派过 {v['out']} 件"
+        elif role == "aux":
+            boss = str(v["boss"] or "").rsplit(" [", 1)[0]
+            note = (f"替 {boss} 干活（{v['in_open']} 件没交）" if v["in_open"] else f"替 {boss} 干过活") if boss else "接过活"
+        else:
+            note = ""
+        out[k] = {"role": role, "role_note": note}
+    return out
+
+
 def sessions(root: Path) -> list[dict]:
     r = run_bus(root, ["who", "--json"])
     try:
@@ -476,10 +548,14 @@ def sessions(root: Path) -> list[dict]:
     except Exception:
         return []
     now = time.time()
+    roles = session_roles(root)
     for x in rows:
         x["listening"] = now - x.get("listening", 0) <= 150
+        x.update(roles.get(f"{x.get('agent')}-{x.get('sid')}", {}))
+        if not x.get("role") and x.get("owner_name"):        # 被认领的 Codex 对话：没活时也算辅
+            x["role"], x["role_note"] = "aux", "归 " + str(x["owner_name"]).rsplit(" [", 1)[0] + " 用"
     return [{k: v for k, v in x.items() if k in ("agent", "sid", "short", "name", "title", "alias", "age", "originator",
-                                                  "listening", "owner_name", "managed")}
+                                                  "listening", "owner_name", "managed", "role", "role_note")}
             for x in rows if x.get("agent") != "user"]
 
 

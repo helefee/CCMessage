@@ -55,6 +55,18 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .body{display:grid;grid-template-columns:250px 1fr 280px;min-height:0}
 .sideL{border-left:0!important;border-right:1px solid var(--line)}
 .winpos{font-weight:400;font-size:11.5px;color:var(--faint)}
+/* 主 / 辅 标志 */
+.rb{display:inline-block;font-size:11px;line-height:16px;padding:0 5px;border-radius:5px;font-weight:700;margin-right:5px;vertical-align:1px;flex:none}
+.r-main{background:var(--accent);color:#fff}
+.r-aux{background:var(--line2);color:var(--muted);border:1px solid var(--line)}
+.srow .rn{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.srow.is-main{box-shadow:inset 3px 0 var(--accent)}
+.rlegend{font-size:11.5px;color:var(--faint);display:flex;gap:10px;margin-top:4px;align-items:center}
+/* 刷新按钮 */
+.rf{border:0;background:transparent;color:var(--muted);padding:0 5px;font-size:14px;line-height:1;cursor:pointer}
+.rf:hover{color:var(--accent)}
+.rf.spin{animation:spin .7s linear}
+@keyframes spin{to{transform:rotate(360deg)}}
 /* 网页里的信件动画 */
 .fly{position:fixed;left:0;top:0;z-index:60;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px;will-change:transform,opacity}
 .fly .env{width:44px;height:30px;border-radius:5px;background:#fffdf7;border:2px solid #b9b0a0;position:relative;box-shadow:0 4px 12px rgba(0,0,0,.25);overflow:hidden}
@@ -274,6 +286,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
     <button class="stdot mob" id="stDot" title="状态"></button>
     <div class="pills" id="pills"></div>
     <div class="topact">
+      <button class="rf" id="refreshAll" data-refresh title="刷新（会话、消息、任务、当前会话记录）" style="font-size:17px">⟳</button>
       <button class="primary admin" id="instBtn" style="display:none"></button>
       <div class="menu" id="menu">
         <button class="ghost" id="menuBtn" title="更多">⋯</button>
@@ -332,15 +345,17 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
 
     <aside class="side" id="colR">
       <div class="card sesscard" id="cardClaude">
-        <h3><span class="a-claude">Claude</span> 会话 <span id="nClaude"></span><span class="sp winpos" id="posClaude"></span></h3>
+        <h3><span class="a-claude">Claude</span> 会话 <span id="nClaude"></span><button class="rf" data-refresh title="刷新会话列表">⟳</button><span class="sp winpos" id="posClaude"></span></h3>
         <div id="sessClaude"><div class="grp">加载中…</div></div>
         <div class="legend"><span><i class="dot d-stand"></i>待命</span><span><i class="dot d-active"></i>活跃</span><span><i class="dot d-idle"></i>空闲</span></div>
+        <div class="rlegend"><span><span class="rb r-main">主</span>派活的</span><span><span class="rb r-aux">辅</span>干活的</span></div>
       </div>
       <div class="card sesscard" id="cardCodex">
-        <h3><span class="a-codex">Codex</span> 会话 <span id="nCodex"></span><span class="sp winpos" id="posCodex"></span></h3>
+        <h3><span class="a-codex">Codex</span> 会话 <span id="nCodex"></span><button class="rf" data-refresh title="刷新会话列表">⟳</button><span class="sp winpos" id="posCodex"></span></h3>
         <div id="codexSt" class="grp" style="margin:0 0 4px"></div>
         <div id="sessCodex"><div class="grp">加载中…</div></div>
         <div class="legend"><span><i class="dot d-stand"></i>待命</span><span><i class="dot d-active"></i>活跃</span><span><i class="dot d-idle"></i>空闲</span></div>
+        <div class="rlegend"><span><span class="rb r-main">主</span>派活的</span><span><span class="rb r-aux">辅</span>干活的</span></div>
       </div>
       <div class="card" id="cardTasks">
         <h3>任务看板 <span class="sp tabs"><span class="chip on" data-t="wait">待完成</span><span class="chip" data-t="done">已结束</span></span></h3>
@@ -688,8 +703,9 @@ async function pollSessions(){
     sessList = await api(`/api/sessions?root=${encodeURIComponent(root)}`);
     if (!cur || cur.root !== root) return;
     const row = x => { const [st, label] = sessState(x), key = keyOf(x.agent, x.short);
-      return `<div class="srow" data-key="${esc(key)}" data-sid="${esc(x.sid)}" data-agent="${esc(x.agent)}" title="点击：打开它的会话记录">
-        <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${esc(x.alias||x.title||"未命名")}</div>
+      return `<div class="srow ${x.role==="main"?"is-main":""}" data-key="${esc(key)}" data-sid="${esc(x.sid)}" data-agent="${esc(x.agent)}" title="点击：打开它的会话记录">
+        <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x)}${esc(x.alias||x.title||"未命名")}</div>
+        ${x.role_note?`<div class="rn">${esc(x.role_note)}</div>`:""}
         <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div>
         <button class="to ghost" data-focus="${esc(key)}" title="总线消息里只看和它有关的">筛选</button></div>`; };
     navBadge("sNav", 0);
@@ -697,6 +713,8 @@ async function pollSessions(){
     $("#sessClaude").innerHTML = g("claude").map(row).join("") || '<div class="grp">没有在线的 Claude 会话</div>';
     $("#sessCodex").innerHTML = g("codex").map(row).join("") || '<div class="grp">没有在线的 Codex 会话</div>';
     $("#nClaude").textContent = g("claude").length ? `（${g("claude").length}）` : "";
+    if (view) { const lv = sessList.find(s => s.agent === view.agent && s.sid === view.sid); const hb = $("#trHead .rb");
+      const nb = roleBadge(lv); if ((hb ? hb.outerHTML : "") !== nb && $("#trHead .nm")) { hb && hb.remove(); if (nb) $("#trHead .nm").insertAdjacentHTML("beforebegin", nb); } }
     $("#nCodex").textContent = g("codex").length ? `（${g("codex").length}）` : "";
     $$(".srow").forEach(el => el.onclick = e => {
       if (e.target.dataset.focus) { showBus(); if (isMobile()) setM("bus"); focusKey = focusKey === el.dataset.key ? null : el.dataset.key; renderFocus(); renderStream(); return; }
@@ -722,6 +740,21 @@ function fillTo(){
   if ([...$("#to").options].some(o => o.value === keep)) $("#to").value = keep;
 }
 function setTo(v){ if (![...$("#to").options].some(o => o.value === v)) $("#to").insertAdjacentHTML("beforeend", `<option value="${esc(v)}">${esc(v)}</option>`); $("#to").value = v; }
+
+// ---------- 主 / 辅 标志与刷新 ----------
+function roleBadge(x){
+  if (!x || !x.role) return "";
+  return x.role === "main" ? `<span class="rb r-main" title="主会话：${esc(x.role_note||"派活的一方")}">主</span>`
+                           : `<span class="rb r-aux" title="辅会话：${esc(x.role_note||"干活的一方")}">辅</span>`;
+}
+function spin(el){ if (!el) return; el.classList.remove("spin"); void el.offsetWidth; el.classList.add("spin"); }
+async function refreshAll(btn){
+  spin(btn); if (!cur) return;
+  await Promise.all([loadProjects(), pollSessions(), pollTasks(), pollCodex(), pollLayout()]);
+  if (view) { trOffset = -1; trEntries = []; await pollTranscript(true); } else { offset = -1; msgs = []; await pollMessages(); }
+  toast("已刷新", 1200);
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-refresh]"); if (b) { e.stopPropagation(); refreshAll(b); } });
 
 // ---------- 按两个桌面窗口的左右位置摆放会话列表 ----------
 let claudeSide = store.get("msgbus.claudeSide") || "left", layoutSrc = "default";
@@ -804,7 +837,7 @@ function renderTabs(){
   $("#vtabs").innerHTML = `<div class="vtab ${view?"":"on"}" data-t="bus">📨 总线消息</div>` + openTabs.map(t => {
     const s = live(tabKey(t)) || t, st = s.listening ? "stand" : (s.age < 180 ? "active" : "idle");
     return `<div class="vtab ${view && tabKey(view)===tabKey(t)?"on":""}" data-t="${esc(tabKey(t))}"><i class="dot d-${st}"></i>
-      <span class="a-${esc(t.agent)}">${esc(s.alias||s.title||"未命名")}</span><button class="x" data-close="${esc(tabKey(t))}" title="关闭">✕</button></div>`; }).join("");
+      ${roleBadge(s)}<span class="a-${esc(t.agent)}">${esc(s.alias||s.title||"未命名")}</span><button class="x" data-close="${esc(tabKey(t))}" title="关闭">✕</button></div>`; }).join("");
   $$(".vtab").forEach(el => el.onclick = e => {
     if (e.target.dataset.close) { closeTab(e.target.dataset.close); e.stopPropagation(); return; }
     if (el.dataset.t === "bus") showBus(); else { const t = openTabs.find(x => tabKey(x) === el.dataset.t); if (t) openSession(t); }
@@ -831,11 +864,15 @@ function openSession(x){
   view = openTabs.find(t => tabKey(t) === tabKey(x)); applyMode(); renderTabs();
   const nm = x.alias || x.title || "未命名";
   if (isMobile()) setM("bus");
-  $("#trHead").innerHTML = `<button class="mback mob" onclick="mBack()" title="返回">‹</button><span class="nm a-${esc(x.agent)}">${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
+  const live = sessList.find(s => s.agent === x.agent && s.sid === x.sid) || x;
+  $("#trHead").innerHTML = `<button class="mback mob" onclick="mBack()" title="返回">‹</button>${roleBadge(live)}<span class="nm a-${esc(x.agent)}">${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
+    ${live.role_note?`<span style="color:var(--muted)">${esc(live.role_note)}</span>`:""}
+    <button class="rf" id="trRefresh" title="从头重读这个会话的记录">⟳</button>
     ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">🤝 交给 Claude</button>` : ""}
     <span class="note" style="color:var(--muted)">${x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : "回复经总线送达 Claude（闲着会被叫醒）；要它当成你本人的指令，最稳还是在 Claude 里直接说"}</span>`;
   $("#toFixed").innerHTML = `发给 <b class="a-${esc(x.agent)}">${esc(nm)}</b>`;
   if ($("#toClaude")) $("#toClaude").onclick = () => handToClaude(x);
+  $("#trRefresh").onclick = e => { spin(e.currentTarget); trOffset = -1; trEntries = []; pollTranscript(true); };
   if (!same) { trOffset = -1; trEntries = []; $("#trView").innerHTML = `<div class="empty">正在读会话记录…</div>`; }
   pollTranscript(true);
 }
