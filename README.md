@@ -1,4 +1,6 @@
-# agent-bridge
+# CCMessage（agent-bridge）
+
+仓库：https://github.com/helefee/CCMessage ・ 许可证：[MIT](LICENSE)
 
 让同一个项目里同时开着的 **Claude Code** 会话和 **Codex** 会话互相发消息、互相派活、互相交接，
 带一个本地网页管理界面（手机扫码也能用）。
@@ -24,8 +26,8 @@
 
 ## 安装与启动
 
-    git clone <本仓地址> agent-bridge
-    cd agent-bridge
+    git clone https://github.com/helefee/CCMessage.git
+    cd CCMessage
     python -m agent_bridge            # 或双击 start.cmd（Windows）/ ./start.sh
 
 浏览器打开 http://127.0.0.1:8765/ 。右上角 ⋯ →「添加项目」选项目目录 →「一键安装」。
