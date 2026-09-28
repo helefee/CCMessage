@@ -306,7 +306,16 @@ def wake_codex(rec: dict, msg: dict) -> str:
     except Exception as e:
         return f"失败（{e!r}）"
     if r.returncode != 0:
-        err = (r.stderr or r.stdout).decode("utf-8", "replace").strip().splitlines()
+        raw = (r.stderr or r.stdout).decode("utf-8", "replace")
+        if "no rollout found" in raw:
+            # 线程在 Codex 里已经删了：把过期登记一起删，免得以后还往它身上派
+            try:
+                (SESS / f"{key_of('codex', rec['sid'])}.json").unlink(missing_ok=True)
+                (CURS / key_of("codex", rec["sid"])).unlink(missing_ok=True)
+            except Exception:
+                pass
+            return "跳过（这个线程在 Codex 里已经删了，已清掉它的登记）"
+        err = raw.strip().splitlines()
         return f"失败（退出码 {r.returncode}：{err[-1] if err else ''}）"
     return "已排队叫醒"
 
