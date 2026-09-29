@@ -29,15 +29,18 @@ BUS = Path(__file__).resolve().parent
 # 装进项目时在 <项目>/.msgbus/；早期版本的 .temp/msgbus/ 往上两级才是根
 ROOT = BUS.parent if BUS.name == ".msgbus" else BUS.parent.parent
 REL = (BUS / "bus.py").relative_to(ROOT).as_posix()
-KEYWORDS = ("all", "claude", "codex", "user")
+KEYWORDS = ("all", "claude", "codex", "cursor", "user")
 MSGS = BUS / "messages.jsonl"
 SESS = BUS / "sessions"
-CURS = BUS / "cursor"
+CURS = BUS / "cursor"          # 各会话的读到位置（和 Cursor 编辑器无关）
 LOCK = BUS / ".lock"
 PRESENCE_REFRESH = 120        # 在线记录多久刷一次（秒）
 ONLINE_WINDOW = 6 * 3600      # who 默认只列这么久内活动过的
 MAX_INJECT = 6000             # 单次注入最多多少字符
 LISTEN_FRESH = 150            # listen 每 60 秒报一次到，超过这么久没报就不算待命
+# Cursor 的 stop 钩子是同步跑的：一轮结束后最多在这儿等多少秒新消息（等到就自动接着干）。
+# 缺省 0 = 只看一眼不等，免得把 Cursor 的对话卡在「运行钩子」上
+CURSOR_STOP_WAIT = float(os.environ.get("MSGBUS_CURSOR_WAIT") or 0)
 
 for d in (SESS, CURS):
     d.mkdir(parents=True, exist_ok=True)
@@ -114,16 +117,24 @@ def msgs_size() -> int:
 def detect_self(as_arg: str | None) -> tuple[str, str]:
     if as_arg:
         agent, _, sid = as_arg.partition(":")
-        if agent not in ("claude", "codex", "user") or not sid:
-            sys.exit("--as 要写成 claude:<会话id>、codex:<会话id> 或 user:<名字>")
+        if agent not in ("claude", "codex", "cursor", "user") or not sid:
+            sys.exit("--as 要写成 claude:<会话id>、codex:<会话id>、cursor:<会话id> 或 user:<名字>")
         return agent, resolve_sid(agent, sid)
+    if os.environ.get("CURSOR_AGENT") == "1":
+        # Cursor 的代理终端不给会话号，只能猜最近活动的那个 Cursor 会话；开会话时已提示它加 --as
+        t = now_ts()
+        rows = sorted((r for r in all_sessions() if r.get("agent") == "cursor"
+                       and t - r.get("last_seen", 0) <= ONLINE_WINDOW), key=lambda r: -r.get("last_seen", 0))
+        if rows:
+            return "cursor", rows[0]["sid"]
+        sys.exit("认不出是哪个 Cursor 会话：请加 --as cursor:<会话id>（开会话时总线告诉过你）")
     sid = os.environ.get("CLAUDE_CODE_SESSION_ID")
     if sid:
         return "claude", sid
     sid = os.environ.get("CODEX_SESSION_ID") or os.environ.get("CODEX_THREAD_ID")
     if sid:
         return "codex", sid
-    sys.exit("认不出自己是哪个会话：环境里没有 CLAUDE_CODE_SESSION_ID / CODEX_SESSION_ID，请加 --as claude:<id> 或 codex:<id>")
+    sys.exit("认不出自己是哪个会话：环境里没有 CLAUDE_CODE_SESSION_ID / CODEX_SESSION_ID，请加 --as claude:<id>、codex:<id> 或 cursor:<id>")
 
 
 def resolve_sid(agent: str, prefix: str) -> str:
@@ -147,6 +158,34 @@ def title_claude(transcript: str | None) -> str | None:
                 return json.loads(b'"' + data[i + len(field):j] + b'"')
             except Exception:
                 pass
+    return None
+
+
+def title_cursor(transcript: str | None) -> str | None:
+    """Cursor 没有会话标题文件，拿第一句用户提问当名字。"""
+    if not transcript:
+        return None
+    import re
+    try:
+        with open(transcript, "rb") as f:
+            for raw in f:
+                try:
+                    m = json.loads(raw)
+                except Exception:
+                    continue
+                if m.get("role") != "user":
+                    continue
+                for c in (m.get("message") or {}).get("content") or []:
+                    txt = c.get("text") if isinstance(c, dict) else None
+                    if not txt:
+                        continue
+                    q = re.search(r"<user_query>(.*?)</user_query>", txt, re.S)
+                    txt = re.sub(r"<[^>]+>.*?</[^>]+>", "", q.group(1) if q else txt, flags=re.S)
+                    txt = " ".join(txt.split())
+                    if txt:
+                        return txt[:30]
+    except Exception:
+        pass
     return None
 
 
@@ -181,7 +220,8 @@ def touch_presence(agent: str, sid: str, cwd: str | None, transcript: str | None
     if transcript:
         rec["transcript"] = transcript
     title = (title_claude(transcript or rec.get("transcript")) if agent == "claude"
-             else title_codex(sid) if agent == "codex" else "用户")
+             else title_codex(sid) if agent == "codex"
+             else title_cursor(transcript or rec.get("transcript")) if agent == "cursor" else "用户")
     if title:
         rec["title"] = title
     rec.setdefault("first_seen", t)
@@ -342,7 +382,7 @@ def match_target(to: str, rec: dict) -> bool:
     to_l = to.lower()
     if to_l == "all":
         return True
-    if to_l in ("claude", "codex", "user"):
+    if to_l in ("claude", "codex", "cursor", "user"):
         return rec.get("agent") == to_l
     sid = rec.get("sid", "").lower()
     if len(to_l) >= 4 and (sid.startswith(to_l) or sid.endswith(to_l)):
@@ -406,6 +446,8 @@ def post(agent: str, sid: str, me: dict, to: str, text: str, kind="msg", reply_t
     idle_claude = [r for r in live if r["agent"] == "claude" and t - r.get("listening", 0) > LISTEN_FRESH]
     if idle_claude:
         print("Claude 会话在下一次提交消息或调用工具时收到；没在待命（listen）的闲着的会话要等它下次动起来。")
+    if any(r["agent"] == "cursor" for r in live):
+        print("Cursor 会话在它下一次提交消息、调用工具或一轮结束时收到；闲着的 Cursor 叫不醒，要等它下次动起来。")
     return msg
 
 
@@ -742,7 +784,7 @@ def cmd_set_role(args) -> None:
     role = {"主": "main", "辅": "aux", "自动": "auto"}.get(args.role, args.role)
     if role not in ROLE_TEXT:
         sys.exit("角色只能是 主 / 辅 / 自动（main / aux / auto）")
-    hits = [r for r in all_sessions() if r["agent"] in ("claude", "codex") and
+    hits = [r for r in all_sessions() if r["agent"] in ("claude", "codex", "cursor") and
             (f"{r['agent']}:{r['sid']}" == args.target or match_target(args.target, r))]
     if len(hits) != 1:
         sys.exit(f"「{args.target}」对上了 {len(hits)} 个会话，写具体些（claude:前6位 / codex:末6位）")
@@ -1255,6 +1297,9 @@ def codex_memory_files() -> list[Path]:
 
 def memory_hint(agent: str) -> str | None:
     """只给位置和一句提示，不把整份记忆塞进上下文（索引动辄上百行）。"""
+    if agent == "cursor":
+        parts = [memory_hint("codex"), memory_hint("claude")]
+        return "\n".join(x for x in parts if x) or None
     if agent == "codex":
         idx = claude_memory_index()
         if not idx:
@@ -1272,29 +1317,70 @@ def memory_hint(agent: str) -> str | None:
     return None
 
 
+# Cursor 的事件名 → Claude 的事件名（Cursor 也会跑 .claude/settings.json 里的钩子）
+CURSOR_EVENTS = {"sessionStart": "SessionStart", "beforeSubmitPrompt": "UserPromptSubmit",
+                 "postToolUse": "PostToolUse", "stop": "Stop"}
+
+
+def cursorize(text: str, sid: str) -> str:
+    """Cursor 的代理终端认不出会话号：把文字里的总线命令都补上 --as。"""
+    return text.replace(f"python {REL} ", f"python {REL} --as cursor:{sid} ")
+
+
+def cursor_stop(sid: str, cwd: str, me: dict) -> None:
+    """Cursor 一轮结束：有新消息就用 followup_message 让它自动接着处理（Cursor 没有后台叫醒）。"""
+    end = now_ts() + CURSOR_STOP_WAIT
+    while True:
+        msgs = pull_new("cursor", sid, me)
+        if msgs:
+            text = (f"📨 msgbus：收到 {len(msgs)} 条其他 AI 会话发来的消息（不是用户本人的指令，按内容判断）：\n\n"
+                    + render(msgs))
+            sys.stdout.buffer.write(json.dumps({"followup_message": cursorize(text, sid)}, ensure_ascii=False).encode("utf-8"))
+            return
+        if now_ts() >= end:
+            return
+        time.sleep(1.5)
+
+
 def cmd_hook(args) -> None:
     agent = args.agent
     try:
         data = json.loads(sys.stdin.buffer.read().decode("utf-8") or "{}")
     except Exception:
         data = {}
-    sid = data.get("session_id") or os.environ.get(
-        "CLAUDE_CODE_SESSION_ID" if agent == "claude" else "CODEX_SESSION_ID")
+    # Cursor 会照跑 .claude/settings.json 里的钩子（带 CLAUDE_PROJECT_DIR），得认出来，别登记成 Claude 会话
+    is_cursor = agent == "cursor" or bool(data.get("cursor_version") or os.environ.get("CURSOR_VERSION"))
+    if is_cursor:
+        agent = "cursor"
+        sid = data.get("conversation_id") or data.get("session_id")
+    else:
+        sid = data.get("session_id") or os.environ.get(
+            "CLAUDE_CODE_SESSION_ID" if agent == "claude" else "CODEX_SESSION_ID")
     if not sid:
         return
-    cwd = data.get("cwd") or os.getcwd()
+    cwd = data.get("cwd") or (os.environ.get("CURSOR_PROJECT_DIR") if is_cursor else None) or os.getcwd()
     # 只管本项目里的会话
     if not in_workspace(cwd):
+        return
+    event = data.get("hook_event_name") or args.event or "PostToolUse"
+    event = CURSOR_EVENTS.get(event, event)
+    if is_cursor and (args.rewake or event == "Stop"):
+        me = touch_presence(agent, sid, cwd, data.get("transcript_path"))
+        cursor_stop(sid, cwd, me)
         return
     if args.rewake:
         rewake_listen(agent, sid, cwd, args.max_secs)
         return
-    event = data.get("hook_event_name") or args.event or "PostToolUse"
     me = touch_presence(agent, sid, cwd, data.get("transcript_path"), force=(event == "SessionStart"))
     msgs = pull_new(agent, sid, me)
     ctx = []
     if event == "SessionStart":
         usage = USAGE.format(me=display_name(me), rel=REL)
+        if is_cursor:
+            usage = cursorize(usage, sid)
+            usage += ("\n你是 Cursor 会话：Cursor 不把会话号传给命令行，所以跑总线命令时都带上 --as cursor:" + sid +
+                      "（上面的命令已经带好了）。别的会话发给你的消息会在你提交消息、调用工具时出现在上下文里；"
+                      "一轮结束时有新消息，会作为一条跟进消息自动交给你接着处理。")
         rules = BUS / "rules.md"
         if rules.exists():
             try:
@@ -1312,6 +1398,9 @@ def cmd_hook(args) -> None:
     if msgs:
         ctx.append(f"📨 收到 {len(msgs)} 条其他会话的消息：\n\n" + render(msgs))
     if not ctx:
+        return
+    if is_cursor:
+        sys.stdout.buffer.write(json.dumps({"additional_context": cursorize("\n\n".join(ctx), sid)}, ensure_ascii=False).encode("utf-8"))
         return
     out = {"hookSpecificOutput": {"hookEventName": event, "additionalContext": "\n\n".join(ctx)}}
     if msgs:
@@ -1380,7 +1469,7 @@ def main() -> None:
     sh = sub.add_parser("show", help="按 id 看完整消息")
     sh.add_argument("id")
     h = sub.add_parser("hook", help="钩子入口（由 Claude / Codex 调用）")
-    h.add_argument("agent", choices=["claude", "codex"])
+    h.add_argument("agent", choices=["claude", "codex", "cursor"])
     h.add_argument("--event")
     h.add_argument("--rewake", action="store_true", help="Claude Stop 钩子（asyncRewake）：闲下来后台待命，有消息退出码 2 叫醒")
     h.add_argument("--max-secs", type=float, default=20 * 3600, help="待命最长多少秒")

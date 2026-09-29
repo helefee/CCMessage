@@ -114,9 +114,21 @@ Codex 开着才交给 Codex（`task --to codex` 没开会拒绝、退出码 3）
 |---|---|---|
 | Claude | 钩子把消息注入上下文 | Stop 钩子（`asyncRewake`）后台待命，有消息退出码 2 → Claude Code 叫醒会话 |
 | Codex | 钩子注入（要先信任） | `codex queue` 排一条提醒，桌面端会话被叫醒 |
+| Cursor | 钩子注入（Cursor 照跑 `.claude/settings.json` 里的钩子） | **叫不醒**；它一轮结束时如果有新消息，会作为一条跟进消息自动接着处理 |
 
 网页里「回复」Codex 是一条真正的用户输入（`codex queue`）；「回复」Claude 只能经总线送达（外部没有往 Claude 桌面会话塞用户输入的口子），
 它会当作经总线转来的话，风险大的事可能还要你在 Claude 里确认。
+
+### Cursor 会话
+
+Cursor（3.x）会读项目 `.claude/settings.json` 里的 Claude 钩子（设置里的第三方钩子 / Claude 兼容，缺省开着），
+所以装好总线后，**在项目里开的 Cursor Agent 对话会自动接上**，身份是 `cursor:<会话号前 6 位>`，网页上排在 Claude 那一栏、名字前标「Cursor」。
+
+- 收消息：提交消息、调用工具时注入上下文；一轮结束时有新消息，用 stop 钩子的 `followup_message` 让它自动接着处理。
+- 闲着的 Cursor 叫不醒（没有像 Claude `asyncRewake` 那样的后台待命）。想让它一轮结束后多等一会儿，
+  设环境变量 `MSGBUS_CURSOR_WAIT=秒数`（缺省 0：只看一眼不等，免得对话卡在「运行钩子」上）。
+- Cursor 的命令行拿不到会话号，所以它跑总线命令要带 `--as cursor:<会话号>`；开会话时注入的说明里命令已经带好了。
+- 发给它：`send --to cursor`（所有 Cursor）或 `--to cursor:前6位`。信件动画暂时不画 Cursor。
 
 ## 手机端
 

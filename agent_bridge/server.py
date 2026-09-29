@@ -754,7 +754,7 @@ def reply(root: Path, agent: str, sid: str, text: str, kind: str, who: str) -> d
     target = f"{agent}:{short}"
     if kind == "task":
         return send(root, target, text, True, "task", who)
-    if agent == "claude":
+    if agent in ("claude", "cursor"):
         r = send(root, target, text, False, "msg", who)
         r["via"] = "bus"
         return r
@@ -1120,7 +1120,7 @@ class Handler(BaseHTTPRequestHandler):
                 text = (body.get("text") or "").strip()
                 if not text:
                     raise ValueError("正文是空的")
-                if body.get("agent") not in ("claude", "codex") or not body.get("sid"):
+                if body.get("agent") not in ("claude", "codex", "cursor") or not body.get("sid"):
                     raise ValueError("缺少会话")
                 self._json(reply(norm_root(body["root"]), body["agent"], body["sid"], text, body.get("kind") or "msg",
                                  "phone" if getattr(self, "device", None) else "ui"))
