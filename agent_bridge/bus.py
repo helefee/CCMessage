@@ -482,9 +482,43 @@ def owner_alive(owner_key: str | None) -> bool:
     return bool(rec) and now_ts() - rec.get("last_seen", 0) <= ONLINE_WINDOW
 
 
+# 后台自动新开 Codex 对话：缺省关（桌面端不会实时显示外部新开的对话，活也不在桌面端里跑）。
+# 设 MSGBUS_CODEX_AUTO_NEW=1 打开；或派活时写 --to codex:new 明确要求新开。
+CODEX_AUTO_NEW = os.environ.get("MSGBUS_CODEX_AUTO_NEW") == "1"
+
+
+_ARCHIVED_CACHE: dict = {}
+
+
+def codex_archived_ids() -> set:
+    """Codex 数据库里标了「已归档」的对话（只读打开；Codex 归档时不挪记录文件，只打标记）。"""
+    if "ids" in _ARCHIVED_CACHE:
+        return _ARCHIVED_CACHE["ids"]
+    ids = set()
+    try:
+        import sqlite3
+        db = CODEX_HOME / "state_5.sqlite"
+        if db.exists():
+            c = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True, timeout=2)
+            ids = {r[0] for r in c.execute("select id from threads where archived = 1")}
+            c.close()
+    except Exception:
+        pass
+    _ARCHIVED_CACHE["ids"] = ids
+    return ids
+
+
+def codex_rollout_live(sid: str) -> bool:
+    """对话还在：记录文件在 sessions/ 下、且没被归档。"""
+    if sid in codex_archived_ids():
+        return False
+    return any((CODEX_HOME / "sessions").glob(f"*/*/*/rollout-*{sid}.jsonl"))
+
+
 def codex_slots(me_key: str | None) -> dict:
     """列出本项目能用的 Codex 对话和各自状态，并替 me_key 挑一个：
-    自己名下空闲的 > 没人认领的空闲对话 > 新开。别人名下（且那个会话还活着）的、手上有活的都不挑。"""
+    自己名下空闲的 > 没人认领的空闲对话；都没有就（开了自动新开时）新开，否则留给 Claude。
+    只用你在 Codex 桌面端里开着的对话：别人名下（且那个会话还活着）的、手上有活的、归档了的都不挑。"""
     discover_codex()
     t, done = now_ts(), results_by_task()
     rows = []
@@ -495,6 +529,12 @@ def codex_slots(me_key: str | None) -> dict:
             continue
         if orig == "codex_exec" and not managed:
             continue                      # 不是总线开的无界面对话：没人续跑它，不派
+        if managed and not CODEX_AUTO_NEW:
+            continue                      # 自动新开关着时，以前后台新开的对话也不再派（桌面端里看不到它在干什么）
+        if not codex_rollout_live(r["sid"]):
+            continue                      # 归档 / 删除了的对话叫不醒
+        if r.get("ignore"):
+            continue                      # 用户标了「别派」
         if not managed and t - r.get("last_seen", 0) > ONLINE_WINDOW:
             continue
         owner = r.get("owner") if owner_alive(r.get("owner")) else None
@@ -506,6 +546,110 @@ def codex_slots(me_key: str | None) -> dict:
         or next((x for x in rows if not x["owner"] and not x["busy"]), None)
     running_new = sum(1 for w in worker_recs() if w.get("state") == "running" and pid_alive(w.get("pid", 0)))
     return {"rows": rows, "pick": pick, "running_new": running_new}
+
+
+PAUSE_SECS = int(os.environ.get("MSGBUS_CODEX_PAUSE_MIN") or 30) * 60
+PAUSE_FILE = BUS / "codex_pause.json"
+_ERR_WORDS = ("usage balance exhausted", "quota", "insufficient", "rate limit", "rate_limit", "429", "503", "502",
+              "Service Unavailable", "auth_unavailable", "billing", "overloaded")
+
+
+def _iso_ts(s) -> float:
+    try:
+        return datetime.fromisoformat(str(s).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
+def _scan_tail(p: Path, want_ok: bool) -> tuple[float, float, str]:
+    """读文件尾巴：最后一次「额度 / 服务报错」和最后一次成功回复的时间。"""
+    last_err = last_ok = 0.0
+    reason = ""
+    try:
+        with open(p, "rb") as f:
+            f.seek(0, 2)
+            n = f.tell()
+            f.seek(max(0, n - 256 * 1024))
+            tail = f.read().decode("utf-8", "replace").splitlines()
+    except Exception:
+        return 0.0, 0.0, ""
+    mt = p.stat().st_mtime
+    for line in tail:
+        if not line.startswith("{"):
+            continue
+        low = line[:4000]
+        is_err = ('"type":"error"' in low or '"type":"stream_error"' in low or '"turn.failed"' in low
+                  or '"type":"turn_failed"' in low) and any(w.lower() in low.lower() for w in _ERR_WORDS)
+        is_ok = want_ok and '"role":"assistant"' in low and '"type":"message"' in low
+        if not (is_err or is_ok):
+            continue
+        try:
+            d = json.loads(line)
+            ts = _iso_ts(d.get("timestamp")) or mt
+        except Exception:
+            ts = mt
+        if is_err and ts >= last_err:
+            last_err = ts
+            import re
+            m = re.search(r'"message":"([^"]{0,300})', low)
+            reason = (m.group(1) if m else "Codex 服务报错")[:200]
+        if is_ok:
+            last_ok = max(last_ok, ts)
+    return last_err, last_ok, reason
+
+
+def codex_health() -> dict:
+    """Codex 现在能不能接活：最近一次额度用完 / 服务报错之后没再成功回复过、且在 PAUSE_SECS 以内 → 暂停。
+    手动：codex-pause 设暂停，codex-resume 清掉（之前的报错不再算）。"""
+    t = now_ts()
+    st = load_json(PAUSE_FILE)
+    if st.get("manual_until", 0) > t:
+        return {"paused": True, "until": st["manual_until"], "reason": st.get("reason") or "手动暂停", "manual": True}
+    resumed = st.get("resumed_at", 0)
+    last_err = last_ok = 0.0
+    reason = ""
+    cands = [p for p in codex_rollouts(1) if t - p.stat().st_mtime < PAUSE_SECS + 600]
+    if WORKERS.exists():
+        cands += [p for p in WORKERS.glob("*.log") if t - p.stat().st_mtime < PAUSE_SECS + 600]
+    for p in cands:
+        e, o, r = _scan_tail(p, want_ok=p.suffix == ".jsonl")
+        if e > last_err:
+            last_err, reason = e, r
+        last_ok = max(last_ok, o)
+    if last_err and last_err > max(last_ok, resumed) and t - last_err < PAUSE_SECS:
+        short = "额度用完" if "exhausted" in reason or "quota" in reason.lower() or "balance" in reason else "服务报错"
+        return {"paused": True, "until": last_err + PAUSE_SECS, "reason": f"{short}：{reason}", "manual": False}
+    return {"paused": False}
+
+
+def cmd_codex_ignore(args) -> None:
+    """标记某个 Codex 对话「别派」（--undo 取消）。"""
+    hits = [r for r in all_sessions() if r["agent"] == "codex" and match_target(args.target, r)]
+    if len(hits) != 1:
+        sys.exit(f"「{args.target}」对上了 {len(hits)} 个 Codex 对话，写具体些（codex:末6位）")
+    p = SESS / f"{key_of('codex', hits[0]['sid'])}.json"
+    rec = load_json(p)
+    if args.undo:
+        rec.pop("ignore", None)
+    else:
+        rec["ignore"] = True
+    save_json(p, rec)
+    print(("已取消「别派」：" if args.undo else "已标「别派」：") + display_name(rec))
+
+
+def cmd_codex_pause(args) -> None:
+    st = load_json(PAUSE_FILE)
+    st.update({"manual_until": now_ts() + args.minutes * 60, "reason": args.reason or "手动暂停"})
+    save_json(PAUSE_FILE, st)
+    print(f"已暂停往 Codex 派活 {args.minutes} 分钟（{st['reason']}）。恢复：python {REL} codex-resume")
+
+
+def cmd_codex_resume(args) -> None:
+    st = load_json(PAUSE_FILE)
+    st.pop("manual_until", None)
+    st["resumed_at"] = now_ts()          # 这之前的报错不再算
+    save_json(PAUSE_FILE, st)
+    print("已恢复往 Codex 派活（之前的额度 / 服务报错不再算；再出错会重新暂停）。")
 
 
 def claim(rec: dict, owner_key: str) -> None:
@@ -529,13 +673,19 @@ def cmd_codex_status(args) -> None:
     except SystemExit:
         me_key = None
     s = codex_slots(me_key)
+    h = codex_health()
+    left = int((h.get("until", 0) - now_ts()) // 60) + 1 if h["paused"] else 0
     if args.json:
-        print(json.dumps({"available": app, "app_running": app,
-                          "reason": "Codex 开着" if app else "Codex 桌面端没开",
+        will = ("不派（Codex 没开）" if not app else
+                f"不派（暂停中，约 {left} 分钟后再试：{h['reason']}）" if h["paused"] else
+                f"交给 {display_name(s['pick']['rec'])}" if s["pick"] else
+                ("新开一个 Codex 对话" if CODEX_AUTO_NEW and s["running_new"] < MAX_NEW_CODEX else
+                 "没有空闲的、开着的 Codex 对话 → 留给 Claude（去 Codex 里多开一个对话就能用）"))
+        print(json.dumps({"available": app and not h["paused"], "app_running": app, "paused": h["paused"],
+                          "pause_reason": h.get("reason"), "pause_left_min": left, "auto_new": CODEX_AUTO_NEW,
+                          "reason": ("Codex 桌面端没开" if not app else f"暂停中：{h['reason']}" if h["paused"] else "Codex 开着"),
                           "pick": s["pick"] and display_name(s["pick"]["rec"]),
-                          "will": ("不派（Codex 没开）" if not app else
-                                   f"交给 {display_name(s['pick']['rec'])}" if s["pick"] else
-                                   ("新开一个 Codex 对话" if s["running_new"] < MAX_NEW_CODEX else "新开的对话已满，留给 Claude")),
+                          "will": will,
                           "rows": [{"name": display_name(x["rec"]), "short": short_id(x["rec"]), "state": x["state"],
                                     "busy": x["busy"], "owner": owner_name(x["owner"]), "mine": x["mine"],
                                     "managed": x["managed"]} for x in s["rows"]],
@@ -544,17 +694,23 @@ def cmd_codex_status(args) -> None:
     if not app:
         print("✗ Codex 桌面端没开：不交给 Codex，这件活留给 Claude（自带子代理，或 task --to claude:<会话>）。")
         return
-    print("✓ Codex 开着。本项目的 Codex 对话：" if s["rows"] else "✓ Codex 开着，本项目还没有 Codex 对话（派活时会新开一个）。")
+    if h["paused"]:
+        print(f"⏸ 暂停往 Codex 派活，约 {left} 分钟后自动再试：{h['reason']}")
+        print(f"  这段时间派给 Codex 的活会被拒（退出码 3），留给 Claude。确认恢复了：python {REL} codex-resume")
+    print("✓ Codex 开着。你在 Codex 里开着的本项目对话：" if s["rows"] else
+          "✓ Codex 开着，但本项目没有你开着的 Codex 对话（去 Codex 里在本项目目录开一个，就能派给它）。")
     for x in s["rows"]:
         who = f"归 {owner_name(x['owner'])}" + ("（就是你）" if x["mine"] else "") if x["owner"] else "没人认领"
         print(f"  {display_name(x['rec'])}  {x['state']}{'（' + '、'.join('#' + i for i in x['busy']) + '）' if x['busy'] else ''}"
               f"  ·  {who}{'  ·  总线新开' if x['managed'] else ''}")
-    if s["pick"]:
+    if h["paused"]:
+        print("→ 暂停中，现在派活会被拒，留给 Claude")
+    elif s["pick"]:
         print(f"→ 现在派活会交给：{display_name(s['pick']['rec'])}")
-    elif s["running_new"] < MAX_NEW_CODEX:
-        print("→ 没有你能用的空闲对话，现在派活会新开一个 Codex 对话")
+    elif CODEX_AUTO_NEW and s["running_new"] < MAX_NEW_CODEX:
+        print("→ 没有你能用的空闲对话，现在派活会在后台新开一个 Codex 对话（MSGBUS_CODEX_AUTO_NEW=1）")
     else:
-        print(f"→ 新开的 Codex 对话已经有 {s['running_new']} 个在跑（上限 {MAX_NEW_CODEX}），这件活留给 Claude")
+        print("→ 没有你能用的空闲对话：这件活留给 Claude；想让 Codex 接，去 Codex 里在本项目目录多开一个对话")
 
 
 def cmd_release(args) -> None:
@@ -724,9 +880,20 @@ def cmd_task(args) -> None:
         if not codex_app_running():
             print("✗ 没派：Codex 桌面端没开。这件活留给 Claude 做（自带子代理，或 task --to claude:<会话>）。")
             sys.exit(NO_CODEX_EXIT)
+        h = codex_health()
+        if h["paused"] and not args.force:
+            left = int((h["until"] - now_ts()) // 60) + 1
+            print(f"✗ 没派：Codex 暂停中（约 {left} 分钟后自动再试）—— {h['reason']}。"
+                  f"这件活留给 Claude 做（自带子代理，或 task --to claude:<会话>）。确认 Codex 恢复了：python {REL} codex-resume")
+            sys.exit(NO_CODEX_EXIT)
         s = codex_slots(me_key)
         if tl == "codex" and s["pick"]:
             how = ("existing", s["pick"]["rec"])
+        elif tl == "codex" and not CODEX_AUTO_NEW:
+            print("✗ 没派：本项目没有你能用的、在 Codex 里开着的空闲对话（别人名下的、忙的都不算）。"
+                  "这件活留给 Claude 做；想让 Codex 接，去 Codex 桌面端在本项目目录多开一个对话，"
+                  f"或明确要求后台新开：task --to codex:new（桌面端不会实时显示它）。")
+            sys.exit(NO_CODEX_EXIT)
         elif tl in ("codex", "codex:new"):
             if s["running_new"] >= MAX_NEW_CODEX:
                 print(f"✗ 没派：没有你能用的空闲 Codex 对话，新开的也已经有 {s['running_new']} 个在跑（上限 {MAX_NEW_CODEX}）。"
@@ -996,7 +1163,8 @@ USAGE = (
     "看任务：python {rel} tasks；等结果：python {rel} wait <任务号>；交活：python {rel} done <任务号> \"结果\"（--fail 表示没做成）。\n"
     "当干活的一方：Claude 会话一闲下来就由 Stop 钩子自动在后台待命，有消息会把你叫醒（没装 Stop 钩子的项目，"
     "可以用后台命令挂 python {rel} listen --once 代替）；Codex 会话会被 codex queue 自动叫醒。\n"
-    "派给 Codex 用 task --to codex：总线先挑你名下空闲的 Codex 对话，再挑没人认领的空闲对话，都没有就新开一个 Codex 对话；"
+    "派给 Codex 用 task --to codex：只派给用户在 Codex 桌面端里开着的本项目对话 —— 先挑你名下空闲的，再挑没人认领的空闲对话；"
+    "都没有就不派（退出码 3），留给 Claude。Codex 额度用完 / 服务报错时总线会自动暂停往 Codex 派 30 分钟（同样退出码 3）；"
     "派过你活的对话归你用，别的会话不会往里派，手上有活没交的也不会再接新活。python {rel} codex-status 看各对话忙闲 / 归属；"
     "Codex 桌面端没开时 task 会拒绝（退出码 3），这件活就留给 Claude（自带子代理，或派给别的 Claude 会话）。\n"
     "什么时候派活（项目 AGENTS.md 里有「什么时候派活」就以它为准）：适合派 —— 可并行、不改同一批文件的独立单元；"
@@ -1183,6 +1351,13 @@ def main() -> None:
     sr.add_argument("target")
     sr.add_argument("role", help="主 / 辅 / 自动（main / aux / auto）")
     sr.add_argument("--quiet", action="store_true", help="只改标记，不给那个会话发消息")
+    cp_ = sub.add_parser("codex-pause", help="手动暂停往 Codex 派活")
+    cp_.add_argument("--minutes", type=int, default=30)
+    cp_.add_argument("--reason", default="")
+    sub.add_parser("codex-resume", help="恢复往 Codex 派活（之前的额度 / 服务报错不再算）")
+    ci = sub.add_parser("codex-ignore", help="标记某个 Codex 对话「别派」（--undo 取消）")
+    ci.add_argument("target")
+    ci.add_argument("--undo", action="store_true")
     rl = sub.add_parser("release", help="放开一个 Codex 对话的归属，别的会话就能派了")
     rl.add_argument("target")
     cw = sub.add_parser("codex-worker", help="（内部）后台跑一件派给 Codex 的活")
@@ -1223,6 +1398,7 @@ def main() -> None:
     {"send": cmd_send, "inbox": cmd_inbox, "who": cmd_who, "name": cmd_name, "show": cmd_show,
      "task": cmd_task, "done": cmd_done, "tasks": cmd_tasks, "wait": cmd_wait,
      "listen": cmd_listen, "codex-status": cmd_codex_status, "release": cmd_release, "set-role": cmd_set_role,
+     "codex-pause": cmd_codex_pause, "codex-resume": cmd_codex_resume, "codex-ignore": cmd_codex_ignore,
      "codex-worker": cmd_codex_worker}[args.cmd](args)
 
 

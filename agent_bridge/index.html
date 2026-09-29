@@ -168,6 +168,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .step{padding:2px 0}
 .step.ok{color:var(--ok)}.step.bad{color:var(--bad)}
 body.phone .admin{display:none!important}
+/* 简洁模式：只留左右会话列表 + 中间对话和输入框；出问题时顶上一行提示 */
+body.simple #pills,body.simple .vtabs,body.simple #filters,body.simple #cardTasks,body.simple .legend,body.simple .rlegend,
+body.simple .srow .rn,body.simple .winpos,body.simple #codexSt,body.simple .trhead .note,body.simple .srow .to,
+body.simple .crow .hint,body.simple #wakeWrap,body.simple .newpill{display:none!important}
+body.simple .srow .sub{font-size:11px}
+body.simple .srow .rb[style*="opacity"]{display:none}
+body.simple .card h3{margin-bottom:4px}
+.simplehint{display:none}
+body.simple .simplehint{display:block}
 .vtabs{display:flex;gap:2px;padding:6px 10px 0;border-bottom:1px solid var(--line);overflow-x:auto;background:var(--panel2)}
 .vtab{display:flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid transparent;border-bottom:0;border-radius:8px 8px 0 0;cursor:pointer;white-space:nowrap;font-size:13px;color:var(--muted)}
 .vtab.on{background:var(--bg);border-color:var(--line);color:var(--text);margin-bottom:-1px}
@@ -305,6 +314,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
           <button id="mFx" class="admin">桌面信件动画：…</button>
           <button id="mFxTest" class="admin">试放信件动画</button>
           <button id="mWebFx">网页信件动画：开 ✓</button>
+          <button id="mSimple">完整模式</button>
           <button id="mTheme">切换深浅色</button>
         </div>
       </div>
@@ -317,6 +327,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
       <div>
         <div class="vtabs" id="vtabs"></div>
         <div class="banner" id="banner" style="display:none"></div>
+        <div class="banner" id="pauseBanner" style="display:none"></div>
         <div class="trhead" id="trHead" style="display:none"></div>
         <div class="filters" id="filters">
           <span class="chip on" data-f="all">全部<span class="n" id="nAll"></span></span>
@@ -441,6 +452,8 @@ function renderTop(){
   const b = $("#instBtn"); b.style.display = need ? "" : "none";
   b.textContent = !p.bus_dir ? "一键安装" : "升级 / 修复";
   let tip = "";
+  if (!p.bus_dir) tip = "这个项目还没装总线：点 ⋯ →「安装 / 升级 / 修复」。";
+  else if (!p.installed || p.bus_outdated) tip = "总线要升级或修复：点 ⋯ →「安装 / 升级 / 修复」。";
   if (p.bus_dir && ch>0 && ch<CT) tip = "Claude 钩子不全：缺闲时待命的 Stop 钩子时，闲着的 Claude 会话收不到消息。点「升级 / 修复」补上。";
   else if (cx===XT && tr<XT) tip = "还差一步：在 Codex 里打开这个项目，进钩子管理（/hooks）把 msgbus 钩子设为信任。没信任时 Codex 仍能被叫醒、用 inbox 收消息。";
   $("#banner").style.display = tip ? "" : "none"; $("#banner").textContent = tip;
@@ -567,6 +580,12 @@ async function openPhone(){
   }, 1500);
 }
 $("#mPhone").onclick = openPhone;
+function applySimple(on){ document.body.classList.toggle("simple", on); $("#mSimple").textContent = on ? "完整模式（显示全部）" : "简洁模式";
+  store.set("msgbus.simple", on ? "1" : "0"); if (on && !view) setFilterAll(); }
+function setFilterAll(){ filter = "all"; query = ""; const q = $("#q"); if (q) q.value = ""; $$(".filters .chip").forEach(c => c.classList.toggle("on", c.dataset.f === "all")); }
+$("#mSimple").onclick = () => { applySimple(!document.body.classList.contains("simple")); renderStream(true); pollSessions(); };
+document.body.classList.toggle("simple", store.get("msgbus.simple") !== "0");   // 先定样式，免得闪一下完整界面
+setTimeout(() => applySimple(store.get("msgbus.simple") !== "0"), 0);          // 其余等脚本都加载完（view 等变量在后面定义）
 $("#mWebFx").onclick = () => { setWebFx(!webFx); toast("网页信件动画已" + (webFx ? "打开" : "关闭")); };
 setTimeout(() => setWebFx(webFx), 0);
 $("#mCSync").onclick = async () => {
@@ -712,7 +731,8 @@ async function pollSessions(){
         <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div>
         <button class="to ghost" data-focus="${esc(key)}" title="总线消息里只看和它有关的">筛选</button></div>`; };
     navBadge("sNav", 0);
-    const g = a => sessList.filter(x => x.agent === a);
+    // 简洁模式：不显示以前后台新开的对话、标了「别派」的对话（它们不会再接活）
+    const g = a => sessList.filter(x => x.agent === a && !(document.body.classList.contains("simple") && (x.managed || x.ignore)));
     $("#sessClaude").innerHTML = g("claude").map(row).join("") || '<div class="grp">没有在线的 Claude 会话</div>';
     $("#sessCodex").innerHTML = g("codex").map(row).join("") || '<div class="grp">没有在线的 Codex 会话</div>';
     $("#nClaude").textContent = g("claude").length ? `（${g("claude").length}）` : "";
@@ -727,10 +747,20 @@ async function pollSessions(){
     renderFocus(); fillTo();
   } catch(e) {}
 }
+let codexPause = null;
+function renderPauseBanner(){
+  const b = $("#pauseBanner"); if (!b) return;
+  if (!codexPause) { b.style.display = "none"; return; }
+  b.style.display = "";
+  b.innerHTML = `⏸ 暂停往 Codex 派活（约 ${codexPause.left} 分钟后自动再试）：${esc(String(codexPause.reason||"").slice(0,120))}
+    <button class="ghost" id="resumeCodex" style="margin-left:8px">恢复</button>`;
+  $("#resumeCodex").onclick = async () => { try { await api("/api/codex/resume", {root: cur.root}); toast("已恢复往 Codex 派活"); pollCodex(); } catch(e){ toast("❌ " + e.message); } };
+}
 async function pollCodex(){
   if (!cur || !cur.bus_dir) return;
   try { const c = await api(`/api/codex?root=${encodeURIComponent(cur.root)}`);
-    $("#codexSt").innerHTML = c.available
+    codexPause = c.paused ? {left: c.pause_left_min, reason: c.pause_reason} : null; renderPauseBanner();
+    $("#codexSt").innerHTML = c.paused ? `<span class="badge b-bad">暂停中</span> ${esc(c.will||"")}` : c.available
       ? `<span class="badge b-ok">Codex 开着</span> 派活交给 ${esc(nameOf(c.session))}`
       : `<span class="badge b-bad">不交给 Codex</span> ${esc(c.reason)}（留给 Claude）`;
   } catch(e) {}
