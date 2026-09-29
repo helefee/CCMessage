@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""读 Claude / Codex 会话记录，整理成界面能直接画的条目。
+"""读 Claude / Codex / Cursor 会话记录，整理成界面能直接画的条目。
 
 条目：{"pos": 字节位置, "ts": 秒, "role": "user"|"assistant"|"tool", "text": …}
   - user：人在会话里说的话（系统注入的 AGENTS.md / system-reminder / 环境上下文 都去掉）
@@ -48,6 +48,13 @@ def claude_file(sid: str, hint: str | None = None) -> Path | None:
     if hint and Path(hint).exists():
         return Path(hint)
     hits = list((CLAUDE_HOME / "projects").glob(f"*/{sid}.jsonl"))
+    return max(hits, key=lambda p: p.stat().st_mtime) if hits else None
+
+
+def cursor_file(sid: str, hint: str | None = None) -> Path | None:
+    if hint and Path(hint).exists():
+        return Path(hint)
+    hits = list((Path.home() / ".cursor" / "projects").glob(f"*/agent-transcripts/{sid}/{sid}.jsonl"))
     return max(hits, key=lambda p: p.stat().st_mtime) if hits else None
 
 
@@ -103,6 +110,30 @@ def parse_claude(d: dict) -> list[dict]:
     return out
 
 
+def parse_cursor(d: dict) -> list[dict]:
+    """Cursor 的记录每行 {"role", "message": {"content": [...]}}，没有时间戳；用户那句在 <user_query> 里。"""
+    import re
+    role, out = d.get("role"), []
+    for x in (d.get("message") or {}).get("content") or []:
+        if not isinstance(x, dict):
+            continue
+        if x.get("type") == "text" and (x.get("text") or "").strip():
+            t = x["text"]
+            if role == "user":
+                q = re.search(r"<user_query>(.*?)</user_query>", t, re.S)
+                u = _user_text(q.group(1) if q else re.sub(r"<timestamp>.*?</timestamp>", "", t, flags=re.S))
+                if u:
+                    out.append({"ts": 0, "role": "user", "text": _clip(u)})
+            elif role == "assistant":
+                out.append({"ts": 0, "role": "assistant", "text": _clip(t)})
+        elif x.get("type") == "tool_use" and role == "assistant":
+            inp = x.get("input") or {}
+            if isinstance(inp, dict) and "path" in inp and "file_path" not in inp:
+                inp = dict(inp, file_path=inp["path"])
+            out.append({"ts": 0, "role": "tool", "text": _tool_line(x.get("name", "工具"), inp)})
+    return out
+
+
 def parse_codex(d: dict) -> list[dict]:
     if d.get("type") != "response_item":
         return []
@@ -127,7 +158,8 @@ def parse_codex(d: dict) -> list[dict]:
 # ---------- 读 ----------
 
 def read(agent: str, sid: str, since: int = -1, hint: str | None = None) -> dict:
-    f = claude_file(sid, hint) if agent == "claude" else codex_file(sid)
+    f = (claude_file(sid, hint) if agent == "claude" else cursor_file(sid, hint) if agent == "cursor"
+         else codex_file(sid))
     if not f:
         return {"entries": [], "offset": 0, "missing": True}
     size = f.stat().st_size
@@ -140,7 +172,7 @@ def read(agent: str, sid: str, since: int = -1, hint: str | None = None) -> dict
         nl = data.find(b"\n")
         data, start = data[nl + 1:], start + nl + 1
     end = data.rfind(b"\n") + 1
-    parse = parse_claude if agent == "claude" else parse_codex
+    parse = {"claude": parse_claude, "cursor": parse_cursor}.get(agent, parse_codex)
     entries, pos = [], start
     for line in data[:end].splitlines(keepends=True):
         try:

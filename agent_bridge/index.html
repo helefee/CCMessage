@@ -8,17 +8,17 @@
 :root{
   --bg:#f4f5f7;--panel:#fff;--panel2:#fafbfc;--line:#e2e5e9;--line2:#eef0f3;--text:#1c2127;--muted:#6a737d;--faint:#9aa3ad;
   --accent:#2f6fde;--accent-weak:#e8f0ff;--ok:#1f8a4c;--ok-weak:#e3f5ea;--warn:#b7791f;--warn-weak:#fdf3e1;--bad:#c53030;--bad-weak:#fdeaea;
-  --claude:#c2622e;--codex:#1f8a7e;--user:#6b5bd2;--shadow:0 6px 24px rgba(20,30,40,.12);
+  --claude:#c2622e;--cursor:#3b6fd6;--codex:#1f8a7e;--user:#6b5bd2;--shadow:0 6px 24px rgba(20,30,40,.12);
   --mono:ui-monospace,SFMono-Regular,Consolas,"Cascadia Mono",monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#131619;--panel:#1b1f24;--panel2:#171a1e;--line:#2c3239;--line2:#23282e;--text:#e3e7eb;--muted:#9aa4ae;--faint:#6b747e;
   --accent:#6b9cff;--accent-weak:#1f2d48;--ok:#4cc38a;--ok-weak:#16302a;--warn:#e7b949;--warn-weak:#352c14;--bad:#f07a7a;--bad-weak:#3a1d1f;
-  --claude:#e59566;--codex:#4fd1c5;--user:#a99dff;--shadow:0 8px 30px rgba(0,0,0,.45);}}
+  --claude:#e59566;--cursor:#7ea6ff;--codex:#4fd1c5;--user:#a99dff;--shadow:0 8px 30px rgba(0,0,0,.45);}}
 :root[data-theme="dark"]{
   --bg:#131619;--panel:#1b1f24;--panel2:#171a1e;--line:#2c3239;--line2:#23282e;--text:#e3e7eb;--muted:#9aa4ae;--faint:#6b747e;
   --accent:#6b9cff;--accent-weak:#1f2d48;--ok:#4cc38a;--ok-weak:#16302a;--warn:#e7b949;--warn-weak:#352c14;--bad:#f07a7a;--bad-weak:#3a1d1f;
-  --claude:#e59566;--codex:#4fd1c5;--user:#a99dff;--shadow:0 8px 30px rgba(0,0,0,.45);}
+  --claude:#e59566;--cursor:#7ea6ff;--codex:#4fd1c5;--user:#a99dff;--shadow:0 8px 30px rgba(0,0,0,.45);}
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 system-ui,"Microsoft YaHei",sans-serif;overflow:hidden}
@@ -99,7 +99,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .msg.hl{box-shadow:0 0 0 2px var(--accent)}
 .meta{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);flex-wrap:wrap}
 .who{font-weight:600;font-size:13px}
-.a-claude{color:var(--claude)}.a-codex{color:var(--codex)}.a-user{color:var(--user)}
+.a-claude{color:var(--claude)}.a-cursor{color:var(--cursor)}.a-codex{color:var(--codex)}.a-user{color:var(--user)}
 .badge{font-size:11px;padding:0 7px;border-radius:9px;font-weight:600}
 .b-task{color:var(--warn);background:var(--warn-weak)}
 .b-ok{color:var(--ok);background:var(--ok-weak)}
@@ -726,14 +726,15 @@ async function pollSessions(){
     if (!cur || cur.root !== root) return;
     const row = x => { const [st, label] = sessState(x), key = keyOf(x.agent, x.short);
       return `<div class="srow ${x.role==="main"?"is-main":""}" data-key="${esc(key)}" data-sid="${esc(x.sid)}" data-agent="${esc(x.agent)}" title="点击：打开它的会话记录">
-        <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x, true)}${esc(x.alias||x.title||"未命名")}</div>
+        <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x, true)}${x.agent==="cursor"?'<span class="a-cursor" style="font-size:11px;font-weight:600;margin-right:4px">Cursor</span>':""}${esc(x.alias||x.title||"未命名")}</div>
         ${x.role_note?`<div class="rn">${esc(x.role_note)}</div>`:""}
         <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div>
         <button class="to ghost" data-focus="${esc(key)}" title="总线消息里只看和它有关的">筛选</button></div>`; };
     navBadge("sNav", 0);
     // 简洁模式：不显示以前后台新开的对话、标了「别派」的对话（它们不会再接活）
-    const g = a => sessList.filter(x => x.agent === a && !(document.body.classList.contains("simple") && (x.managed || x.ignore)));
+    const g = a => sessList.filter(x => (x.agent === a || (a === "claude" && x.agent === "cursor")) && !(document.body.classList.contains("simple") && (x.managed || x.ignore)));
     $("#sessClaude").innerHTML = g("claude").map(row).join("") || '<div class="grp">没有在线的 Claude 会话</div>';
+    $("#cardClaude h3 .a-claude").textContent = sessList.some(x => x.agent === "cursor") ? "Claude / Cursor" : "Claude";
     $("#sessCodex").innerHTML = g("codex").map(row).join("") || '<div class="grp">没有在线的 Codex 会话</div>';
     $("#nClaude").textContent = g("claude").length ? `（${g("claude").length}）` : "";
     if (view) { const lv = sessList.find(s => s.agent === view.agent && s.sid === view.sid); const hb = $("#trHead .rb");
@@ -765,10 +766,11 @@ async function pollCodex(){
       : `<span class="badge b-bad">不交给 Codex</span> ${esc(c.reason)}（留给 Claude）`;
   } catch(e) {}
 }
+const AGENT_NAME = {claude: "Claude", cursor: "Cursor", codex: "Codex"};
 function fillTo(){
   const keep = $("#to").value;
-  $("#to").innerHTML = `<optgroup label="群发"><option value="all">全部会话</option><option value="claude">所有 Claude</option><option value="codex">Codex（派活时自动挑一个）</option></optgroup>` +
-    ["claude","codex"].map(a => { const xs = sessList.filter(x=>x.agent===a); return xs.length ? `<optgroup label="${a==="claude"?"Claude":"Codex"}">` +
+  $("#to").innerHTML = `<optgroup label="群发"><option value="all">全部会话</option><option value="claude">所有 Claude</option><option value="codex">Codex（派活时自动挑一个）</option>${sessList.some(x=>x.agent==="cursor")?'<option value="cursor">所有 Cursor</option>':""}</optgroup>` +
+    ["claude","cursor","codex"].map(a => { const xs = sessList.filter(x=>x.agent===a); return xs.length ? `<optgroup label="${AGENT_NAME[a]}">` +
       xs.map(x => `<option value="${esc(keyOf(x.agent,x.short))}">${esc((x.alias||x.title||"未命名"))} · ${esc(x.short)}${x.listening?" · 待命":""}</option>`).join("") + `</optgroup>` : ""; }).join("");
   if ([...$("#to").options].some(o => o.value === keep)) $("#to").value = keep;
 }
@@ -920,7 +922,7 @@ function openSession(x){
       <button data-role="main" class="${live.role_set==="main"?"on":""}">主</button><button data-role="aux" class="${live.role_set==="aux"?"on":""}">辅</button><button data-role="auto" class="${!live.role_set?"on":""}">自动</button></span>
     <button class="rf" id="trRefresh" title="从头重读这个会话的记录">⟳</button>
     ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">🤝 交给 Claude</button>` : ""}
-    <span class="note" style="color:var(--muted)">${x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : "回复经总线送达 Claude（闲着会被叫醒）；要它当成你本人的指令，最稳还是在 Claude 里直接说"}</span>`;
+    <span class="note" style="color:var(--muted)">${x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : x.agent==="cursor" ? "回复经总线送达 Cursor：它下次提交消息、调用工具或一轮结束时收到，闲着叫不醒；要它当成你本人的指令，最稳还是在 Cursor 里直接说" : "回复经总线送达 Claude（闲着会被叫醒）；要它当成你本人的指令，最稳还是在 Claude 里直接说"}</span>`;
   $("#toFixed").innerHTML = `发给 <b class="a-${esc(x.agent)}">${esc(nm)}</b>`;
   if ($("#toClaude")) $("#toClaude").onclick = () => handToClaude(x);
   $("#trRefresh").onclick = e => { spin(e.currentTarget); trOffset = -1; trEntries = []; pollTranscript(true); };
@@ -940,7 +942,7 @@ function trHtml(){
     flush();
     const long = e.text.length > 700 || e.text.split("\n").length > 14;
     html += `<div class="bub ${e.role==="user"?"u":"a"} ${long?"clamp":""}"><div class="bx">${esc(e.text)}</div>
-      ${long?'<a class="link more" data-bmore>展开全文</a>':""}<div class="bt">${e.role==="user"?"你":(view.agent==="codex"?"Codex":"Claude")} · ${e.ts?hm(e.ts):""}</div></div>`;
+      ${long?'<a class="link more" data-bmore>展开全文</a>':""}<div class="bt">${e.role==="user"?"你":(AGENT_NAME[view.agent]||"Claude")} · ${e.ts?hm(e.ts):""}</div></div>`;
   }
   flush();
   return html || `<div class="empty">这段时间没有对话内容</div>`;
@@ -966,13 +968,13 @@ async function handToClaude(x){
   toast("正在导出交接文件…", 20000);
   let r; try { r = await api("/api/export", {sid: x.sid}); } catch(e){ return toast("❌ 导出失败：" + e.message, 6000); }
   $("#toast").style.display = "none";
-  const claudes = sessList.filter(s => s.agent === "claude");
+  const claudes = sessList.filter(s => s.agent === "claude" || s.agent === "cursor");
   openDlg("🤝 交给 Claude 接着做", `
     <div>已导出：<code style="word-break:break-all">${esc(r.file)}</code></div>
     <div style="margin:8px 0 4px;font-weight:600">接手提示词（新开一个 Claude 会话粘进去就行）：</div>
     <textarea id="hoPrompt" rows="4" style="width:100%">${esc(r.prompt)}</textarea>
     <div style="margin-top:10px;font-weight:600">或者直接派给一个开着的 Claude 会话：</div>
-    <div style="display:flex;gap:6px;margin-top:4px"><select id="hoTo" style="flex:1;min-width:0">${claudes.map(s => `<option value="claude:${esc(s.short)}">${esc(s.alias||s.title||"未命名")} · ${esc(s.short)}${s.listening?" · 待命":""}</option>`).join("") || '<option value="">（没有开着的 Claude 会话）</option>'}</select>
+    <div style="display:flex;gap:6px;margin-top:4px"><select id="hoTo" style="flex:1;min-width:0">${claudes.map(s => `<option value="${esc(s.agent)}:${esc(s.short)}">${s.agent==="cursor"?"[Cursor] ":""}${esc(s.alias||s.title||"未命名")} · ${esc(s.short)}${s.listening?" · 待命":""}</option>`).join("") || '<option value="">（没有开着的 Claude 会话）</option>'}</select>
       <button class="primary" id="hoSend" ${claudes.length?"":"disabled"}>派活</button></div>
     <div style="color:var(--muted);font-size:12.5px;margin-top:8px">文件里有：接手说明、导出时现查的 git 状态（分支 / 未提交改动）、最后几轮、完整对话和跑过的命令。以文件和 git 为准。</div>`,
     `<button id="hoCopy">复制提示词</button><button onclick="closeDlg()">关闭</button>`);
