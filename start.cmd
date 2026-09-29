@@ -1,5 +1,5 @@
 @echo off
-rem 双击启动 agent-bridge 管理界面
+rem Start the agent-bridge web UI (keep this file ASCII-only: cmd reads it in the system code page)
 cd /d "%~dp0"
 python -m agent_bridge %*
 if errorlevel 1 pause

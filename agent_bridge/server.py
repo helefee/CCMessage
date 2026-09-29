@@ -862,7 +862,7 @@ def device_of(tok: str | None) -> dict | None:
 def start_lan() -> dict:
     if not LAN["srv"]:
         ip = lan_ip()
-        srv = ThreadingHTTPServer((ip, PORT["n"]), Handler)
+        srv = Server((ip, PORT["n"]), Handler)
         threading.Thread(target=srv.serve_forever, daemon=True, name="lan").start()
         LAN.update(srv=srv, ip=ip, port=PORT["n"])
         s = load_settings()
@@ -946,6 +946,17 @@ PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=
 
 # ---------- HTTP ----------
 
+# 浏览器刷新 / 切页 / 手机锁屏会中途断开请求，这时往回写包就会碰到这几种错，属正常现象
+_GONE = (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)
+
+
+class Server(ThreadingHTTPServer):
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], _GONE):
+            return  # 对方已经走了，不用在窗口里刷一屏报错
+        super().handle_error(request, client_address)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "agent-bridge/1"
 
@@ -962,6 +973,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _err(self, e, code=400):
+        if isinstance(e, _GONE):
+            return  # 连接已断，回不了错误包
         self._json({"error": str(e)}, code)
 
     def _html(self, html: str, code=200, headers=()):
@@ -1170,7 +1183,7 @@ def main(argv=None):
     url = f"http://127.0.0.1:{a.port}/"
     PORT["n"] = a.port
     try:
-        srv = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
+        srv = Server(("127.0.0.1", a.port), Handler)
     except OSError:
         # 端口被占：多半是已经开着一个，直接打开它
         print(f"端口 {a.port} 已被占用，可能已经在运行：{url}")
