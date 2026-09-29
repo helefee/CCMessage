@@ -1195,6 +1195,124 @@ def cmd_show(args) -> None:
     sys.exit("没找到这条")
 
 
+# ---------- 共享资源排队（lock）：部署测试服这类「同一时间只能一个人动」的事 ----------
+# 登记在 <总线>/locks/<资源>.json，不群发；交还时只私信排在第一位的那个会话。
+
+LOCKS = BUS / "locks"
+LOCK_TTL_MIN = 180          # 占用超过这么久没交还，算过期（别人可以直接接手）
+
+
+def _lock_path(name: str) -> Path:
+    LOCKS.mkdir(exist_ok=True)
+    safe = "".join("_" if c in '\\/:*?"<>|' else c for c in name.strip()) or "default"
+    return LOCKS / f"{safe}.json"
+
+
+def _lock_expired(h: dict | None) -> bool:
+    return bool(h) and now_ts() - h.get("since", 0) > h.get("ttl", LOCK_TTL_MIN) * 60
+
+
+def _lock_log(st: dict, what: str, who: dict, note: str = "") -> None:
+    st.setdefault("history", []).append({"ts": now_ts(), "what": what, "name": who.get("name"), "note": note})
+    st["history"] = st["history"][-30:]
+
+
+def _mins(ts: float) -> str:
+    return f"{int((now_ts() - ts) // 60)} 分钟"
+
+
+def lock_status_text(name: str, st: dict, me_key: str | None = None) -> str:
+    h = st.get("holder")
+    lines = []
+    if not h:
+        lines.append(f"「{name}」现在空着。")
+    else:
+        tag = "（过期了，可以直接接手）" if _lock_expired(h) else ""
+        mine = "（就是你）" if me_key and h["key"] == me_key else ""
+        lines.append(f"「{name}」正被 {h['name']}{mine} 占用 {_mins(h['since'])}{tag}：{h.get('note') or '（没写在做什么）'}")
+    for i, q in enumerate(st.get("queue") or [], 1):
+        mine = "（你）" if me_key and q["key"] == me_key else ""
+        lines.append(f"  排队 {i}. {q['name']}{mine}，等了 {_mins(q['since'])}：{q.get('note') or ''}")
+    return "\n".join(lines)
+
+
+def cmd_lock(args) -> None:
+    agent, sid = detect_self(args.as_)
+    me = touch_presence(agent, sid, os.getcwd(), None, force=True)
+    me_key, me_name = key_of(agent, sid), display_name(me)
+    if args.action == "show" and not args.name:
+        fs = sorted(LOCKS.glob("*.json")) if LOCKS.exists() else []
+        if not fs:
+            print("还没有人登记过占用。")
+        for f in fs:
+            print(lock_status_text(f.stem, load_json(f), me_key))
+        return
+    name = args.name or "副服"
+    path = _lock_path(name)
+    who = {"name": me_name}
+    deadline = now_ts() + (args.wait or 0)
+    while True:
+        with FileLock():
+            st = load_json(path)
+            h, q = st.get("holder"), st.setdefault("queue", [])
+            if args.action == "show":
+                print(lock_status_text(name, st, me_key))
+                hist = st.get("history") or []
+                if hist:
+                    print("最近：")
+                    for x in hist[-args.n:]:
+                        print(f"  {fmt_ts(x['ts'])} {x['name']} {x['what']}{('：' + x['note']) if x.get('note') else ''}")
+                return
+            if args.action == "leave":
+                st["queue"] = [x for x in q if x["key"] != me_key]
+                _lock_log(st, "退出排队", who)
+                save_json(path, st)
+                print(f"已退出「{name}」的排队。")
+                return
+            if args.action == "done":
+                if not h or h["key"] != me_key:
+                    sys.exit(f"「{name}」不在你手上。\n" + lock_status_text(name, st, me_key))
+                st["holder"] = None
+                st["freed_at"] = now_ts()
+                _lock_log(st, "交还", who, args.note)
+                save_json(path, st)
+                nxt = q[0] if q else None
+                print(f"已交还「{name}」。" + (f"下一个是 {nxt['name']}，已私信通知它。" if nxt else "没人排队。"))
+                break
+            # take：本来就是我 → 续上；空着 / 过期，且我排第一（或队首空出来 10 分钟还没来接）→ 拿到
+            mine = bool(h) and h["key"] == me_key
+            free = not h or _lock_expired(h)
+            first_ok = not q or q[0]["key"] == me_key or now_ts() - st.get("freed_at", 0) > 600
+            if mine or (free and first_ok):
+                if h and not mine:
+                    _lock_log(st, "过期被接手", {"name": h["name"]})
+                st["holder"] = {"key": me_key, "name": me_name, "note": args.note, "since": now_ts(),
+                                "ttl": args.ttl}
+                st["queue"] = [x for x in q if x["key"] != me_key]
+                _lock_log(st, "占用", who, args.note)
+                save_json(path, st)
+                print(f"✅ 拿到「{name}」，现在归你用（{args.ttl} 分钟内要交还，做完跑 lock done {name}）。")
+                if st["queue"]:
+                    print(f"后面还排着 {len(st['queue'])} 个会话。")
+                return
+            if not any(x["key"] == me_key for x in q):
+                q.append({"key": me_key, "name": me_name, "note": args.note, "since": now_ts()})
+                _lock_log(st, "排队", who, args.note)
+                save_json(path, st)
+            text = lock_status_text(name, st, me_key)
+        if now_ts() >= deadline:
+            print(text)
+            print(f"没拿到：已排进队。轮到你时会收到一条私信，到时再跑一次 lock take {name}（或加 --wait 秒数 原地等）。")
+            sys.exit(4)
+        time.sleep(5)
+    # done 之后：只私信排第一的那个
+    if nxt:
+        post(agent, sid, me, f"{nxt['key'].split('-', 1)[0]}:{nxt['key'].split('-', 1)[1]}",
+             f"【{name} 轮到你了】{me_name} 已交还「{name}」" + (f"（{args.note}）" if args.note else "") +
+             f"。你排第一：跑 python {REL} lock take {name} \"要做什么\" 占用，做完 lock done {name}。",
+             to_keys=[nxt["key"]])
+
+
 # ---------- 钩子 ----------
 
 USAGE = (
@@ -1203,6 +1321,9 @@ USAGE = (
     "看在线：python {rel} who；手动收：python {rel} inbox。\n"
     "派活：python {rel} task --to <对象> \"要做什么、做完交什么\"（加 --wait 秒数 原地等结果）；"
     "看任务：python {rel} tasks；等结果：python {rel} wait <任务号>；交活：python {rel} done <任务号> \"结果\"（--fail 表示没做成）。\n"
+    "占共享资源（部署测试服这类同一时间只能一个人动的事）别群发：先 python {rel} lock take <资源名，如 副服> \"要做什么\"，"
+    "拿到才动手，做完 python {rel} lock done <资源名> \"结果\"；被占着会自动排队（退出码 4），轮到你时会收到私信；"
+    "看谁在用、谁在排：python {rel} lock show。占用和排队只登记在总线里，不会打扰别的会话。\n"
     "当干活的一方：Claude 会话一闲下来就由 Stop 钩子自动在后台待命，有消息会把你叫醒（没装 Stop 钩子的项目，"
     "可以用后台命令挂 python {rel} listen --once 代替）；Codex 会话会被 codex queue 自动叫醒。\n"
     "派给 Codex 用 task --to codex：只派给用户在 Codex 桌面端里开着的本项目对话 —— 先挑你名下空闲的，再挑没人认领的空闲对话；"
@@ -1468,6 +1589,13 @@ def main() -> None:
     n.add_argument("alias")
     sh = sub.add_parser("show", help="按 id 看完整消息")
     sh.add_argument("id")
+    lk = sub.add_parser("lock", help="共享资源（如副服）的占用与排队：take 占 / done 交还 / show 看 / leave 退出排队")
+    lk.add_argument("action", choices=["take", "done", "show", "leave"])
+    lk.add_argument("name", nargs="?", help="资源名，缺省「副服」；show 不写就列出全部")
+    lk.add_argument("note", nargs="?", default="", help="take：要做什么；done：结果")
+    lk.add_argument("--ttl", type=int, default=LOCK_TTL_MIN, help="最多占多少分钟，过期别人可接手")
+    lk.add_argument("--wait", type=float, default=0, help="take 时被占着就原地等最多多少秒")
+    lk.add_argument("-n", type=int, default=8, help="show 显示最近几条记录")
     h = sub.add_parser("hook", help="钩子入口（由 Claude / Codex 调用）")
     h.add_argument("agent", choices=["claude", "codex", "cursor"])
     h.add_argument("--event")
@@ -1484,11 +1612,12 @@ def main() -> None:
                 pass
         return
     sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     {"send": cmd_send, "inbox": cmd_inbox, "who": cmd_who, "name": cmd_name, "show": cmd_show,
      "task": cmd_task, "done": cmd_done, "tasks": cmd_tasks, "wait": cmd_wait,
      "listen": cmd_listen, "codex-status": cmd_codex_status, "release": cmd_release, "set-role": cmd_set_role,
      "codex-pause": cmd_codex_pause, "codex-resume": cmd_codex_resume, "codex-ignore": cmd_codex_ignore,
-     "codex-worker": cmd_codex_worker}[args.cmd](args)
+     "codex-worker": cmd_codex_worker, "lock": cmd_lock}[args.cmd](args)
 
 
 if __name__ == "__main__":
