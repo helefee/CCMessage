@@ -61,6 +61,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .r-aux{background:var(--line2);color:var(--muted);border:1px solid var(--line)}
 .srow .rn{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .srow.is-main{box-shadow:inset 3px 0 var(--accent)}
+.rolesel button{padding:1px 9px;font-size:12px}
+.rb.man{outline:1px dashed currentColor;outline-offset:1px}
+.srow .rb{cursor:pointer}
 .rlegend{font-size:11.5px;color:var(--faint);display:flex;gap:10px;margin-top:4px;align-items:center}
 /* 刷新按钮 */
 .rf{border:0;background:transparent;color:var(--muted);padding:0 5px;font-size:14px;line-height:1;cursor:pointer}
@@ -704,7 +707,7 @@ async function pollSessions(){
     if (!cur || cur.root !== root) return;
     const row = x => { const [st, label] = sessState(x), key = keyOf(x.agent, x.short);
       return `<div class="srow ${x.role==="main"?"is-main":""}" data-key="${esc(key)}" data-sid="${esc(x.sid)}" data-agent="${esc(x.agent)}" title="点击：打开它的会话记录">
-        <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x)}${esc(x.alias||x.title||"未命名")}</div>
+        <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x, true)}${esc(x.alias||x.title||"未命名")}</div>
         ${x.role_note?`<div class="rn">${esc(x.role_note)}</div>`:""}
         <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div>
         <button class="to ghost" data-focus="${esc(key)}" title="总线消息里只看和它有关的">筛选</button></div>`; };
@@ -742,11 +745,27 @@ function fillTo(){
 function setTo(v){ if (![...$("#to").options].some(o => o.value === v)) $("#to").insertAdjacentHTML("beforeend", `<option value="${esc(v)}">${esc(v)}</option>`); $("#to").value = v; }
 
 // ---------- 主 / 辅 标志与刷新 ----------
-function roleBadge(x){
-  if (!x || !x.role) return "";
-  return x.role === "main" ? `<span class="rb r-main" title="主会话：${esc(x.role_note||"派活的一方")}">主</span>`
-                           : `<span class="rb r-aux" title="辅会话：${esc(x.role_note||"干活的一方")}">辅</span>`;
+function roleBadge(x, inList){
+  if (!x) return "";
+  if (!x.role) return !inList ? "" : `<span class="rb r-aux" data-rolecycle title="还没有主 / 辅身份，点一下设为主（再点变辅、再点回自动）" style="opacity:.45">设</span>`;
+  const m = x.role_manual ? " man" : "", tip = (x.role_manual ? "（手动）" : "（自动，点一下改）");
+  return x.role === "main" ? `<span class="rb r-main${m}" data-rolecycle title="主会话${tip}：${esc(x.role_note||"派活的一方")}">主</span>`
+                           : `<span class="rb r-aux${m}" data-rolecycle title="辅会话${tip}：${esc(x.role_note||"干活的一方")}">辅</span>`;
 }
+async function setRole(x, role){
+  try { await api("/api/role", {root:cur.root, agent:x.agent, sid:x.sid, role});
+    toast(`已把「${x.alias||x.title||"会话"}」设为${{main:"主会话",aux:"辅会话",auto:"自动判断"}[role]}，并通知了它`);
+    await pollSessions(); if (view && view.sid === x.sid) openSession(sessList.find(s => s.sid === x.sid) || x);
+  } catch(e){ toast("❌ " + e.message, 5000); }
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-rolecycle]"); if (!b) return;
+  const row = b.closest(".srow"); if (!row) return;
+  e.stopPropagation(); e.preventDefault();
+  const x = sessList.find(s => s.sid === row.dataset.sid && s.agent === row.dataset.agent); if (!x) return;
+  const next = !x.role_set ? "main" : x.role_set === "main" ? "aux" : "auto";
+  setRole(x, next);
+}, true);
 function spin(el){ if (!el) return; el.classList.remove("spin"); void el.offsetWidth; el.classList.add("spin"); }
 async function refreshAll(btn){
   spin(btn); if (!cur) return;
@@ -867,12 +886,15 @@ function openSession(x){
   const live = sessList.find(s => s.agent === x.agent && s.sid === x.sid) || x;
   $("#trHead").innerHTML = `<button class="mback mob" onclick="mBack()" title="返回">‹</button>${roleBadge(live)}<span class="nm a-${esc(x.agent)}">${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
     ${live.role_note?`<span style="color:var(--muted)">${esc(live.role_note)}</span>`:""}
+    <span class="seg rolesel" title="手动设这个会话是主还是辅；自动 = 按派活关系判断">
+      <button data-role="main" class="${live.role_set==="main"?"on":""}">主</button><button data-role="aux" class="${live.role_set==="aux"?"on":""}">辅</button><button data-role="auto" class="${!live.role_set?"on":""}">自动</button></span>
     <button class="rf" id="trRefresh" title="从头重读这个会话的记录">⟳</button>
     ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">🤝 交给 Claude</button>` : ""}
     <span class="note" style="color:var(--muted)">${x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : "回复经总线送达 Claude（闲着会被叫醒）；要它当成你本人的指令，最稳还是在 Claude 里直接说"}</span>`;
   $("#toFixed").innerHTML = `发给 <b class="a-${esc(x.agent)}">${esc(nm)}</b>`;
   if ($("#toClaude")) $("#toClaude").onclick = () => handToClaude(x);
   $("#trRefresh").onclick = e => { spin(e.currentTarget); trOffset = -1; trEntries = []; pollTranscript(true); };
+  $$(".rolesel button").forEach(b => b.onclick = () => setRole(x, b.dataset.role));
   if (!same) { trOffset = -1; trEntries = []; $("#trView").innerHTML = `<div class="empty">正在读会话记录…</div>`; }
   pollTranscript(true);
 }
