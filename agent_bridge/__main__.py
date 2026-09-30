@@ -10,6 +10,7 @@
     python -m agent_bridge export <Codex 线程>  Codex 线程导出成交接文件（给 Claude 接手）
     python -m agent_bridge codex-list          最近的 Codex 线程
     python -m agent_bridge claude-sync [--dry-run] [--list] [--to 账号/组织]
+    python -m agent_bridge codex-sync [--dry-run] [--days 14] [--cwd 项目] [--to 账号/组织]   把 Codex 对话同步进 Claude 桌面端列表
                                                切换账号后看不到的 Claude 桌面端会话，补齐到当前账号的列表里
 """
 from __future__ import annotations
@@ -117,6 +118,9 @@ def main(argv=None):
     if cmd == "claude-sync":
         from . import claude_sync
         return claude_sync.main(rest)
+    if cmd == "codex-sync":
+        from . import codex_sync
+        return codex_sync.main(rest)
     if cmd in ("export", "codex-list", "to-claude"):
         from .paths import PKG
         sub = {"codex-list": "list"}.get(cmd, cmd)

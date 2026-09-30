@@ -277,8 +277,9 @@ def iso(ts) -> str:
         return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def cmd_to_claude(args):
-    p = find_thread(args.thread)
+def build_claude(p: Path, sid: str | None = None, version: str = "2.1.281",
+                 title_prefix: str = "（从 Codex 导入）") -> dict:
+    """把一个 Codex 线程写成 Claude Code 会话记录；sid 给了就覆盖写同一个会话（同步时用）。"""
     conv = parse(p)
     m = conv["meta"]
     tid = m.get("id", p.stem[-36:])
@@ -305,8 +306,7 @@ def cmd_to_claude(args):
         pass
     if turns[-1][0] == "user":        # 最后一条要是助手，resume 时新问题才能接上
         push("assistant", "（导入到此为止。）", turns[-1][2])
-    sid = str(uuid.uuid4())
-    version = args.version
+    sid = sid or str(uuid.uuid4())
     recs, parent = [], None
     for role, parts, ts in turns:
         u = str(uuid.uuid4())
@@ -322,15 +322,19 @@ def cmd_to_claude(args):
                                "usage": {"input_tokens": 0, "output_tokens": 0}}
         recs.append(base)
         parent = u
-    recs.append({"type": "custom-title", "customTitle": f"（从 Codex 导入）{title}", "sessionId": sid})
+    recs.append({"type": "custom-title", "customTitle": f"{title_prefix}{title}", "sessionId": sid})
     d = CLAUDE_HOME / "projects" / claude_slug(cwd)
     d.mkdir(parents=True, exist_ok=True)
     f = d / f"{sid}.jsonl"
     with open(f, "w", encoding="utf-8", newline="\n") as fh:
         for r in recs:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
-    print(json.dumps({"ok": True, "session": sid, "file": str(f), "turns": len(turns), "cwd": cwd,
-                      "resume": f'claude --resume {sid}'}, ensure_ascii=False))
+    return {"ok": True, "session": sid, "file": str(f), "turns": len(turns), "cwd": cwd, "title": title,
+            "thread": tid, "resume": f"claude --resume {sid}"}
+
+
+def cmd_to_claude(args):
+    print(json.dumps(build_claude(find_thread(args.thread), version=args.version), ensure_ascii=False))
 
 
 def main():

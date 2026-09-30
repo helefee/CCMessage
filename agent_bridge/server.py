@@ -1038,6 +1038,9 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/claude-sync":
                 from . import claude_sync
                 self._json(claude_sync.plan())
+            elif u.path == "/api/codex-sync":
+                from . import codex_sync
+                self._json(codex_sync.plan(float(q.get("days", 14)), q.get("root") or None))
             elif u.path == "/api/layout":
                 self._json(window_layout())
             elif u.path == "/api/transcript":
@@ -1127,6 +1130,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/claude-sync":
                 from . import claude_sync
                 self._json(claude_sync.run())
+            elif path == "/api/codex-sync":
+                from . import codex_sync
+                self._json(codex_sync.run(float(body.get("days") or 14), body.get("root") or None))
             elif path == "/api/pair/new":
                 self._json(new_pair())
             elif path == "/api/lan/stop":
