@@ -536,7 +536,11 @@ def owner_alive(owner_key: str | None) -> bool:
 #   缺省 = 在 Codex **桌面版**里新开（深链预填 + 拉到前台按回车；用户能在桌面版里看过程）。设 MSGBUS_CODEX_DESKTOP_NEW=0 关掉。
 #   后台无界面新开（codex exec）：派活写 --to codex:bg；或设 MSGBUS_CODEX_AUTO_NEW=1 且关掉桌面版新开。
 CODEX_AUTO_NEW = os.environ.get("MSGBUS_CODEX_AUTO_NEW") == "1"
-CODEX_DESKTOP_NEW = os.environ.get("MSGBUS_CODEX_DESKTOP_NEW", "1") != "0"
+# ☠ 缺省关（09-30 实测）：窗口停在某个老对话时，深链没切到新对话，回车把活发进了老对话。设 1 才开
+CODEX_DESKTOP_NEW = os.environ.get("MSGBUS_CODEX_DESKTOP_NEW", "0") == "1"
+# 反过来一样：task --to claude 没有空闲可用的 Claude 会话时，在 Claude 桌面端新开一个（claude://code/new）。设 0 关掉
+# ☠ 缺省关（09-30 实测三次）：新会话页和预填都出来了，模拟回车却发不出去。设 1 才开
+CLAUDE_DESKTOP_NEW = os.environ.get("MSGBUS_CLAUDE_DESKTOP_NEW", "0") == "1"
 
 
 _ARCHIVED_CACHE: dict = {}
@@ -872,7 +876,9 @@ def start_worker(msg: dict, owner_key: str, thread: str | None, kind: str = "cod
     """后台起一个进程跑这件活：thread=None 新开对话，否则接着那个对话（codex exec resume / cursor --resume）。"""
     import subprocess
     WORKERS.mkdir(exist_ok=True)
-    save_json(WORKERS / f"{msg['id']}.json", {"task": msg["id"], "owner": owner_key, "thread": thread, "kind": kind,
+    save_json(WORKERS / f"{msg['id']}.json", {"task": msg["id"], "owner": owner_key, "thread": thread,
+                                              "kind": "desktop" if kind == "desktop-claude" else kind,
+                                              "app": "claude" if kind == "desktop-claude" else None,
                                               "state": "starting", "created": now_ts()})
     flags = 0
     if os.name == "nt":
@@ -880,13 +886,20 @@ def start_worker(msg: dict, owner_key: str, thread: str | None, kind: str = "cod
     env = dict(os.environ, PYTHONUTF8="1")
     for k in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"):
         env.pop(k, None)
+    app = None
+    if kind == "desktop-claude":
+        kind, app = "desktop", "claude"
     args = [sys.executable, str(BUS / "bus.py"), f"{kind}-worker", msg["id"], "--owner", owner_key]
+    if app:
+        args += ["--app", app]
     if thread:
         args += ["--thread", thread]
     subprocess.Popen(args, cwd=str(ROOT), env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL, creationflags=flags, close_fds=True)
     if kind == "cursor":
         return "已接着这个 Cursor 后台对话跑" if thread else "已用 Cursor 命令行在后台新开一个对话来做"
+    if kind == "desktop" and app == "claude":
+        return "正在 Claude 桌面端里新开一个会话来做（等用户键盘鼠标空闲几秒后才把桌面端拉到前台按回车；没发出去会私信你）"
     if kind == "desktop":
         return ("正在 Codex 桌面版里新开一个对话来做（等用户键盘鼠标空闲几秒后才把桌面版拉到前台按回车；"
                 "没发出去会私信你）")
@@ -928,7 +941,12 @@ def _wait_idle(need: float, max_wait: float) -> bool:
 
 
 def _codex_windows() -> list:
-    """Codex 桌面版（OpenAI.Codex 包里的 ChatGPT.exe）可见的顶层窗口句柄。只在 Windows 上有。"""
+    return _app_windows("codex")
+
+
+def _app_windows(app: str = "codex") -> list:
+    """桌面版可见的顶层窗口句柄。codex = OpenAI.Codex 包里的 ChatGPT.exe；claude = Claude 包里的 Claude.exe
+    （命令行 Claude Code 的 claude.exe 在 AppData 下、没有窗口，不算）。只在 Windows 上有。"""
     if os.name != "nt":
         return []
     import ctypes
@@ -953,18 +971,20 @@ def _codex_windows() -> list:
     def cb(hwnd, _):
         if u32.IsWindowVisible(hwnd) and u32.GetWindowTextLengthW(hwnd) > 0:
             p = exe_of(hwnd)
-            if "OpenAI.Codex" in p and p.lower().endswith("chatgpt.exe"):
+            pl = p.lower()
+            if (app == "codex" and "OpenAI.Codex" in p and pl.endswith("chatgpt.exe")) or \
+                    (app == "claude" and "\\windowsapps\\claude_" in pl and pl.endswith("\\claude.exe")):
                 out.append(hwnd)
         return True
     u32.EnumWindows(cb, 0)
     return out
 
 
-def _codex_foreground() -> int | None:
+def _codex_foreground(app: str = "codex") -> int | None:
     """桌面版窗口在最前面就返回它的句柄；不在就试着拉到前台（借前台线程的输入队列），拉不过来返回 None。"""
     import ctypes
     u32, k32 = ctypes.windll.user32, ctypes.windll.kernel32
-    wins = _codex_windows()
+    wins = _app_windows(app)
     if not wins:
         return None
     fg = u32.GetForegroundWindow()
@@ -986,11 +1006,11 @@ def _codex_foreground() -> int | None:
     return hwnd if u32.GetForegroundWindow() == hwnd else None
 
 
-def _press_enter(since_idle: float) -> bool:
+def _press_enter(since_idle: float, app: str = "codex") -> bool:
     """按回车前一刻再核一次：前台还是桌面版、这段时间用户没碰过键盘鼠标；有一样不对就不按。"""
     import ctypes
     u32 = ctypes.windll.user32
-    if u32.GetForegroundWindow() not in _codex_windows() or _idle_secs() < since_idle:
+    if u32.GetForegroundWindow() not in _app_windows(app) or _idle_secs() < since_idle:
         return False
     u32.keybd_event(0x0D, 0, 0, 0)
     u32.keybd_event(0x0D, 0, 2, 0)
@@ -1000,18 +1020,89 @@ def _press_enter(since_idle: float) -> bool:
 def _find_desktop_thread(task_id: str, since: float) -> str | None:
     """在今天 / 昨天的 Codex 会话文件里找：开在本工作区、用户线程、内容里带这个任务号、在 since 之后建的。"""
     needle = task_id.encode()
+    known = {r["sid"] for r in all_sessions() if r.get("agent") == "codex"}
     for p in codex_rollouts(2):
         try:
-            if p.stat().st_mtime < since - 5:
+            # 只认派活之后新建的、总线没见过的对话：老对话 / 它的子线程里也会出现这个任务号（09-30 误判过一次）
+            if p.stat().st_ctime < since - 5:
                 continue
             meta = rollout_meta(p)
-            if meta.get("thread_source") != "user" or not in_workspace(meta.get("cwd")):
+            if meta.get("thread_source") != "user" or not in_workspace(meta.get("cwd")) or meta.get("id") in known:
                 continue
             if needle in p.read_bytes():
                 return meta.get("id")
         except OSError:
             continue
     return None
+
+
+def _click_composer(hwnd: int) -> bool:
+    """Claude 桌面端开新会话页后，焦点常落在左栏的项目筛选框（回车按进去没用）：在窗口底部的输入框里点一下。
+    输入框贴着窗口底部、占主区大半宽度：取「右边往左 35% 宽、底边往上 70 像素（按缩放比例）」那一点，
+    侧栏开着或收起都落在框里。点完把鼠标放回原处。"""
+    import ctypes
+    from ctypes import wintypes
+    u32 = ctypes.windll.user32
+    try:    # 按真实像素算：不声明的话窗口坐标是缩放前的，再乘缩放比例就点偏了
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        pass
+    r = wintypes.RECT()
+    if not u32.GetWindowRect(hwnd, ctypes.byref(r)):
+        return False
+    try:
+        scale = u32.GetDpiForWindow(hwnd) / 96.0
+    except Exception:
+        scale = 1.0
+    x = r.right - int((r.right - r.left) * 0.35)
+    y = r.bottom - int(70 * scale)
+    old = wintypes.POINT()
+    u32.GetCursorPos(ctypes.byref(old))
+    u32.SetCursorPos(x, y)
+    u32.mouse_event(0x0002, 0, 0, 0, 0)          # 左键按下
+    u32.mouse_event(0x0004, 0, 0, 0, 0)          # 左键抬起
+    u32.SetCursorPos(old.x, old.y)
+    return True
+
+
+def _find_desktop_claude(task_id: str, since: float) -> str | None:
+    """在本项目的 Claude Code 会话记录里找：since 之后动过、内容里带这个任务号的那个会话。"""
+    import re
+    d = CLAUDE_HOME / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(ROOT))
+    needle = task_id.encode()
+    for f in sorted(d.glob("*.jsonl"), key=lambda x: -x.stat().st_mtime) if d.exists() else []:
+        try:
+            if f.stat().st_mtime < since - 5:
+                break
+            # 只认派活之后新建的会话文件：派活方自己的会话里也有这个任务号
+            if f.stat().st_ctime < since - 5:
+                continue
+            if needle in f.read_bytes():
+                return f.stem
+        except OSError:
+            continue
+    return None
+
+
+def claude_slots(me_key: str) -> dict:
+    """task --to claude 能用的 Claude 会话：总线在桌面端新开的、或用户设成「辅」的；
+    归我或没人认领、正在待命（闲着）、手上没有没交的活。用户自己的主线会话不挑。"""
+    t, done, rows = now_ts(), results_by_task(), []
+    for r in all_sessions():
+        if r.get("agent") != "claude" or key_of("claude", r["sid"]) == me_key:
+            continue
+        if not (r.get("desktop_opened") or r.get("role_set") == "aux") or t - r.get("last_seen", 0) > ONLINE_WINDOW:
+            continue
+        own = r.get("owner")
+        mine = own == me_key
+        if own and not mine and owner_alive(own):
+            continue
+        busy = pending_for(r["sid"], done, agent="claude")
+        idle = t - r.get("listening", 0) <= LISTEN_FRESH and not busy
+        rows.append({"rec": r, "mine": mine, "idle": idle, "busy": busy})
+    pick = next((x["rec"] for x in sorted(rows, key=lambda x: (not x["mine"], -x["rec"].get("last_seen", 0)))
+                 if x["idle"]), None)
+    return {"rows": rows, "pick": pick}
 
 
 def cmd_desktop_worker(args) -> None:
@@ -1021,22 +1112,27 @@ def cmd_desktop_worker(args) -> None:
     w = load_json(wp)
     if not task:
         return
+    app = getattr(args, "app", None) or "codex"
+    appname = "Claude 桌面端" if app == "claude" else "Codex 桌面版"
     WORKERS.mkdir(exist_ok=True)
     pf = WORKERS / f"{args.id}.prompt.md"
-    pf.write_text(task_prompt(task), encoding="utf-8")
+    pf.write_text(task_prompt(task, who="Claude") if app == "claude" else task_prompt(task), encoding="utf-8")
     first = task["text"].strip().splitlines()[0][:40] if task["text"].strip() else ""
     prompt = (f"消息总线派活 #{args.id}（{task['from']['name']} 派）：{first}\n"
               f"完整说明在 {pf.as_posix()} ，先读它再照做；做完按里面写的运行 done 交回。")
     from urllib.parse import quote
-    url = f"codex://threads/new?path={quote(str(ROOT), safe='')}&prompt={quote(prompt, safe='')}"
-    w.update({"state": "running", "pid": os.getpid(), "started": now_ts(), "kind": "desktop"})
+    if app == "claude":
+        url = f"claude://code/new?q={quote(prompt, safe='')}&folder={quote(str(ROOT), safe='')}"
+    else:
+        url = f"codex://threads/new?path={quote(str(ROOT), safe='')}&prompt={quote(prompt, safe='')}"
+    w.update({"state": "running", "pid": os.getpid(), "started": now_ts(), "kind": "desktop", "app": app})
     save_json(wp, w)
     since = now_ts()
     why, draft = "", False
     # 深链本身就会把桌面版切到前台：先等用户闲下来再动手，免得打断正在打字的人
     if not _wait_idle(DESKTOP_IDLE_SECS, DESKTOP_IDLE_WAIT):
         span = f"{int(DESKTOP_IDLE_WAIT // 60)} 分钟" if DESKTOP_IDLE_WAIT >= 60 else f"{int(DESKTOP_IDLE_WAIT)} 秒"
-        why = f"你一直在用电脑，{span}内没等到空闲 {DESKTOP_IDLE_SECS:g} 秒，没去动桌面版"
+        why = f"你一直在用电脑，{span}内没等到空闲 {DESKTOP_IDLE_SECS:g} 秒，没去动{appname}"
     else:
         try:
             t0 = now_ts()
@@ -1045,25 +1141,33 @@ def cmd_desktop_worker(args) -> None:
             time.sleep(3.0)
             if _idle_secs() < now_ts() - t0:
                 why = "打开桌面版时你正好在操作电脑，没按回车"
-            elif not _codex_foreground():
-                why = "桌面版窗口没抢到前台（可能有别的弹窗挡着），没按回车"
-            elif not _press_enter(now_ts() - t0):
-                why = "按回车前一刻前台已不是桌面版，或你刚动过键盘鼠标，没按回车"
+            elif not (hwnd := _codex_foreground(app)):
+                why = f"{appname}窗口没抢到前台（可能有别的弹窗挡着），没按回车"
+            else:
+                since = now_ts() - t0
+                if app == "claude":
+                    # 我们自己点的这一下也算「有输入」：之后只要求这 0.4 秒里没人再动
+                    _click_composer(hwnd)
+                    time.sleep(0.4)
+                    since = 0.3
+                if not _press_enter(since, app):
+                    why = f"按回车前一刻前台已不是{appname}，或你刚动过键盘鼠标，没按回车"
         except Exception as e:
             why = f"深链打不开：{e!r}"
     sid = None
     deadline = now_ts() + DESKTOP_DETECT_SECS
     while not why and now_ts() < deadline:
-        sid = _find_desktop_thread(args.id, since)
+        sid = _find_desktop_claude(args.id, since) if app == "claude" else _find_desktop_thread(args.id, since)
         if sid:
             break
         time.sleep(2)
     if sid:
-        discover_codex()
-        rp = SESS / f"{key_of('codex', sid)}.json"
+        if app == "codex":
+            discover_codex()
+        rp = SESS / f"{key_of(app, sid)}.json"
         rec = load_json(rp)
-        rec.update({"agent": "codex", "sid": sid, "cwd": rec.get("cwd") or str(ROOT),
-                    "originator": rec.get("originator") or "Codex Desktop",
+        rec.update({"agent": app, "sid": sid, "cwd": rec.get("cwd") or str(ROOT),
+                    "originator": rec.get("originator") or ("Claude Desktop" if app == "claude" else "Codex Desktop"),
                     "owner": args.owner, "owner_since": now_ts(), "desktop_opened": True,
                     "title": rec.get("title") or f"（总线新开）{first[:24]}",
                     "last_seen": now_ts()})
@@ -1075,11 +1179,15 @@ def cmd_desktop_worker(args) -> None:
     w.update({"state": "finished", "exit": why or "没认出新对话", "ended": now_ts()})
     save_json(wp, w)
     f = task["from"]
-    me = {"agent": "bus", "sid": "desktop", "name": "消息总线"}
-    tail = ("Codex 桌面版里可能已经预填好一个新对话（没发送）：到桌面版按回车即可；"
-            f"不想要就清掉那条草稿，改用 python {REL} task --to codex:bg … 后台跑，或留给 Claude。") if draft or not why else \
-           (f"桌面版没动过、没有草稿。可以晚点再派，或改用 python {REL} task --to codex:bg … 后台跑，或留给 Claude。")
-    body = (f"【桌面版新开没发出去】任务 #{args.id}：{why or f'{DESKTOP_DETECT_SECS} 秒内没在 Codex 会话记录里认出新对话'}。" + tail)
+    me = {"agent": "bus", "sid": "desktop", "name": "消息总线", "title": "消息总线"}
+    if app == "codex" and not why:
+        why = "没认出新对话 —— 也可能被发进了桌面版当时开着的老对话，去桌面版看一眼"
+    other = ("改派给某个开着的 Claude 会话（task --to claude:<会话>），或自己做" if app == "claude"
+             else f"改用 python {REL} task --to codex:bg … 后台跑，或留给 Claude")
+    tail = (f"{appname}里可能已经预填好一个新对话（没发送）：到{appname}按回车即可；不想要就清掉那条草稿，{other}。"
+            if draft or not why else f"{appname}没动过、没有草稿。可以晚点再派，或{other}。")
+    body = (f"【{appname}新开没发出去】任务 #{args.id}："
+            f"{why or f'{DESKTOP_DETECT_SECS} 秒内没在会话记录里认出新对话'}。" + tail)
     post("bus", "desktop", me, f"{f['agent']}:{short_id(f)}", body, kind="msg",
          to_keys=[key_of(f["agent"], f["sid"])])
 
@@ -1270,7 +1378,7 @@ def cmd_task(args) -> None:
                   f"这件活留给 Claude 做（自带子代理，或 task --to claude:<会话>）。确认 Codex 恢复了：python {REL} codex-resume")
             sys.exit(NO_CODEX_EXIT)
         s = codex_slots(me_key)
-        desk_busy = sum(1 for wr in worker_recs() if wr.get("kind") == "desktop"
+        desk_busy = sum(1 for wr in worker_recs() if wr.get("kind") == "desktop" and wr.get("app") != "claude"
                         and wr.get("task") not in results_by_task() and now_ts() - wr.get("created", 0) < WORKER_TIMEOUT)
         if tl == "codex" and s["pick"]:
             how = ("existing", s["pick"]["rec"])
@@ -1306,6 +1414,30 @@ def cmd_task(args) -> None:
             to, to_keys = f"codex:{short_id(how[1])}", [key_of("codex", how[1]["sid"])]
         else:
             to, to_keys = "codex:new", []
+    elif tl in ("claude", "claude:new"):
+        # 派给 Claude：先挑归我 / 没人认领的、闲着的「总线新开」或「辅」会话；没有就在 Claude 桌面端新开一个
+        cs = claude_slots(me_key)
+        text = read_text(args.text)
+        if tl == "claude" and cs["pick"]:
+            r = cs["pick"]
+            msg = post(agent, sid, me, f"claude:{short_id(r)}", text, kind="task", to_keys=[key_of("claude", r["sid"])])
+            claim(r, me_key)
+        else:
+            if not (CLAUDE_DESKTOP_NEW and os.name == "nt" and _app_windows("claude")):
+                why = ("Claude 桌面端没开" if CLAUDE_DESKTOP_NEW and os.name == "nt" else "没开「在 Claude 桌面端新开」")
+                print(f"✗ 没派：没有你能用的闲着的 Claude 辅会话，{why}。派给指定会话用 task --to claude:<会话>，或自己做。")
+                sys.exit(NO_CODEX_EXIT)
+            busy = sum(1 for wr in worker_recs() if wr.get("kind") == "desktop" and wr.get("app") == "claude"
+                       and wr.get("task") not in results_by_task() and now_ts() - wr.get("created", 0) < WORKER_TIMEOUT)
+            if busy >= MAX_NEW_CODEX:
+                print(f"✗ 没派：总线在 Claude 桌面端新开的会话已有 {busy} 个手上有活（上限 {MAX_NEW_CODEX}）。等一个交完再派。")
+                sys.exit(NO_CODEX_EXIT)
+            msg = post(agent, sid, me, "claude:new", text, kind="task", no_wake=True, to_keys=[])
+            print("  " + start_worker(msg, me_key, None, kind="desktop-claude"))
+        print(f"任务编号：{msg['id']}。对方做完会用 done 回报；等结果：python {REL} wait {msg['id']}")
+        if args.wait:
+            wait_result(msg["id"], args.wait)
+        return
     elif tl in ("cursor-agent", "cursor:new") or (tl.startswith("cursor:") and any(
             r.get("managed") and match_target(to, r) for r in all_sessions() if r.get("agent") == "cursor")):
         # Cursor 命令行后台接活：cursor:new / cursor-agent = 挑一个归我、空闲的后台对话接着用，没有就新开
@@ -1827,6 +1959,8 @@ USAGE = (
     "开了 PR 用 claim add <卡号> --pr 编号 补上；合完 python {rel} claim done <卡号> --pr 编号 \"结果\"。\n"
     "当干活的一方：Claude 会话一闲下来就由 Stop 钩子自动在后台待命，有消息会把你叫醒（没装 Stop 钩子的项目，"
     "可以用后台命令挂 python {rel} listen --once 代替）；Codex 会话会被 codex queue 自动叫醒。\n"
+    "派给 Claude 用 task --to claude：先挑归你 / 没人认领的、闲着的「辅」会话或总线开的会话（用户自己的主线会话不挑）；"
+    "没有就在 Claude 桌面端新开一个（等用户空闲几秒才动手），用户能在桌面端看过程。指定某个会话写 --to claude:<前6位>。\n"
     "要 Cursor 在后台干活（本机装了 Cursor 命令行时）：task --to cursor:new \"…\" —— 总线用 Cursor 命令行开一个后台对话（或接着你名下空闲的那个）跑完交回，不用谁开着 Cursor。\n"
     "派给 Codex 用 task --to codex：只派给用户在 Codex 桌面端里开着的本项目对话 —— 先挑你名下空闲的，再挑没人认领的空闲对话；"
     "都没有就在 Codex 桌面版里自动新开一个（深链预填 + 自动回车，用户能在桌面版看过程；要后台无界面跑写 --to codex:bg）。Codex 额度用完 / 服务报错时总线会自动暂停往 Codex 派 30 分钟（同样退出码 3）；"
@@ -2083,7 +2217,8 @@ def main() -> None:
     cuw.add_argument("id")
     cuw.add_argument("--owner", required=True)
     cuw.add_argument("--thread")
-    dw = sub.add_parser("desktop-worker", help="（内部）在 Codex 桌面版里新开对话接一件活")
+    dw = sub.add_parser("desktop-worker", help="（内部）在 Codex / Claude 桌面端里新开对话接一件活")
+    dw.add_argument("--app", choices=["codex", "claude"], default="codex")
     dw.add_argument("id")
     dw.add_argument("--owner", required=True)
     dw.add_argument("--thread")
