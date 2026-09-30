@@ -153,6 +153,20 @@ Cursor（3.x）会读项目 `.claude/settings.json` 里的 Claude 钩子（设�
 - Cursor 的命令行拿不到会话号，所以它跑总线命令要带 `--as cursor:<会话号>`；开会话时注入的说明里命令已经带好了。
 - 发给它：`send --to cursor`（所有 Cursor）或 `--to cursor:前6位`。信件动画暂时不画 Cursor。
 
+### Cursor 后台派活（Cursor 命令行）
+
+不用谁开着 Cursor：`task --to cursor:new "…"` 让总线用 Cursor 命令行在后台开一个对话跑完交回
+（或接着你名下空闲的那个后台对话，上下文接得上）。和 Codex 后台一样：归派活的会话用、手上有活的不再派、同时最多 4 个。
+
+- 先装 Cursor 命令行并登录（一次）：Windows PowerShell 里 `irm 'https://cursor.com/install?win32=true' | iex`，
+  macOS / Linux `curl https://cursor.com/install -fsS | bash`；然后 `agent login`。程序装在 `~/.local/bin/agent`。
+  ☠ 别的工具也可能叫 `agent`（比如 Grok），总线只认 `cursor-agent` 或 `~/.local/bin` 下的 `agent`；装在别处就设 `MSGBUS_CURSOR_AGENT=<完整路径>`。
+- 跑法：`agent -p --output-format stream-json --force --workspace <项目> [--resume <对话>] "<一句话>"`。
+  任务说明写进 `<总线>/workers/<任务号>.prompt.md`，只给它一句话让它去读（多行说明经 Windows 的 .cmd 包装会被截断）。
+  `--force` 表示它跑命令不再逐条问你 —— 这就是「后台」的意思，派活时写清楚不许碰什么。
+- 它用环境变量 `MSGBUS_AS=cursor:<对话>` 认身份，`done` 交活；没交就拿它最后一句回复兜底交回。日志在 `<总线>/workers/<任务号>.log`。
+- 后台开的对话在 Cursor 桌面端里大概率看不到（和 Codex 后台开的一样）。
+
 ## 手机端
 
 电脑界面 ⋯ →「📱 手机端（扫码）」：打开局域网监听、出一次性配对二维码（3 分钟、只能用一次）。
@@ -170,7 +184,16 @@ Cursor（3.x）会读项目 `.claude/settings.json` 里的 Claude 钩子（设�
       python -m agent_bridge export <Codex 线程末几位>
 
   导出交接 Markdown 到 `<项目>/.msgbus/exports/`：接手说明、导出时现查的 git 状态、最后几轮、完整对话与命令。
-  `to-claude` 能转成 Claude Code 会话记录（实验性：只有登录的命令行 Claude Code 能 `--resume`，桌面端列表看不到，且会被 Codex 反导回去）。
+- **把 Codex 对话同步进 Claude 桌面端列表**（和 Codex 自动导入 Claude 会话反过来）：界面 ⋯ →「📥 把 Codex 对话同步进 Claude…」，或
+
+      python -m agent_bridge codex-sync [--dry-run] [--days 14] [--cwd 项目目录]
+
+  - 只同步你在 Codex 桌面端里自己开的对话；从 Claude 导进 Codex 的、后台 exec 开的、子代理都不同步（免得来回套娃）。
+  - 每个 Codex 对话对应一个固定的 Claude 会话，标题前带「（Codex）」：Codex 那边又聊了就更新；你在 Claude 里接着聊过的不再覆盖。
+  - 只带对话文字，Codex 跑过的命令折成一行说明；接着做之前让 Claude 先核一下 git / 文件现状。
+  - 顺手在 Codex 的导入记录里登记「这份就是原来那个对话」，Codex 不会再把它导回去成重复的。写之前整目录备份到 `~/.agent-bridge/codex-sync-bak/`。
+  - Claude 桌面端只在启动时读列表：同步完要**重启 Claude 桌面端**。
+  - 这靠的是本机 Claude / Codex 的文件格式（没公开的），它们升级改格式后可能要跟着改。
 
 ## 记忆互通
 

@@ -306,6 +306,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
           <button id="mPhone" class="admin">📱 手机端（扫码）…</button>
           <button id="mAdd" class="admin">＋ 添加项目…</button>
           <button id="mCSync" class="admin">🔄 同步 Claude 会话到当前账号…</button>
+          <button id="mXSync" class="admin">📥 把 Codex 对话同步进 Claude…</button>
           <button id="mInst" class="admin">安装 / 升级 / 修复</button>
           <button id="mTest" class="admin">自检</button>
           <button id="mRm" class="admin">从列表移除</button>
@@ -604,6 +605,26 @@ $("#mCSync").onclick = async () => {
   if ($("#csGo")) $("#csGo").onclick = async () => {
     try { const r = await api("/api/claude-sync", {}); openDlg("✅ 已补齐", `<div>补进来 ${r.done} 个会话。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
       <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到。</div>`); }
+    catch(e){ toast("❌ " + e.message, 5000); } };
+};
+
+$("#mXSync").onclick = async () => {
+  const root = cur && cur.root ? cur.root : "";
+  let p; try { p = await api(`/api/codex-sync?days=14&root=${encodeURIComponent(root)}`); } catch(e){ return toast("❌ " + e.message, 5000); }
+  if (!p.ok) return openDlg("同步 Codex 对话", `<div>${esc(p.error)}</div>`);
+  const lab = {new:"新同步", update:"更新", same:"没变", diverged:"已在 Claude 里续聊，不覆盖"};
+  const n = p.counts.new + p.counts.update;
+  const rows = p.rows.slice(0, 60).map(r => `<div class="devrow"><div class="grow"><b>${esc(r.title)}</b> <span class="badge ${r.state==="new"||r.state==="update"?"b-ok":"b-wait"}">${lab[r.state]}</span>
+      <div style="color:var(--muted);font-size:12px">${fmtDay(r.mtime)} · codex:${esc(r.thread.slice(-6))} · ${esc(r.cwd||"")}</div></div></div>`).join("");
+  openDlg("📥 把 Codex 对话同步进 Claude", `
+    <div style="font-size:13px;color:var(--muted)">把你在 Codex 桌面端里开的对话（${root ? "只看当前项目，" : ""}最近 14 天）转成 Claude 会话，放进 Claude 桌面端当前账号的列表，标题前带「（Codex）」。
+      只带对话文字，Codex 跑过的命令折成一行说明。Codex 又聊了会更新；你已经在 Claude 里接着聊过的不再覆盖。写之前先备份。</div>
+    <div style="font-weight:600;margin:10px 0 4px">要写 ${n} 个：</div>${rows || '<div style="color:var(--muted)">没有可同步的 Codex 对话。</div>'}
+    <div style="margin-top:10px;color:var(--warn);font-size:13px">写完要<b>重启 Claude 桌面端</b>才会出现在列表里。</div>`,
+    n ? `<button onclick="closeDlg()">取消</button><button class="primary" id="xsGo">同步 ${n} 个</button>` : `<button onclick="closeDlg()">关闭</button>`);
+  if ($("#xsGo")) $("#xsGo").onclick = async () => {
+    try { const r = await api("/api/codex-sync", {days: 14, root}); openDlg("✅ 已同步", `<div>写了 ${r.done} 个。${(r.errors||[]).length?"失败："+esc(r.errors.join("；")):""}备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
+      <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到（标题前带「（Codex）」）。</div>`); }
     catch(e){ toast("❌ " + e.message, 5000); } };
 };
 

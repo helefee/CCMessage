@@ -115,6 +115,7 @@ def msgs_size() -> int:
 # ---------- 身份与在线记录 ----------
 
 def detect_self(as_arg: str | None) -> tuple[str, str]:
+    as_arg = as_arg or os.environ.get("MSGBUS_AS")      # 后台干活的进程（cursor-agent）由总线设好
     if as_arg:
         agent, _, sid = as_arg.partition(":")
         if agent not in ("claude", "codex", "cursor", "user") or not sid:
@@ -515,10 +516,10 @@ def worker_recs() -> list[dict]:
     return [r for r in (load_json(p) for p in WORKERS.glob("*.json")) if r.get("task")]
 
 
-def pending_for(codex_sid: str, done: set[str] | None = None) -> list[str]:
-    """这个 Codex 对话手上还没交的活（任务号）。"""
+def pending_for(codex_sid: str, done: set[str] | None = None, agent: str = "codex") -> list[str]:
+    """这个对话（缺省 Codex）手上还没交的活（任务号）。"""
     done = results_by_task() if done is None else done
-    key = key_of("codex", codex_sid)
+    key = key_of(agent, codex_sid)
     ids = [m["id"] for m in iter_log() if m.get("kind") == "task" and key in (m.get("to_keys") or [])]
     ids += [w["task"] for w in worker_recs() if w.get("thread") == codex_sid]
     return [i for i in dict.fromkeys(ids) if i not in done]
@@ -702,7 +703,7 @@ def cmd_codex_resume(args) -> None:
 
 
 def claim(rec: dict, owner_key: str) -> None:
-    p = SESS / f"{key_of('codex', rec['sid'])}.json"
+    p = SESS / f"{key_of(rec.get('agent') or 'codex', rec['sid'])}.json"
     cur = load_json(p) or rec
     cur.update({"owner": owner_key, "owner_since": now_ts()})
     save_json(p, cur)
@@ -810,7 +811,50 @@ def cmd_set_role(args) -> None:
         post(agent, sid, me, f"{r['agent']}:{short_id(r)}", ROLE_TEXT[role], to_keys=[key_of(r["agent"], r["sid"])])
 
 
-def task_prompt(msg: dict) -> str:
+def cursor_agent_exe() -> str | None:
+    """Cursor 命令行：新版叫 agent（装在 ~/.local/bin），老版叫 cursor-agent。
+    ☠ 别的工具也可能叫 agent（例如 Grok 的 ~/.grok/bin/agent），所以只认 cursor-agent，或 ~/.local/bin 下的 agent。"""
+    import shutil
+    env = os.environ.get("MSGBUS_CURSOR_AGENT")
+    if env and Path(env).exists():
+        return env
+    w = shutil.which("cursor-agent")
+    if w:
+        return w
+    home_bin = Path.home() / ".local" / "bin"
+    for name in ("agent.exe", "agent.cmd", "agent.ps1", "agent", "cursor-agent.exe", "cursor-agent.cmd"):
+        f = home_bin / name
+        if f.exists():
+            return str(f)
+    la = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    for f in (la / "cursor-agent" / "agent.cmd", la / "cursor-agent" / "cursor-agent.cmd", la / "cursor-agent" / "agent.exe"):
+        if f.exists():
+            return str(f)
+    return None
+
+
+def cursor_slots(me_key: str) -> dict:
+    """总线用 Cursor 命令行开的对话：挑一个归我、手上没活的接着用；没有就新开。"""
+    done = results_by_task()
+    rows = []
+    for r in all_sessions():
+        if r.get("agent") != "cursor" or not r.get("managed"):
+            continue
+        busy = pending_for(r["sid"], done, agent="cursor")
+        mine = r.get("owner") == me_key
+        rows.append({"rec": r, "busy": busy, "mine": mine})
+    pick = next((x["rec"] for x in sorted(rows, key=lambda x: -x["rec"].get("last_seen", 0))
+                 if x["mine"] and not x["busy"]), None)
+    running = sum(1 for w in worker_recs() if w.get("kind") == "cursor" and w.get("state") != "finished")
+    return {"rows": rows, "pick": pick, "running": running}
+
+
+def task_prompt(msg: dict, who: str = "Codex", as_: str | None = None) -> str:
+    t = _task_prompt(msg).replace("Codex 对话", f"{who} 对话", 1)
+    return t.replace(f"python {REL} ", f"python {REL} --as {as_} ") if as_ else t
+
+
+def _task_prompt(msg: dict) -> str:
     return (f"你是被消息总线派活的 Codex 对话，这个对话归「{msg['from']['name']}」使用。\n"
             f"任务 #{msg['id']}：\n{msg['text']}\n\n"
             f"规矩：这件活和本对话里之前的活是**独立**的 —— 先确认工作目录、分支、worktree 再动手，别沿用上一件活的假设；"
@@ -819,11 +863,11 @@ def task_prompt(msg: dict) -> str:
             f"做不了就 python {REL} done {msg['id']} --fail \"原因\"。然后结束这一轮。")
 
 
-def start_worker(msg: dict, owner_key: str, thread: str | None) -> str:
-    """后台起一个进程跑这件活：thread=None 新开对话，否则接着那个对话（codex exec resume）。"""
+def start_worker(msg: dict, owner_key: str, thread: str | None, kind: str = "codex") -> str:
+    """后台起一个进程跑这件活：thread=None 新开对话，否则接着那个对话（codex exec resume / cursor --resume）。"""
     import subprocess
     WORKERS.mkdir(exist_ok=True)
-    save_json(WORKERS / f"{msg['id']}.json", {"task": msg["id"], "owner": owner_key, "thread": thread,
+    save_json(WORKERS / f"{msg['id']}.json", {"task": msg["id"], "owner": owner_key, "thread": thread, "kind": kind,
                                               "state": "starting", "created": now_ts()})
     flags = 0
     if os.name == "nt":
@@ -831,12 +875,103 @@ def start_worker(msg: dict, owner_key: str, thread: str | None) -> str:
     env = dict(os.environ, PYTHONUTF8="1")
     for k in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"):
         env.pop(k, None)
-    args = [sys.executable, str(BUS / "bus.py"), "codex-worker", msg["id"], "--owner", owner_key]
+    args = [sys.executable, str(BUS / "bus.py"), f"{kind}-worker", msg["id"], "--owner", owner_key]
     if thread:
         args += ["--thread", thread]
     subprocess.Popen(args, cwd=str(ROOT), env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL, creationflags=flags, close_fds=True)
+    if kind == "cursor":
+        return "已接着这个 Cursor 后台对话跑" if thread else "已用 Cursor 命令行在后台新开一个对话来做"
     return "已接着这个对话跑（codex exec resume）" if thread else "已新开一个 Codex 对话来做"
+
+
+def cmd_cursor_worker(args) -> None:
+    """后台进程：Cursor 命令行 -p 跑一件活（--resume 接着同一个对话）；结束后没交活就拿最后的回复兜底交回。"""
+    import re
+    import subprocess
+    task = find_task(args.id)
+    wp = WORKERS / f"{args.id}.json"
+    w = load_json(wp)
+    exe = cursor_agent_exe()
+    if not task or not exe:
+        return
+    log = WORKERS / f"{args.id}.log"
+    nowin = 0x08000000 if os.name == "nt" else 0
+    pre = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", exe] if exe.endswith(".ps1") else [exe]
+    sid = args.thread
+    rec = load_json(SESS / f"{key_of('cursor', sid)}.json") if sid else {}
+    chat = rec.get("chat") or sid
+    if not sid:
+        # 先建一个空对话拿到号，这样派活的话里就能写好 --as cursor:<号>
+        try:
+            r = subprocess.run(pre + ["create-chat"], cwd=str(ROOT), capture_output=True, timeout=120,
+                               stdin=subprocess.DEVNULL, creationflags=nowin)
+            m = re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                          (r.stdout + r.stderr).decode("utf-8", "replace"))
+            chat = m.group(0) if m else None
+        except Exception:
+            chat = None
+        sid = chat or f"w{args.id}"
+        rec = {"agent": "cursor", "sid": sid, "chat": chat, "cwd": str(ROOT), "originator": "cursor_agent",
+               "managed": True, "owner": args.owner, "owner_since": now_ts(),
+               "title": f"（总线新开·Cursor）{task['text'].splitlines()[0][:24]}",
+               "last_seen": now_ts(), "first_seen": now_ts()}
+        save_json(SESS / f"{key_of('cursor', sid)}.json", rec)
+    w.update({"state": "running", "pid": os.getpid(), "started": now_ts(), "thread": sid})
+    save_json(wp, w)
+    cmd = pre + ["-p", "--output-format", "stream-json", "--force", "--workspace", str(ROOT)]
+    if chat:
+        cmd += ["--resume", chat]
+    # 多行说明经 Windows 的 .cmd / .ps1 包装会被截断、引号会被吃：写进文件，只给一句单行的话让它去读
+    pf = WORKERS / f"{args.id}.prompt.md"
+    pf.write_text(task_prompt(task, who="Cursor", as_=f"cursor:{sid}"), encoding="utf-8")
+    cmd.append(f"消息总线派给你一件活（任务 {args.id}），完整说明在这个文件里，先读它再照做（路径两边有空格）： {pf.as_posix()} "
+               f"—— 做完按文件里写的跑 done 命令交回。")
+    env = dict(os.environ, MSGBUS_AS=f"cursor:{sid}", PYTHONUTF8="1")
+    last, code = "", None
+    try:
+        p = subprocess.Popen(cmd, cwd=str(ROOT), env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, creationflags=nowin)
+        deadline = now_ts() + WORKER_TIMEOUT
+        with open(log, "wb") as lf:
+            for line in p.stdout:
+                lf.write(line)
+                try:
+                    ev = json.loads(line)
+                except Exception:
+                    continue
+                if ev.get("session_id") and not rec.get("chat"):
+                    rec["chat"] = ev["session_id"]            # create-chat 没拿到号时，从第一条事件补上
+                    save_json(SESS / f"{key_of('cursor', sid)}.json", dict(load_json(SESS / f"{key_of('cursor', sid)}.json"), chat=rec["chat"]))
+                if ev.get("type") == "result":
+                    last = str(ev.get("result") or "")
+                    if ev.get("is_error"):
+                        code = "is_error"
+                elif ev.get("type") == "assistant":
+                    for c in (ev.get("message") or {}).get("content") or []:
+                        if isinstance(c, dict) and c.get("type") == "text" and c.get("text"):
+                            last = c["text"]
+                if now_ts() > deadline:
+                    p.kill()
+                    break
+        rc = p.wait()
+        code = code or rc
+    except Exception as e:
+        code = f"起不来：{e!r}"
+    touch_presence("cursor", sid, str(ROOT), None, force=True)
+    w.update({"state": "finished", "exit": code, "ended": now_ts()})
+    save_json(wp, w)
+    if task["id"] in results_by_task():
+        return
+    me = load_json(SESS / f"{key_of('cursor', sid)}.json") or {"agent": "cursor", "sid": sid}
+    me["name"] = display_name(me)
+    if code == 0 and last.strip():
+        body = "（Cursor 没用 done 交活，以下是它这一轮最后的回复）\n" + last.strip()
+    else:
+        body = f"【没做成】Cursor 命令行退出码 {code}，没交活。日志：{log}"
+    f = task["from"]
+    post("cursor", sid, me, f"{f['agent']}:{short_id(f)}", body, kind="result", reply_to=task["id"],
+         to_keys=[key_of(f["agent"], f["sid"])])
 
 
 def cmd_codex_worker(args) -> None:
@@ -964,6 +1099,39 @@ def cmd_task(args) -> None:
             to, to_keys = f"codex:{short_id(how[1])}", [key_of("codex", how[1]["sid"])]
         else:
             to, to_keys = "codex:new", []
+    elif tl in ("cursor-agent", "cursor:new") or (tl.startswith("cursor:") and any(
+            r.get("managed") and match_target(to, r) for r in all_sessions() if r.get("agent") == "cursor")):
+        # Cursor 命令行后台接活：cursor:new / cursor-agent = 挑一个归我、空闲的后台对话接着用，没有就新开
+        if not cursor_agent_exe():
+            print("✗ 没派：本机没装 Cursor 命令行（agent / cursor-agent）。装法见 README「Cursor 后台派活」；"
+                  "或者 task --to cursor:<会话> 派给开着的 Cursor 对话（它下次动起来才收到）。")
+            sys.exit(NO_CODEX_EXIT)
+        cs = cursor_slots(me_key)
+        if tl.startswith("cursor:") and tl != "cursor:new":
+            hit = next(x for x in cs["rows"] if match_target(to, x["rec"]))
+            if hit["rec"].get("owner") not in (None, me_key) and owner_alive(hit["rec"].get("owner")) and not args.force:
+                sys.exit(f"✗ 没派：{display_name(hit['rec'])} 归「{owner_name(hit['rec']['owner'])}」在用；确实要插队加 --force。")
+            if hit["busy"] and not args.force:
+                sys.exit(f"✗ 没派：{display_name(hit['rec'])} 手上还有没交的活；用 --to cursor:new 让总线挑，或加 --force。")
+            crec = hit["rec"]
+        else:
+            crec = cs["pick"]
+            if not crec and cs["running"] >= MAX_NEW_CODEX:
+                print(f"✗ 没派：已经有 {cs['running']} 个 Cursor 后台对话在跑（上限 {MAX_NEW_CODEX}）。这件活留给 Claude，或等一个交完再派。")
+                sys.exit(NO_CODEX_EXIT)
+        text = read_text(args.text)
+        if crec:
+            msg = post(agent, sid, me, f"cursor:{short_id(crec)}", text, kind="task", no_wake=True,
+                       to_keys=[key_of("cursor", crec["sid"])])
+            claim(crec, me_key)
+            print("  " + start_worker(msg, me_key, crec["sid"], kind="cursor"))
+        else:
+            msg = post(agent, sid, me, "cursor:new", text, kind="task", no_wake=True, to_keys=[])
+            print("  " + start_worker(msg, me_key, None, kind="cursor"))
+        print(f"任务编号：{msg['id']}。Cursor 做完会用 done 回报（没交就拿它最后的回复兜底）；等结果：python {REL} wait {msg['id']}")
+        if args.wait:
+            wait_result(msg["id"], args.wait)
+        return
     text = read_text(args.text)
     managed_target = how and how[0] == "existing" and how[1].get("managed")
     msg = post(agent, sid, me, to, text, kind="task", multi=args.multi,
@@ -1449,6 +1617,7 @@ USAGE = (
     "开了 PR 用 claim add <卡号> --pr 编号 补上；合完 python {rel} claim done <卡号> --pr 编号 \"结果\"。\n"
     "当干活的一方：Claude 会话一闲下来就由 Stop 钩子自动在后台待命，有消息会把你叫醒（没装 Stop 钩子的项目，"
     "可以用后台命令挂 python {rel} listen --once 代替）；Codex 会话会被 codex queue 自动叫醒。\n"
+    "要 Cursor 在后台干活（本机装了 Cursor 命令行时）：task --to cursor:new \"…\" —— 总线用 Cursor 命令行开一个后台对话（或接着你名下空闲的那个）跑完交回，不用谁开着 Cursor。\n"
     "派给 Codex 用 task --to codex：只派给用户在 Codex 桌面端里开着的本项目对话 —— 先挑你名下空闲的，再挑没人认领的空闲对话；"
     "都没有就不派（退出码 3），留给 Claude。Codex 额度用完 / 服务报错时总线会自动暂停往 Codex 派 30 分钟（同样退出码 3）；"
     "派过你活的对话归你用，别的会话不会往里派，手上有活没交的也不会再接新活。python {rel} codex-status 看各对话忙闲 / 归属；"
@@ -1700,6 +1869,10 @@ def main() -> None:
     ci.add_argument("--undo", action="store_true")
     rl = sub.add_parser("release", help="放开一个 Codex 对话的归属，别的会话就能派了")
     rl.add_argument("target")
+    cuw = sub.add_parser("cursor-worker", help="（内部）后台用 Cursor 命令行跑一件活")
+    cuw.add_argument("id")
+    cuw.add_argument("--owner", required=True)
+    cuw.add_argument("--thread")
     cw = sub.add_parser("codex-worker", help="（内部）后台跑一件派给 Codex 的活")
     cw.add_argument("id")
     cw.add_argument("--owner", required=True)
@@ -1763,7 +1936,7 @@ def main() -> None:
      "task": cmd_task, "done": cmd_done, "tasks": cmd_tasks, "wait": cmd_wait,
      "listen": cmd_listen, "codex-status": cmd_codex_status, "release": cmd_release, "set-role": cmd_set_role,
      "codex-pause": cmd_codex_pause, "codex-resume": cmd_codex_resume, "codex-ignore": cmd_codex_ignore,
-     "codex-worker": cmd_codex_worker, "lock": cmd_lock, "claim": cmd_claim}[args.cmd](args)
+     "codex-worker": cmd_codex_worker, "cursor-worker": cmd_cursor_worker, "lock": cmd_lock, "claim": cmd_claim}[args.cmd](args)
 
 
 if __name__ == "__main__":
