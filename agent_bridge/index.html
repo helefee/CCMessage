@@ -139,6 +139,11 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .srow:hover{background:var(--line2)}
 .srow.sel{background:var(--accent-weak)}
 .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.bbw{position:relative;flex:none;width:26px;height:26px;display:inline-block}
+.bbw svg{display:block;overflow:visible}
+.bbw .dot{position:absolute;right:-2px;bottom:-1px;width:8px;height:8px;box-shadow:0 0 0 2px var(--bg)}
+.bb-a{transform-box:view-box;transform-origin:0 0;animation-timing-function:linear;animation-iteration-count:infinite}
+@media (prefers-reduced-motion: reduce){.bb-a{animation:none!important}}
 .d-stand{background:var(--ok)}.d-active{background:var(--accent)}.d-idle{background:var(--faint)}
 .srow .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .srow .sub{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
@@ -761,6 +766,45 @@ async function pollMessages(){
   } catch(e) {}
 }
 
+// ---------- 会话头像（bloub：MIT，Jérémy Perret）----------
+// 身形、颜色按会话号定（同一个会话永远长一样）；活跃的会动（呼吸 / 眨眼 / 眼神漂移），
+// 待命的静止「专注」脸，空闲的静止「犯困」脸。数据由 tools/gen_bloub_icons.ts 用 bloub 的引擎导出。
+let BB = null, bbSeq = 0;
+const BB_COLORS = ["rouge","orange","ambre","vert","turquoise","bleu","violet","rose","brun","gris"];  // 不用纯黑 / 米白：深浅主题下会看不见
+fetch("/bloub-icons.json").then(r => r.json()).then(d => {
+  BB = d;
+  const st = document.createElement("style");
+  st.textContent = Object.entries(d.anim).map(([sh, a]) => {
+    const pct = i => (i * 100 / a.scale.length).toFixed(2) + "%";
+    const kf = (name, val) => `@keyframes ${name}{${a.scale.map((_, i) => `${pct(i)}{transform:${val(i)}}`).join("")}100%{transform:${val(0)}}}`;
+    return kf(`bb-${sh}-b`, i => `scale(${a.scale[i]})`) + [0, 1].map(k => kf(`bb-${sh}-${k}`, i => `matrix(${a.eyes[i][k]})`)).join("");
+  }).join("");
+  document.head.appendChild(st);
+  if (typeof pollSessions === "function") pollSessions();
+}).catch(() => {});
+function bbHash(s){ let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function bbAvatar(x, st, size){
+  if (!BB) return `<i class="dot d-${st}"></i>`;
+  const h = bbHash(x.agent + ":" + x.sid), shapes = Object.keys(BB.shapes);
+  const sh = shapes[h % shapes.length], color = BB.colors[BB_COLORS[(h >>> 4) % BB_COLORS.length]];
+  // 收紧画布：原数据留了给特效的大边（±158），身体最宽约 ±115，按 118 取，头像在小格子里才显得够大
+  const vb = 118, id = "bbm" + (++bbSeq), live = st === "active";
+  let eyes;
+  if (live) {
+    // 按当前时间定播放位置：列表几秒重画一次，这样动画能接着播、不会跳回开头；再按会话号错开，别一起眨眼
+    const a = BB.anim[sh], delay = -((Date.now() / 1000 + ((h >>> 8) % 1000) / 1000 * a.secs) % a.secs);
+    eyes = a.d.map((d, k) => `<path class="bb-a" d="${d}" fill="#000" style="animation-name:bb-${sh}-${k};animation-duration:${a.secs}s;animation-delay:${delay}s"/>`).join("");
+  } else {
+    const ex = st === "stand" ? "attentif" : "somnolent";
+    eyes = BB.eyes[sh][ex].map(([d, m]) => `<path d="${d}" transform="matrix(${m})" fill="#000"/>`).join("");
+  }
+  const body = live ? `class="bb-a" style="animation-name:bb-${sh}-b;animation-duration:${BB.anim[sh].secs}s;animation-delay:${-((Date.now() / 1000) % BB.anim[sh].secs)}s"` : "";
+  const px = size || 26;
+  return `<span class="bbw" style="width:${px}px;height:${px}px" title="${st === "active" ? "活跃" : st === "stand" ? "待命" : "空闲"}"><svg width="${px}" height="${px}" viewBox="${-vb} ${-vb} ${vb * 2} ${vb * 2}" aria-hidden="true">
+    <defs><mask id="${id}" maskUnits="userSpaceOnUse" x="${-vb}" y="${-vb}" width="${vb * 2}" height="${vb * 2}"><g ${body}><path d="${BB.shapes[sh]}" fill="#fff"/>${eyes}</g></mask></defs>
+    <rect x="${-vb}" y="${-vb}" width="${vb * 2}" height="${vb * 2}" fill="${color}" mask="url(#${id})"/></svg><i class="dot d-${st}"></i></span>`;
+}
+
 // ---------- 会话 ----------
 function sessState(x){ if (x.listening) return ["stand","待命"]; if (x.age < 180) return ["active","活跃"]; return ["idle", "空闲"]; }
 async function pollSessions(){
@@ -770,7 +814,7 @@ async function pollSessions(){
     if (!cur || cur.root !== root) return;
     const row = x => { const [st, label] = sessState(x), key = keyOf(x.agent, x.short);
       return `<div class="srow ${x.role==="main"?"is-main":""}" data-key="${esc(key)}" data-sid="${esc(x.sid)}" data-agent="${esc(x.agent)}" title="点击：打开它的会话记录">
-        <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x, true)}${x.agent==="cursor"?'<span class="a-cursor" style="font-size:11px;font-weight:600;margin-right:4px">Cursor</span>':""}${esc(x.alias||x.title||"未命名")}</div>
+        ${bbAvatar(x, st)}<div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x, true)}${x.agent==="cursor"?'<span class="a-cursor" style="font-size:11px;font-weight:600;margin-right:4px">Cursor</span>':""}${esc(x.alias||x.title||"未命名")}</div>
         ${x.role_note?`<div class="rn">${esc(x.role_note)}</div>`:""}
         <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div>
         <button class="to ghost" data-focus="${esc(key)}" title="总线消息里只看和它有关的">筛选</button></div>`; };
@@ -931,7 +975,7 @@ function renderTabs(){
   const live = k => sessList.find(s => tabKey(s) === k);
   $("#vtabs").innerHTML = `<div class="vtab ${view?"":"on"}" data-t="bus">📨 总线消息</div>` + openTabs.map(t => {
     const s = live(tabKey(t)) || t, st = s.listening ? "stand" : (s.age < 180 ? "active" : "idle");
-    return `<div class="vtab ${view && tabKey(view)===tabKey(t)?"on":""}" data-t="${esc(tabKey(t))}"><i class="dot d-${st}"></i>
+    return `<div class="vtab ${view && tabKey(view)===tabKey(t)?"on":""}" data-t="${esc(tabKey(t))}">${bbAvatar(s, st, 18)}
       ${roleBadge(s)}<span class="a-${esc(t.agent)}">${esc(s.alias||s.title||"未命名")}</span><button class="x" data-close="${esc(tabKey(t))}" title="关闭">✕</button></div>`; }).join("");
   $$(".vtab").forEach(el => el.onclick = e => {
     if (e.target.dataset.close) { closeTab(e.target.dataset.close); e.stopPropagation(); return; }

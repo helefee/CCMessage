@@ -40,6 +40,7 @@ TOOL = paths.PKG                      # 程序本体（包目录）
 DATA = paths.HOME                     # 每个用户自己的数据：~/.agent-bridge
 BUS_SRC = TOOL / "bus.py"
 INDEX = TOOL / "index.html"
+AVATARS = TOOL / "bloub-icons.json"      # 会话头像数据（由 tools/gen_bloub_icons.ts 从 bloub 导出）
 REGISTRY = DATA / "projects.json"
 PY = Path(sys.executable).as_posix()
 CODEX_HOME = paths.CODEX_HOME
@@ -820,7 +821,7 @@ _dev_lock = threading.Lock()
 LAN = {"srv": None, "ip": None, "port": None}
 PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
-PHONE_GET = {"/", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
+PHONE_GET = {"/", "/bloub-icons.json", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
              "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout"}
 PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role", "/api/codex/resume"}
 
@@ -1052,6 +1053,14 @@ class Handler(BaseHTTPRequestHandler):
                 p = _pairs.get(q.get("c", ""))
                 self._json({"used": bool(p and p["used_by"]), "expired": (not p) or p["exp"] < time.time(),
                             "device": p and p["used_by"]})
+            elif u.path == "/bloub-icons.json":
+                body = AVATARS.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(body)
             elif u.path == "/":
                 body = INDEX.read_bytes()
                 self.send_response(200)
