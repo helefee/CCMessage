@@ -56,7 +56,7 @@
 
 **会话头像**：每条会话前面有一个小头像，身形（8 种）和颜色（10 种）按会话号定，同一个会话永远长一样，一眼能认出是哪条线。
 **活跃的会动**（呼吸、眨眼、眼神漂移），待命的静止「专注」脸，空闲的静止「犯困」脸；右下角的小圆点仍是状态色。
-系统设了「减少动态效果」时一律不动。头像来自 [bloub](https://github.com/helefee/bloub)（MIT，© 2026 Jérémy Perret，许可证见 `licenses/bloub-MIT.txt`）：
+系统设了「减少动态效果」时一律不动。界面里其余图标都是内嵌 SVG（[Lucide](https://lucide.dev)，ISC 许可）；Claude / Codex / Cursor 三个标识是按意思画的简化图形，不是官方商标原图。头像来自 [bloub](https://github.com/helefee/bloub)（MIT，© 2026 Jérémy Perret，许可证见 `licenses/bloub-MIT.txt`）：
 `agent_bridge/bloub-icons.json` 是用它自己的引擎导出的静态路径与 idle 动画帧（`tools/gen_bloub_icons.ts`，约 84KB），网页里用 CSS 播放，不带它的程序。
 
 电脑上是三栏：**Claude 会话列表和 Codex 会话列表分在左右两侧，跟着两个桌面窗口在屏幕上的左右位置摆**

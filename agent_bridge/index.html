@@ -211,6 +211,14 @@ body.simple .simplehint{display:block}
 code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 5px;border-radius:4px}
 
 .mob{display:none!important}
+/* SVG 图标：跟着字号和文字颜色走 */
+.ic{width:1.1em;height:1.1em;vertical-align:-.18em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ic.logo{width:1.05em;height:1.05em;margin-right:4px;stroke-width:2.2}
+.menu .list button{display:flex;align-items:center;gap:9px}
+.menu .list button .ic{color:var(--muted)}
+.menu .list button .ic.ok{margin-left:auto;color:var(--ok)}
+#dlgTitle,.toast{display:inline-flex;align-items:center;gap:8px}
+.toast[style*="block"]{display:flex!important}
 .mnav{display:none}
 
 /* ---------- 风格：照 Open WebUI —— 纯中性灰、大圆角、淡边框；你说的话是右侧圆角气泡，AI 的回复不套框；底部圆角输入浮层 ---------- */
@@ -399,30 +407,30 @@ code{background:var(--hover);border-radius:6px}
 <body>
 <div class="app">
   <header class="top">
-    <span class="brand">📨<span class="btx"> 会话消息总线</span><span id="phoneTag" style="display:none;font-weight:400;font-size:12px;color:var(--muted)"> · 手机</span></span>
+    <span class="brand"><i data-ic="messages"></i><span class="btx"> 会话消息总线</span><span id="phoneTag" style="display:none;font-weight:400;font-size:12px;color:var(--muted)"> · 手机</span></span>
     <select class="projsel" id="projSel" title="切换项目"></select>
     <button class="stdot mob" id="stDot" title="状态"></button>
     <div class="pills" id="pills"></div>
     <div class="topact">
-      <button class="rf" id="refreshAll" data-refresh title="刷新（会话、消息、任务、当前会话记录）" style="font-size:17px">⟳</button>
+      <button class="rf" id="refreshAll" data-refresh title="刷新（会话、消息、任务、当前会话记录）" style="font-size:17px"><i data-ic="refresh"></i></button>
       <button class="primary admin" id="instBtn" style="display:none"></button>
       <div class="menu" id="menu">
-        <button class="ghost" id="menuBtn" title="更多">⋯</button>
+        <button class="ghost" id="menuBtn" title="更多"><i data-ic="more"></i></button>
         <div class="list">
-          <button id="mPhone" class="admin">📱 手机端（扫码）…</button>
-          <button id="mAdd" class="admin">＋ 添加项目…</button>
-          <button id="mCSync" class="admin">🔄 同步 Claude 会话到当前账号…</button>
-          <button id="mXSync" class="admin">📥 把 Codex 对话同步进 Claude…</button>
-          <button id="mInst" class="admin">安装 / 升级 / 修复</button>
-          <button id="mTest" class="admin">自检</button>
-          <button id="mRm" class="admin">从列表移除</button>
-          <button id="mUninst" class="danger admin">卸载…</button>
+          <button id="mPhone" class="admin"><i data-ic="phone"></i>手机端（扫码）…</button>
+          <button id="mAdd" class="admin"><i data-ic="plus"></i>添加项目…</button>
+          <button id="mCSync" class="admin"><i data-ic="sync"></i>同步 Claude 会话到当前账号…</button>
+          <button id="mXSync" class="admin"><i data-ic="download"></i>把 Codex 对话同步进 Claude…</button>
+          <button id="mInst" class="admin"><i data-ic="wrench"></i>安装 / 升级 / 修复</button>
+          <button id="mTest" class="admin"><i data-ic="activity"></i>自检</button>
+          <button id="mRm" class="admin"><i data-ic="listx"></i>从列表移除</button>
+          <button id="mUninst" class="danger admin"><i data-ic="trash"></i>卸载…</button>
           <hr style="border:0;border-top:1px solid var(--line);margin:4px 0">
           <button id="mFx" class="admin">桌面信件动画：…</button>
-          <button id="mFxTest" class="admin">试放信件动画</button>
+          <button id="mFxTest" class="admin"><i data-ic="play"></i>试放信件动画</button>
           <button id="mWebFx">网页信件动画：开 ✓</button>
           <button id="mSimple">完整模式</button>
-          <button id="mTheme">切换深浅色</button>
+          <button id="mTheme"><i data-ic="contrast"></i>切换深浅色</button>
         </div>
       </div>
     </div>
@@ -441,14 +449,14 @@ code{background:var(--hover);border-radius:6px}
           <span class="chip" data-f="msg">消息<span class="n" id="nMsg"></span></span>
           <span class="chip" data-f="task">任务<span class="n" id="nTask"></span></span>
           <span class="chip" data-f="wait">待完成<span class="n" id="nWait"></span></span>
-          <button class="ghost mob" id="qBtn" title="搜索">🔍</button>
+          <button class="ghost mob" id="qBtn" title="搜索"><i data-ic="search"></i></button>
           <span class="focus" id="focus"></span>
           <input id="q" placeholder="搜索消息内容 / 编号 / 会话名">
         </div>
       </div>
       <div class="stream" id="stream"><div class="empty">正在加载…</div></div>
       <div class="stream trv" id="trView" style="display:none"></div>
-      <button class="newpill" id="newPill">有新消息 ↓</button>
+      <button class="newpill" id="newPill">有新消息 <i data-ic="down"></i></button>
       <div class="compose" id="compose">
         <div class="crow">
           <div class="seg" id="kindSeg"><button data-k="msg" class="on">消息</button><button data-k="task">任务</button></div>
@@ -466,13 +474,13 @@ code{background:var(--hover);border-radius:6px}
 
     <aside class="side" id="colR">
       <div class="card sesscard" id="cardClaude">
-        <h3><span class="a-claude">Claude</span> 会话 <span id="nClaude"></span><button class="rf" data-refresh title="刷新会话列表">⟳</button><span class="sp winpos" id="posClaude"></span></h3>
+        <h3><span class="a-claude"><i data-ic="claude" data-cls="logo"></i>Claude</span> 会话 <span id="nClaude"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><span class="sp winpos" id="posClaude"></span></h3>
         <div id="sessClaude"><div class="grp">加载中…</div></div>
         <div class="legend"><span><i class="dot d-stand"></i>待命</span><span><i class="dot d-active"></i>活跃</span><span><i class="dot d-idle"></i>空闲</span></div>
         <div class="rlegend"><span><span class="rb r-main">主</span>派活的</span><span><span class="rb r-aux">辅</span>干活的</span></div>
       </div>
       <div class="card sesscard" id="cardCodex">
-        <h3><span class="a-codex">Codex</span> 会话 <span id="nCodex"></span><button class="rf" data-refresh title="刷新会话列表">⟳</button><span class="sp winpos" id="posCodex"></span></h3>
+        <h3><span class="a-codex"><i data-ic="codex" data-cls="logo"></i>Codex</span> 会话 <span id="nCodex"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><span class="sp winpos" id="posCodex"></span></h3>
         <div id="codexSt" class="grp" style="margin:0 0 4px"></div>
         <div id="sessCodex"><div class="grp">加载中…</div></div>
         <div class="legend"><span><i class="dot d-stand"></i>待命</span><span><i class="dot d-active"></i>活跃</span><span><i class="dot d-idle"></i>空闲</span></div>
@@ -485,21 +493,66 @@ code{background:var(--hover);border-radius:6px}
     </aside>
   </div>
   <nav class="mnav" id="mnav">
-    <button data-m="bus" class="on">💬<span>消息</span><i id="bNav"></i></button>
-    <button data-m="sess">👥<span>会话</span><i id="sNav"></i></button>
-    <button data-m="tasks">📋<span>任务</span><i id="tNav"></i></button>
+    <button data-m="bus" class="on"><i data-ic="chat"></i><span>消息</span><i id="bNav"></i></button>
+    <button data-m="sess"><i data-ic="users"></i><span>会话</span><i id="sNav"></i></button>
+    <button data-m="tasks"><i data-ic="clipboard"></i><span>任务</span><i id="tNav"></i></button>
   </nav>
 </div>
 
 <div class="toast" id="toast"></div>
 <div class="dlg" id="dlg"><div class="box">
-  <div class="hd"><span id="dlgTitle"></span><button class="ghost" onclick="closeDlg()">✕</button></div>
+  <div class="hd"><span id="dlgTitle"></span><button class="ghost" onclick="closeDlg()"><i data-ic="x"></i></button></div>
   <div class="bd" id="dlgBody"></div>
   <div class="ft" id="dlgFt"><button onclick="closeDlg()">关闭</button></div>
 </div></div>
 
 <script>
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+// ---------- SVG 图标（Lucide，ISC 许可；Claude / Codex / Cursor 三个标识是按意思画的简化图形，不是官方商标原图）----------
+const ICON = {
+  messages: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  phone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  sync: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  listx: '<path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="m19 10-4 4"/><path d="m15 10 4 4"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  play: '<path d="M6 3l14 9-14 9z"/>',
+  sparkles: '<path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/>',
+  layout: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  contrast: '<circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  back: '<path d="m15 18-6-6 6-6"/>',
+  down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  ok: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  err: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  handoff: '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
+  tool: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  clipboard: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+  // 三家标识：Claude = 放射星芒；Codex = 终端提示符方框；Cursor = 鼠标指针；用户 = 人像
+  claude: '<path d="M12 2.5v6M12 15.5v6M2.5 12h6M15.5 12h6M5.3 5.3l4.2 4.2M14.5 14.5l4.2 4.2M18.7 5.3l-4.2 4.2M9.5 14.5l-4.2 4.2"/>',
+  codex: '<rect width="18" height="18" x="3" y="3" rx="4"/><path d="m7.5 10 2.5 2-2.5 2"/><path d="M12.5 15h4"/>',
+  cursor: '<path d="M4.04 4.04a.5.5 0 0 1 .65-.65l15.5 6.24a.5.5 0 0 1-.06.95l-6.1 1.57a2 2 0 0 0-1.45 1.45l-1.57 6.1a.5.5 0 0 1-.95.06z"/>',
+  user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>'
+};
+function ic(name, cls){ return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICON[name] || ""}</svg>`; }
+const logo = agent => ic({claude: "claude", codex: "codex", cursor: "cursor"}[agent] || "user", "logo");
+// 提示条 / 弹窗标题里开头的 emoji 换成 SVG（其余照文字转义）
+const EMO = {"✅": "ok", "❌": "err", "⚠": "warn", "📱": "phone", "🔄": "sync", "📥": "download", "🤝": "handoff", "⏸": "pause", "🖥": "monitor", "🔧": "tool", "📨": "messages"};
+function emoIcons(t){ let out = esc(String(t)); for (const [e, n] of Object.entries(EMO)) out = out.split(e).join(ic(n)); return out.replace(/\uFE0F/g, ""); }
+$$("[data-ic]").forEach(e => { e.outerHTML = ic(e.dataset.ic, e.dataset.cls); });
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 let projects = [], cur = null, offset = -1, msgs = [], sessList = [], tasks = [], timers = [];
@@ -511,8 +564,8 @@ async function api(path, body){
   const r = await fetch(path, opt); const j = await r.json();
   if (!r.ok) throw new Error(j.error || r.status); return j;
 }
-let toastT; function toast(t, ms=2600){ const el=$("#toast"); el.textContent=t; el.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display="none", ms); }
-function openDlg(title, html, footer){ $("#dlgTitle").textContent=title; $("#dlgBody").innerHTML=html; $("#dlgFt").innerHTML=footer||'<button onclick="closeDlg()">关闭</button>'; $("#dlg").classList.add("open"); }
+let toastT; function toast(t, ms=2600){ const el=$("#toast"); el.innerHTML=emoIcons(t); el.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display="none", ms); }
+function openDlg(title, html, footer){ $("#dlgTitle").innerHTML=emoIcons(title); $("#dlgBody").innerHTML=html; $("#dlgFt").innerHTML=footer||'<button onclick="closeDlg()">关闭</button>'; $("#dlg").classList.add("open"); }
 function closeDlg(){ $("#dlg").classList.remove("open"); }
 $("#dlg").onclick = e => { if (e.target.id === "dlg") closeDlg(); };
 const pad = n => String(n).padStart(2,"0");
@@ -627,7 +680,7 @@ $("#mTheme").onclick = () => { const r=document.documentElement; const dark = r.
   r.dataset.theme = dark ? "light" : "dark"; store.set("msgbus.theme", r.dataset.theme); };
 { const t = store.get("msgbus.theme"); if (t) document.documentElement.dataset.theme = t; }
 let fxOn = true;
-async function loadFx(){ try { fxOn = (await api("/api/settings")).fx; } catch(e) {} $("#mFx").textContent = "桌面信件动画：" + (fxOn ? "开 ✓" : "关"); }
+async function loadFx(){ try { fxOn = (await api("/api/settings")).fx; } catch(e) {} $("#mFx").innerHTML = ic("mail") + "桌面信件动画：" + (fxOn ? "开" + ic("check", "ok") : "关"); }
 $("#mFx").onclick = async () => { try { fxOn = (await api("/api/settings", {fx: !fxOn})).fx; toast("信件动画已" + (fxOn ? "打开" : "关闭")); } catch(e){ toast("❌ " + e.message); } loadFx(); };
 $("#mFxTest").onclick = async () => { await api("/api/fx/test", {dir:"c2x", kind:"task"}); setTimeout(() => api("/api/fx/test", {dir:"x2c", kind:"result"}), 300);
   const c = sessList.find(s => s.agent === "claude"), x = sessList.find(s => s.agent === "codex");
@@ -646,7 +699,7 @@ async function loadMe(){
 function fmtDay(ts){ const d=new Date(ts*1000); return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 async function devicesHtml(){
   const l = await api("/api/lan");
-  const rows = l.devices.map(d => `<div class="devrow"><span>📱</span><div class="grow"><b>${esc(d.name)}</b>
+  const rows = l.devices.map(d => `<div class="devrow"><span>${ic("phone")}</span><div class="grow"><b>${esc(d.name)}</b>
       <div style="color:var(--muted);font-size:12px">配对于 ${fmtDay(d.created)} · 最近 ${fmtDay(d.last_seen)} · ${Math.max(0,Math.round((d.expires-Date.now()/1000)/86400))} 天后失效</div></div>
       <button data-revoke="${esc(d.id)}">移除</button></div>`).join("");
   return {l, html: rows || `<div style="color:var(--muted);font-size:13px;padding:6px 0">还没有配对过的手机</div>`};
@@ -687,7 +740,7 @@ async function openPhone(){
   }, 1500);
 }
 $("#mPhone").onclick = openPhone;
-function applySimple(on){ document.body.classList.toggle("simple", on); $("#mSimple").textContent = on ? "完整模式（显示全部）" : "简洁模式";
+function applySimple(on){ document.body.classList.toggle("simple", on); $("#mSimple").innerHTML = ic("layout") + (on ? "完整模式（显示全部）" : "简洁模式");
   store.set("msgbus.simple", on ? "1" : "0"); if (on && !view) setFilterAll(); }
 function setFilterAll(){ filter = "all"; query = ""; const q = $("#q"); if (q) q.value = ""; $$(".filters .chip").forEach(c => c.classList.toggle("on", c.dataset.f === "all")); }
 $("#mSimple").onclick = () => { applySimple(!document.body.classList.contains("simple")); renderStream(true); pollSessions(); };
@@ -802,7 +855,7 @@ function msgHtml(m){
   if (k==="task" && t && t.result) linked = `<div class="linked"><span class="badge ${t.status==="没做成"?"b-bad":"b-ok"}">↳ ${esc(nameOf(t.by))}</span><div class="txt">${esc(t.result.length>300?t.result.slice(0,300)+"…":t.result)}</div></div>`;
   const cls = ["msg", a==="user"?"mine":"", k==="task"?"task":"", k==="result"?"result":"", fail?"fail":""].join(" ");
   return `<div class="${cls}" id="m-${esc(m.id)}">
-    <div class="meta">${badge}<span class="who a-${esc(a)}">${esc(nameOf(m.from.name))}</span>
+    <div class="meta">${badge}<span class="who a-${esc(a)}">${logo(a)}${esc(nameOf(m.from.name))}</span>
       <span>→ ${esc(m.to)}</span><span title="${esc(new Date(m.ts*1000).toLocaleString())}">${hm(m.ts)}</span><span>#${esc(m.id.slice(0,6))}</span></div>
     <div class="txt ${long?"clamp":""}">${esc(m.text)}</div>
     ${long?`<a class="link more" data-more>展开全文</a>`:""}${linked}
@@ -842,7 +895,7 @@ function renderFocus(){
   const f = $("#focus");
   if (!focusKey) { f.style.display="none"; $$(".srow").forEach(r=>r.classList.remove("sel")); return; }
   const s = sessList.find(x => keyOf(x.agent,x.short) === focusKey);
-  f.style.display="inline"; f.innerHTML = `只看：${esc(s ? (s.alias||s.title||"未命名") : focusKey)} <button class="ghost" id="unfocus">✕</button>`;
+  f.style.display="inline"; f.innerHTML = `只看：${esc(s ? (s.alias||s.title||"未命名") : focusKey)} <button class="ghost" id="unfocus">${ic("x")}</button>`;
   $("#unfocus").onclick = () => { focusKey=null; renderFocus(); renderStream(); };
   $$(".srow").forEach(r=>r.classList.toggle("sel", r.dataset.key===focusKey));
 }
@@ -942,7 +995,7 @@ function renderPauseBanner(){
   const b = $("#pauseBanner"); if (!b) return;
   if (!codexPause) { b.style.display = "none"; return; }
   b.style.display = "";
-  b.innerHTML = `⏸ 暂停往 Codex 派活（约 ${codexPause.left} 分钟后自动再试）：${esc(String(codexPause.reason||"").slice(0,120))}
+  b.innerHTML = `${ic("pause")} 暂停往 Codex 派活（约 ${codexPause.left} 分钟后自动再试）：${esc(String(codexPause.reason||"").slice(0,120))}
     <button class="ghost" id="resumeCodex" style="margin-left:8px">恢复</button>`;
   $("#resumeCodex").onclick = async () => { try { await api("/api/codex/resume", {root: cur.root}); toast("已恢复往 Codex 派活"); pollCodex(); } catch(e){ toast("❌ " + e.message); } };
 }
@@ -1004,8 +1057,8 @@ function placeCards(){
   else if (claudeSide === "left") { L.appendChild(cl); R.insertBefore(cx, R.firstChild); }
   else { L.appendChild(cx); R.insertBefore(cl, R.firstChild); }
   const tip = layoutSrc === "windows" ? "跟着窗口：" : "缺省：";
-  $("#posClaude").textContent = isMobile() ? "" : (layoutSrc === "windows" ? "🖥 窗口在" + (claudeSide==="left"?"左":"右") : "");
-  $("#posCodex").textContent = isMobile() ? "" : (layoutSrc === "windows" ? "🖥 窗口在" + (claudeSide==="left"?"右":"左") : "");
+  $("#posClaude").innerHTML = isMobile() ? "" : (layoutSrc === "windows" ? ic("monitor") + " 窗口在" + (claudeSide==="left"?"左":"右") : "");
+  $("#posCodex").innerHTML = isMobile() ? "" : (layoutSrc === "windows" ? ic("monitor") + " 窗口在" + (claudeSide==="left"?"右":"左") : "");
 }
 async function pollLayout(){
   try { const l = await api("/api/layout");
@@ -1067,17 +1120,17 @@ function flyMail(m){
         if (land) { land.classList.remove("landed"); void land.offsetWidth; land.classList.add("landed"); setTimeout(() => land.classList.remove("landed"), 1400); } };
     }, i * 180));
 }
-function setWebFx(on){ webFx = on; store.set("msgbus.webfx", on ? "1" : "0"); $("#mWebFx").textContent = "网页信件动画：" + (on ? "开 ✓" : "关"); }
+function setWebFx(on){ webFx = on; store.set("msgbus.webfx", on ? "1" : "0"); $("#mWebFx").innerHTML = ic("sparkles") + "网页信件动画：" + (on ? "开" + ic("check", "ok") : "关"); }
 
 // ---------- 会话视图（看记录、直接回复、派活） ----------
 let view = null, openTabs = [], trOffset = -1, trEntries = [], trBusy = false;
 const tabKey = x => x.agent + ":" + x.sid;
 function renderTabs(){
   const live = k => sessList.find(s => tabKey(s) === k);
-  $("#vtabs").innerHTML = `<div class="vtab ${view?"":"on"}" data-t="bus">📨 总线消息</div>` + openTabs.map(t => {
+  $("#vtabs").innerHTML = `<div class="vtab ${view?"":"on"}" data-t="bus">${ic("messages")} 总线消息</div>` + openTabs.map(t => {
     const s = live(tabKey(t)) || t, st = sessState(s)[0];
     return `<div class="vtab ${view && tabKey(view)===tabKey(t)?"on":""}" data-t="${esc(tabKey(t))}">${bbAvatar(s, st, 18)}
-      ${roleBadge(s)}<span class="a-${esc(t.agent)}">${esc(s.alias||s.title||"未命名")}</span><button class="x" data-close="${esc(tabKey(t))}" title="关闭">✕</button></div>`; }).join("");
+      ${roleBadge(s)}<span class="a-${esc(t.agent)}">${esc(s.alias||s.title||"未命名")}</span><button class="x" data-close="${esc(tabKey(t))}" title="关闭">${ic("x")}</button></div>`; }).join("");
   $$(".vtab").forEach(el => el.onclick = e => {
     if (e.target.dataset.close) { closeTab(e.target.dataset.close); e.stopPropagation(); return; }
     if (el.dataset.t === "bus") showBus(); else { const t = openTabs.find(x => tabKey(x) === el.dataset.t); if (t) openSession(t); }
@@ -1105,12 +1158,12 @@ function openSession(x){
   const nm = x.alias || x.title || "未命名";
   if (isMobile()) setM("bus");
   const live = sessList.find(s => s.agent === x.agent && s.sid === x.sid) || x;
-  $("#trHead").innerHTML = `<button class="mback mob" onclick="mBack()" title="返回">‹</button>${roleBadge(live)}<span class="nm a-${esc(x.agent)}">${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
+  $("#trHead").innerHTML = `<button class="mback mob" onclick="mBack()" title="返回">${ic("back")}</button>${roleBadge(live)}<span class="nm a-${esc(x.agent)}">${logo(x.agent)}${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
     ${live.role_note?`<span style="color:var(--muted)">${esc(live.role_note)}</span>`:""}
     <span class="seg rolesel" title="手动设这个会话是主还是辅；自动 = 按派活关系判断">
       <button data-role="main" class="${live.role_set==="main"?"on":""}">主</button><button data-role="aux" class="${live.role_set==="aux"?"on":""}">辅</button><button data-role="auto" class="${!live.role_set?"on":""}">自动</button></span>
-    <button class="rf" id="trRefresh" title="从头重读这个会话的记录">⟳</button>
-    ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">🤝 交给 Claude</button>` : ""}
+    <button class="rf" id="trRefresh" title="从头重读这个会话的记录">${ic("refresh")}</button>
+    ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">${ic("handoff")} 交给 Claude</button>` : ""}
     <span class="note" style="color:var(--muted)">${x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : x.agent==="cursor" ? "回复经总线送达 Cursor：它下次提交消息、调用工具或一轮结束时收到，闲着叫不醒；要它当成你本人的指令，最稳还是在 Cursor 里直接说" : "回复经总线送达 Claude（闲着会被叫醒）；要它当成你本人的指令，最稳还是在 Claude 里直接说"}</span>`;
   $("#toFixed").innerHTML = `发给 <b class="a-${esc(x.agent)}">${esc(nm)}</b>`;
   if ($("#toClaude")) $("#toClaude").onclick = () => handToClaude(x);
@@ -1122,8 +1175,8 @@ function openSession(x){
 function trHtml(){
   let html = "", tools = [], lastDay = "";
   const flush = () => { if (!tools.length) return;
-    html += tools.length === 1 ? `<div class="tools"><div class="tl">🔧 ${esc(tools[0].text)}</div></div>`
-      : `<details class="tools"><summary>🔧 ${tools.length} 次工具调用 · 最后：${esc(tools[tools.length-1].text.slice(0,60))}</summary>${tools.map(t=>`<div class="tl" title="${esc(t.text)}">${esc(t.text)}</div>`).join("")}</details>`;
+    html += tools.length === 1 ? `<div class="tools"><div class="tl">${ic("tool")} ${esc(tools[0].text)}</div></div>`
+      : `<details class="tools"><summary>${ic("tool")} ${tools.length} 次工具调用 · 最后：${esc(tools[tools.length-1].text.slice(0,60))}</summary>${tools.map(t=>`<div class="tl" title="${esc(t.text)}">${esc(t.text)}</div>`).join("")}</details>`;
     tools = []; };
   for (const e of trEntries) {
     const d = e.ts ? dayOf(e.ts) : ""; if (d && d !== lastDay) { flush(); html += `<div class="day">${d}</div>`; lastDay = d; }
@@ -1131,7 +1184,7 @@ function trHtml(){
     flush();
     const long = e.text.length > 700 || e.text.split("\n").length > 14;
     html += `<div class="bub ${e.role==="user"?"u":"a"} ${long?"clamp":""}"><div class="bx">${esc(e.text)}</div>
-      ${long?'<a class="link more" data-bmore>展开全文</a>':""}<div class="bt">${e.role==="user"?"你":(AGENT_NAME[view.agent]||"Claude")} · ${e.ts?hm(e.ts):""}</div></div>`;
+      ${long?'<a class="link more" data-bmore>展开全文</a>':""}<div class="bt">${e.role==="user"?ic("user","logo")+"你":logo(view.agent)+(AGENT_NAME[view.agent]||"Claude")} · ${e.ts?hm(e.ts):""}</div></div>`;
   }
   flush();
   return html || `<div class="empty">这段时间没有对话内容</div>`;
