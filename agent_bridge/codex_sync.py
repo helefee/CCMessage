@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """把 Codex 桌面端里你自己开的对话同步进 Claude 桌面端的会话列表（和 Codex 自动导入 Claude 会话反过来）。
 
-    python -m agent_bridge codex-sync [--dry-run] [--days 14] [--cwd 项目目录] [--to 账号/组织]
+    python -m agent_bridge codex-sync [--dry-run] [--days 14] [--cwd 项目目录] [--to 账号/组织] [--only 末6位,末6位]
 
 - 只同步用户自己开的 Codex 对话（thread_source=user、桌面端建的）；从 Claude 导进 Codex 的、后台 exec 开的、子代理都不同步，免得来回套娃。
 - 每个 Codex 对话对应一个固定的 Claude 会话（记在 ~/.agent-bridge/codex_to_claude.json）。Codex 那边又聊了就覆盖更新；
@@ -156,9 +156,14 @@ def _mark_imported(jsonl: Path, codex_tid: str, title: str) -> bool:
     return True
 
 
-def run(days: float = 14, cwd: str | None = None, target: str | None = None, dry: bool = False) -> dict:
+def run(days: float = 14, cwd: str | None = None, target: str | None = None, dry: bool = False,
+        only: list[str] | None = None) -> dict:
+    """only：只同步这几个 Codex 对话（完整号或末几位）；不给就同步全部可同步的。"""
     p = plan(days, cwd, target)
     todo = [r for r in p.get("rows", []) if r["state"] in ("new", "update")] if p["ok"] else []
+    if only is not None:
+        keys = [k.strip().lower() for k in only if k.strip()]
+        todo = [r for r in todo if any(r["thread"].lower() == k or r["thread"].lower().endswith(k) for k in keys)]
     if not p["ok"] or dry or not todo:
         return dict(p, done=0, dry=dry)
     tdir = Path(p["target"]["path"])
@@ -194,8 +199,9 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--days", type=float, default=14, help="只同步最近几天动过的（缺省 14）")
     ap.add_argument("--cwd", help="只同步这个项目目录下的")
     ap.add_argument("--to", help="写进哪个账号 / 组织文件夹（缺省当前在用的）")
+    ap.add_argument("--only", help="只同步这几个 Codex 对话（号或末 6 位，逗号分隔）")
     a = ap.parse_args(argv)
-    r = run(a.days, a.cwd, a.to, a.dry_run)
+    r = run(a.days, a.cwd, a.to, a.dry_run, a.only.split(",") if a.only else None)
     if not r["ok"]:
         print(r["error"])
         return 1
