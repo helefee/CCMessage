@@ -1129,10 +1129,11 @@ class Handler(BaseHTTPRequestHandler):
                                  "phone" if getattr(self, "device", None) else "ui"))
             elif path == "/api/claude-sync":
                 from . import claude_sync
-                self._json(claude_sync.run())
+                self._json(claude_sync.run(only=body.get("only")))
             elif path == "/api/codex-sync":
                 from . import codex_sync
-                self._json(codex_sync.run(float(body.get("days") or 14), body.get("root") or None))
+                self._json(codex_sync.run(float(body.get("days") or 14), body.get("root") or None,
+                                          only=body.get("only")))
             elif path == "/api/pair/new":
                 self._json(new_pair())
             elif path == "/api/lan/stop":

@@ -98,8 +98,12 @@ def plan(target: str | None = None) -> dict:
     return {"ok": True, "target": tgt, "folders": fs, "add": add, "skip_missing": skip_missing}
 
 
-def run(target: str | None = None, dry: bool = False) -> dict:
+def run(target: str | None = None, dry: bool = False, only: list[str] | None = None) -> dict:
+    """only：只补这几个（local_*.json 文件名）；不给就全补。"""
     p = plan(target)
+    if p.get("ok") and only is not None:
+        keep = set(only)
+        p["add"] = [a for a in p["add"] if a["name"] in keep]
     if not p["ok"] or dry or not p["add"]:
         return dict(p, done=0, dry=dry)
     tdir = Path(p["target"]["path"])
@@ -126,7 +130,8 @@ def main(argv: list[str]) -> int:
             t = datetime.fromtimestamp(f["latest"]).strftime("%m-%d %H:%M") if f["latest"] else "—"
             print(f"{f['key']}  会话 {f['count']:>3}  最近 {t}")
         return 0
-    r = run(tgt, dry)
+    only = argv[argv.index("--only") + 1].split(",") if "--only" in argv else None
+    r = run(tgt, dry, only)
     if not r["ok"]:
         print("✗ " + r["error"])
         return 1
