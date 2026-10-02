@@ -552,6 +552,11 @@ def sessions(root: Path) -> list[dict]:
     roles = session_roles(root)
     for x in rows:
         x["listening"] = now - x.get("listening", 0) <= 150
+        # 会话记录 90 秒内有写入 = 正在干活（比「待命」标记可靠：老版本的待命进程干活时不退）
+        try:
+            x["busy"] = bool(x.get("transcript")) and now - Path(x["transcript"]).stat().st_mtime <= 90
+        except OSError:
+            x["busy"] = False
         x.update(roles.get(f"{x.get('agent')}-{x.get('sid')}", {}))
         if not x.get("role") and x.get("owner_name"):        # 被认领的 Codex 对话：没活时也算辅
             x["role"], x["role_note"] = "aux", "归 " + str(x["owner_name"]).rsplit(" [", 1)[0] + " 用"

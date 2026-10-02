@@ -141,8 +141,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .dot{width:8px;height:8px;border-radius:50%;flex:none}
 .bbw{position:relative;flex:none;width:26px;height:26px;display:inline-block}
 .bbw svg{display:block;overflow:visible}
+@media (prefers-reduced-motion: reduce){.bbw.live svg{animation:none}}
 .bbw .dot{position:absolute;right:-2px;bottom:-1px;width:8px;height:8px;box-shadow:0 0 0 2px var(--bg)}
 .bb-a{transform-box:view-box;transform-origin:0 0;animation-timing-function:linear;animation-iteration-count:infinite}
+/* 活跃的头像再加一点上下浮动：26 像素下眨眼和呼吸太细，一眼看不出在动 */
+.bbw.live svg{animation:bbBob 1.6s ease-in-out infinite}
+@keyframes bbBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
 @media (prefers-reduced-motion: reduce){.bb-a{animation:none!important}}
 .d-stand{background:var(--ok)}.d-active{background:var(--accent)}.d-idle{background:var(--faint)}
 .srow .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -897,13 +901,13 @@ function bbAvatar(x, st, size){
   }
   const body = live ? `class="bb-a" style="animation-name:bb-${sh}-b;animation-duration:${BB.anim[sh].secs}s;animation-delay:${-((Date.now() / 1000) % BB.anim[sh].secs)}s"` : "";
   const px = size || 26;
-  return `<span class="bbw" style="width:${px}px;height:${px}px" title="${st === "active" ? "活跃" : st === "stand" ? "待命" : "空闲"}"><svg width="${px}" height="${px}" viewBox="${-vb} ${-vb} ${vb * 2} ${vb * 2}" aria-hidden="true">
+  return `<span class="bbw${live ? " live" : ""}" style="width:${px}px;height:${px}px" title="${st === "active" ? "活跃" : st === "stand" ? "待命" : "空闲"}"><svg width="${px}" height="${px}" viewBox="${-vb} ${-vb} ${vb * 2} ${vb * 2}" aria-hidden="true">
     <defs><mask id="${id}" maskUnits="userSpaceOnUse" x="${-vb}" y="${-vb}" width="${vb * 2}" height="${vb * 2}"><g ${body}><path d="${BB.shapes[sh]}" fill="#fff"/>${eyes}</g></mask></defs>
     <rect x="${-vb}" y="${-vb}" width="${vb * 2}" height="${vb * 2}" fill="${color}" mask="url(#${id})"/></svg><i class="dot d-${st}"></i></span>`;
 }
 
 // ---------- 会话 ----------
-function sessState(x){ if (x.listening) return ["stand","待命"]; if (x.age < 180) return ["active","活跃"]; return ["idle", "空闲"]; }
+function sessState(x){ if (x.busy) return ["active","活跃"]; if (x.listening) return ["stand","待命"]; if (x.age < 180) return ["active","活跃"]; return ["idle", "空闲"]; }
 async function pollSessions(){
   if (!cur || !cur.bus_dir) return; const root = cur.root;
   try {
@@ -1071,7 +1075,7 @@ const tabKey = x => x.agent + ":" + x.sid;
 function renderTabs(){
   const live = k => sessList.find(s => tabKey(s) === k);
   $("#vtabs").innerHTML = `<div class="vtab ${view?"":"on"}" data-t="bus">📨 总线消息</div>` + openTabs.map(t => {
-    const s = live(tabKey(t)) || t, st = s.listening ? "stand" : (s.age < 180 ? "active" : "idle");
+    const s = live(tabKey(t)) || t, st = sessState(s)[0];
     return `<div class="vtab ${view && tabKey(view)===tabKey(t)?"on":""}" data-t="${esc(tabKey(t))}">${bbAvatar(s, st, 18)}
       ${roleBadge(s)}<span class="a-${esc(t.agent)}">${esc(s.alias||s.title||"未命名")}</span><button class="x" data-close="${esc(tabKey(t))}" title="关闭">✕</button></div>`; }).join("");
   $$(".vtab").forEach(el => el.onclick = e => {
