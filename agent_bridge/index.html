@@ -209,6 +209,103 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
 .mob{display:none!important}
 .mnav{display:none}
 
+/* ---------- 风格：照 Open WebUI —— 纯中性灰、大圆角、淡边框；你说的话是右侧圆角气泡，AI 的回复不套框；底部圆角输入浮层 ---------- */
+:root{
+  --bg:#ffffff;--panel:#ffffff;--panel2:#f9f9f9;--side:#f9f9f9;--hover:#ececec;--hover2:#e3e3e3;--bubble:#f4f4f4;
+  --line:#e3e3e3;--line2:#ececec;--text:#0d0d0d;--muted:#676767;--faint:#9b9b9b;
+  --accent:#2563eb;--accent-weak:#eff4ff;--ink:#0d0d0d;--ink-on:#ffffff;
+  --shadow:0 4px 18px rgba(0,0,0,.08);--r:12px;--r2:20px;
+  font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Microsoft YaHei",ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#171717;--panel:#171717;--panel2:#212121;--side:#0f0f0f;--hover:#262626;--hover2:#333333;--bubble:#262626;
+  --line:#2a2a2a;--line2:#222222;--text:#ececec;--muted:#b4b4b4;--faint:#7c7c7c;
+  --accent:#7aa2ff;--accent-weak:#1c2333;--ink:#ececec;--ink-on:#0d0d0d;--shadow:0 6px 24px rgba(0,0,0,.5);}}
+:root[data-theme="dark"]{
+  --bg:#171717;--panel:#171717;--panel2:#212121;--side:#0f0f0f;--hover:#262626;--hover2:#333333;--bubble:#262626;
+  --line:#2a2a2a;--line2:#222222;--text:#ececec;--muted:#b4b4b4;--faint:#7c7c7c;
+  --accent:#7aa2ff;--accent-weak:#1c2333;--ink:#ececec;--ink-on:#0d0d0d;--shadow:0 6px 24px rgba(0,0,0,.5);}
+body{font-family:inherit;-webkit-font-smoothing:antialiased}
+*{scrollbar-width:thin;scrollbar-color:var(--hover2) transparent}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--hover2);border-radius:8px}::-webkit-scrollbar-track{background:transparent}
+/* 按钮 / 输入：无框浅底、大圆角；主按钮是墨色（浅色主题黑、深色主题白） */
+button{border:0;background:var(--hover);border-radius:10px;padding:5px 12px;transition:background .15s}
+button:hover{border-color:transparent;background:var(--hover2)}
+button.primary{background:var(--ink);color:var(--ink-on);border:0}
+button.primary:hover{opacity:.88;background:var(--ink)}
+button.ghost{background:transparent}
+button.ghost:hover{background:var(--hover);color:var(--text)}
+input,select,textarea{border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+input:focus,select:focus,textarea:focus{border-color:var(--faint)}
+/* 顶栏融进背景 */
+.top{background:var(--bg);border-bottom:0;padding:10px 16px}
+.brand{font-weight:600;letter-spacing:.2px}
+.pill{border-radius:999px;border-color:var(--line)}
+.menu .list{border-radius:14px;padding:6px;border-color:var(--line)}
+.menu .list button{border-radius:9px;padding:7px 10px}
+.menu .list button:hover{background:var(--hover)}
+.banner{border-bottom:0;margin:0 16px 6px;border-radius:var(--r)}
+/* 两侧栏：浅灰底、无分隔线，行是圆角块 */
+.side{background:var(--side);border-left:0}
+.sideL{border-right:0}
+.card{border-bottom:0;padding:10px 10px 6px}
+.card h3{font-size:12px;color:var(--faint);font-weight:500;padding:0 6px}
+.srow{border-radius:var(--r);padding:7px 8px;gap:10px}
+.srow:hover{background:var(--hover)}
+.srow.sel{background:var(--hover2)}
+.srow.is-main{box-shadow:inset 3px 0 var(--ink)}
+.srow .nm{font-weight:500}
+.r-main{background:var(--ink);color:var(--ink-on)}
+.r-aux{background:var(--hover);border-color:transparent}
+.bbw .dot{box-shadow:0 0 0 2px var(--side)}
+/* 中间：标签页是圆角药丸；总线消息是淡边大圆角卡片 */
+.vtabs{background:var(--bg);border-bottom:0;padding:6px 14px 4px;gap:4px}
+.vtab{border:0;border-radius:999px;padding:5px 12px}
+.vtab:hover{background:var(--hover)}
+.vtab.on{background:var(--hover2);margin-bottom:0}
+.filters{border-bottom:0;padding:6px 16px}
+.chip{border:0;background:var(--hover);border-radius:999px}
+.chip.on{background:var(--ink);color:var(--ink-on)}
+.trhead{border-bottom:0;padding:10px 18px}
+.stream{padding:12px 18px 22px;gap:10px}
+.msg{border-radius:var(--r2);border-color:var(--line2);background:var(--bg);padding:10px 16px 11px;max-width:860px;align-self:center;width:100%}
+.msg.mine,.msg.task,.msg.result,.msg.result.fail{border-left-width:1px;border-left-color:var(--line2)}
+.msg.mine{background:var(--bubble);border-color:transparent}
+.msg.task{box-shadow:inset 3px 0 var(--warn)}
+.msg.result{box-shadow:inset 3px 0 var(--ok)}
+.msg.result.fail{box-shadow:inset 3px 0 var(--bad)}
+.linked{border-radius:var(--r);border-style:solid;border-color:var(--line2)}
+.badge{border-radius:999px}
+code{background:var(--hover);border-radius:6px}
+/* 会话记录：你 = 右侧圆角气泡；AI = 不套框的正文 */
+.trv{max-width:860px;width:100%;margin:0 auto}
+.bub{border:0;border-radius:22px;padding:10px 16px}
+.bub.u{background:var(--bubble);border-bottom-right-radius:22px;max-width:min(680px,80%)}
+.bub.a{background:transparent;padding:4px 2px;max-width:100%;border-radius:0}
+.bub .bt{color:var(--faint)}
+/* 发送区：底部一个圆角浮层，输入框和发送键在里面 */
+.compose{border-top:0;background:var(--bg);padding:6px 18px 16px}
+.crow{max-width:860px;margin:0 auto 6px}
+.seg{border:0;border-radius:999px;background:var(--hover);padding:2px}
+.seg button{border-radius:999px;background:transparent;padding:3px 12px}
+.seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.cin{max-width:860px;margin:0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:26px;padding:6px 6px 6px 16px;
+  box-shadow:var(--shadow);align-items:flex-end}
+.cin textarea{border:0;background:transparent;padding:8px 0;min-height:24px}
+.cin textarea:focus{border:0}
+.cin button{border-radius:999px;padding:8px 16px}
+.newpill{background:var(--ink);color:var(--ink-on);border-radius:999px}
+/* 弹窗 / 提示 */
+.dlg{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
+.dlg .box{border-radius:22px;border:1px solid var(--line2)}
+.dlg .hd{border-bottom:0;padding:16px 20px 6px;font-weight:600}
+.dlg .bd{padding:8px 20px 12px}
+.dlg .ft{border-top:0;padding:10px 20px 18px}
+.devrow{border-top-color:var(--line2)}
+.toast{border-radius:999px;padding:8px 18px}
+.trow{border-radius:var(--r);border-color:var(--line2)}
+.trow:hover{border-color:var(--line);background:var(--hover)}
+
 /* ---------- 手机：一屏一个视图 + 底部导航 ---------- */
 @media (max-width:860px){
   body{font-size:15px;overflow:hidden}
