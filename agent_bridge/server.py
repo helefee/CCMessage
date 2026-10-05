@@ -40,6 +40,7 @@ TOOL = paths.PKG                      # 程序本体（包目录）
 DATA = paths.HOME                     # 每个用户自己的数据：~/.agent-bridge
 BUS_SRC = TOOL / "bus.py"
 INDEX = TOOL / "index.html"
+AVATARS = TOOL / "bloub-icons.json"      # 会话头像数据（由 tools/gen_bloub_icons.ts 从 bloub 导出）
 REGISTRY = DATA / "projects.json"
 PY = Path(sys.executable).as_posix()
 CODEX_HOME = paths.CODEX_HOME
@@ -551,6 +552,11 @@ def sessions(root: Path) -> list[dict]:
     roles = session_roles(root)
     for x in rows:
         x["listening"] = now - x.get("listening", 0) <= 150
+        # 会话记录 90 秒内有写入 = 正在干活（比「待命」标记可靠：老版本的待命进程干活时不退）
+        try:
+            x["busy"] = bool(x.get("transcript")) and now - Path(x["transcript"]).stat().st_mtime <= 90
+        except OSError:
+            x["busy"] = False
         x.update(roles.get(f"{x.get('agent')}-{x.get('sid')}", {}))
         if not x.get("role") and x.get("owner_name"):        # 被认领的 Codex 对话：没活时也算辅
             x["role"], x["role_note"] = "aux", "归 " + str(x["owner_name"]).rsplit(" [", 1)[0] + " 用"
@@ -820,9 +826,70 @@ _dev_lock = threading.Lock()
 LAN = {"srv": None, "ip": None, "port": None}
 PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
-PHONE_GET = {"/", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
+PHONE_GET = {"/", "/bloub-icons.json", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
              "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout"}
 PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role", "/api/codex/resume"}
+
+
+# ---------- 会话管理器 / 同步与还原（只认电脑本机） ----------
+
+def sm_get(path: str, q: dict) -> dict:
+    from . import apps, claude_sync, codex_unify, session_mgr
+    if path == "/api/sm/list":
+        return session_mgr.list_all()
+    if path == "/api/sm/search":
+        return session_mgr.fulltext(q.get("q", ""))
+    if path == "/api/sm/trash":
+        return {"items": session_mgr.trash_list()}
+    if path == "/api/jobs":
+        return {"jobs": apps.pending(), "apps": apps.status()}
+    if path == "/api/sm/sync":
+        cp = claude_sync.plan()
+        xp = codex_unify.plan()
+        return {"apps": apps.status(),
+                "claude": {"ok": cp.get("ok"), "error": cp.get("error"), "target": cp.get("target"),
+                           "add": len(cp.get("add", [])), "update": len(cp.get("update", [])),
+                           "add_archived": sum(1 for a in cp.get("add", []) if a["archived"]),
+                           "backups": claude_sync.list_backups()[:15]},
+                "codex": {"provider": xp["provider"], "account": xp["account"], "by_provider": xp["by_provider"],
+                          "by_account": xp["by_account"], "threads": len(xp["threads"]), "files": len(xp["files"]),
+                          "archived": xp["archived"], "ledgers": codex_unify.list_ledgers()[:15]},
+                "jobs": apps.pending()}
+    raise ValueError("没有这个接口")
+
+
+def sm_post(path: str, body: dict) -> dict:
+    from . import apps, session_mgr
+    if path == "/api/sm/export":
+        return session_mgr.export_md(body["agent"], body["id"])
+    if path == "/api/sm/batch":
+        action = body["action"]
+        if action not in ("archive", "unarchive", "delete"):
+            raise ValueError("不认识的操作")
+        word = {"archive": "归档", "unarchive": "取消归档", "delete": "删除（进回收站）"}[action]
+        out = {}
+        for kind in ("claude", "codex"):          # 两个桌面端各管各的，分开排队
+            its = [{"agent": i["agent"], "id": i["id"]} for i in body.get("items", []) if i.get("agent") == kind]
+            if its:
+                out[kind] = apps.run_or_defer(kind, "sessions-batch", {"action": action, "items": its},
+                                              f"{word} {len(its)} 个 {kind} 会话")
+        return {"ok": True, "results": out}
+    if path == "/api/sm/trash/restore":
+        t = next((x for x in session_mgr.trash_list() if x["id"] == body["id"]), None)
+        if not t:
+            raise ValueError("回收站里没有这一批")
+        kind = t["items"][0]["agent"] if t["items"] else "claude"
+        return apps.run_or_defer(kind, "trash-restore", {"batch": body["id"]}, f"从回收站还原 {body['id']}")
+    if path == "/api/sm/claude-restore":
+        return apps.run_or_defer("claude", "claude-restore", {"backup": body["id"]}, f"撤回 Claude 同步 {body['id']}")
+    if path == "/api/sm/codex-unify":
+        return apps.run_or_defer("codex", "codex-unify", {"fix_account": bool(body.get("fix_account", True))},
+                                 "Codex 历史归桶")
+    if path == "/api/sm/codex-restore":
+        return apps.run_or_defer("codex", "codex-restore", {"ledger": body["id"]}, f"还原 Codex 归桶 {body['id']}")
+    if path == "/api/jobs/cancel":
+        return {"ok": apps.cancel(body["id"])}
+    raise ValueError("没有这个接口")
 
 
 def lan_ip() -> str:
@@ -1041,6 +1108,8 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/codex-sync":
                 from . import codex_sync
                 self._json(codex_sync.plan(float(q.get("days", 14)), q.get("root") or None))
+            elif u.path.startswith("/api/sm/") or u.path == "/api/jobs":
+                self._json(sm_get(u.path, q))
             elif u.path == "/api/layout":
                 self._json(window_layout())
             elif u.path == "/api/transcript":
@@ -1052,6 +1121,14 @@ class Handler(BaseHTTPRequestHandler):
                 p = _pairs.get(q.get("c", ""))
                 self._json({"used": bool(p and p["used_by"]), "expired": (not p) or p["exp"] < time.time(),
                             "device": p and p["used_by"]})
+            elif u.path == "/bloub-icons.json":
+                body = AVATARS.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(body)
             elif u.path == "/":
                 body = INDEX.read_bytes()
                 self.send_response(200)
@@ -1128,12 +1205,16 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(reply(norm_root(body["root"]), body["agent"], body["sid"], text, body.get("kind") or "msg",
                                  "phone" if getattr(self, "device", None) else "ui"))
             elif path == "/api/claude-sync":
-                from . import claude_sync
-                self._json(claude_sync.run(only=body.get("only")))
+                # 桌面端开着时直接写会在它退出时被盖回去：排到退出之后做
+                from . import apps
+                self._json(apps.run_or_defer("claude", "claude-sync", {"only": body.get("only")}, "同步 Claude 会话到当前账号"))
             elif path == "/api/codex-sync":
-                from . import codex_sync
-                self._json(codex_sync.run(float(body.get("days") or 14), body.get("root") or None,
-                                          only=body.get("only")))
+                from . import apps
+                self._json(apps.run_or_defer("claude", "codex-sync", {"days": float(body.get("days") or 14),
+                                                                      "root": body.get("root") or None,
+                                                                      "only": body.get("only")}, "把 Codex 对话同步进 Claude"))
+            elif path.startswith("/api/sm/") or path.startswith("/api/jobs/"):
+                self._json(sm_post(path, body))
             elif path == "/api/pair/new":
                 self._json(new_pair())
             elif path == "/api/lan/stop":

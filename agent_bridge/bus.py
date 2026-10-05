@@ -2134,6 +2134,21 @@ def cmd_hook(args) -> None:
         rewake_listen(agent, sid, cwd, args.max_secs)
         return
     me = touch_presence(agent, sid, cwd, data.get("transcript_path"), force=(event == "SessionStart"))
+    if agent == "claude" and event in ("UserPromptSubmit", "PostToolUse"):
+        # 会话开始干活了：让闲时挂着的待命进程退出（删掉它的 pid 文件，它下一轮自己就走），
+        # 不然它还会每分钟报一次「待命」，网页把正在干活的会话显示成待命
+        pf = BUS / "listen" / f"{key_of(agent, sid)}.pid"
+        if pf.exists():
+            try:
+                pf.unlink()
+            except OSError:
+                pass
+            p = SESS / f"{key_of(agent, sid)}.json"
+            rec = load_json(p)
+            if rec.get("listening"):
+                rec["listening"] = 0
+                save_json(p, rec)
+                me = rec
     msgs = pull_new(agent, sid, me)
     ctx = []
     if event == "SessionStart":

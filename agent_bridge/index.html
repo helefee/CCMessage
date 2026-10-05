@@ -139,6 +139,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .srow:hover{background:var(--line2)}
 .srow.sel{background:var(--accent-weak)}
 .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.bbw{position:relative;flex:none;width:26px;height:26px;display:inline-block}
+.bbw svg{display:block;overflow:visible}
+@media (prefers-reduced-motion: reduce){.bbw.live svg{animation:none}}
+.bbw .dot{position:absolute;right:-2px;bottom:-1px;width:8px;height:8px;box-shadow:0 0 0 2px var(--bg)}
+.bb-a{transform-box:view-box;transform-origin:0 0;animation-timing-function:linear;animation-iteration-count:infinite}
+/* 活跃的头像再加一点上下浮动：26 像素下眨眼和呼吸太细，一眼看不出在动 */
+.bbw.live svg{animation:bbBob 1.6s ease-in-out infinite}
+@keyframes bbBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@media (prefers-reduced-motion: reduce){.bb-a{animation:none!important}}
 .d-stand{background:var(--ok)}.d-active{background:var(--accent)}.d-idle{background:var(--faint)}
 .srow .nm{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .srow .sub{font-size:11.5px;color:var(--muted);font-family:var(--mono)}
@@ -165,6 +174,53 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .dlg .bd{padding:12px 16px;overflow:auto}
 .dlg .ft{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
 .dlg pre{white-space:pre-wrap;font-family:var(--mono);font-size:12.5px;margin:0}
+.dlg.wide .box{width:min(1100px,100%);height:88vh;max-height:88vh}
+.smtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.smtabs button.on{background:var(--accent-weak);color:var(--accent);border-color:var(--accent)}
+.smbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.smbar input[type=search]{flex:1;min-width:180px}
+.smrow{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-bottom:1px solid var(--line2)}
+.smrow:hover{background:var(--panel2)}
+.smrow .grow{flex:1;min-width:0}
+.smrow .t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smrow .m{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smrow .acts{display:flex;gap:4px;flex-shrink:0}
+.smrow .acts button{padding:2px 8px;font-size:12px}
+.smtag{display:inline-block;font-size:11px;padding:0 6px;border-radius:8px;margin-left:6px;font-weight:400;vertical-align:1px}
+.smtag.ok{background:var(--ok-weak);color:var(--ok)}.smtag.warn{background:var(--warn-weak);color:var(--warn)}.smtag.mut{background:var(--line2);color:var(--muted)}
+.smcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.smcard h4{margin:0 0 6px;font-size:14px}
+.smnote{color:var(--muted);font-size:12.5px;line-height:1.7}
+.smchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.smbig{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin:6px 0 8px}
+.smbig span{color:var(--muted);font-size:13px}.smbig span b{font-size:24px;color:var(--text);margin-right:4px}
+.smbig button.primary{margin-left:auto;padding:7px 18px}
+.smchip{border:1px solid var(--line)!important;background:var(--panel)!important;border-radius:999px!important;padding:3px 12px!important;font-size:13px}
+.smchip b{margin-left:4px;font-weight:600;color:var(--muted)}
+.smchip.on{background:var(--accent)!important;border-color:var(--accent)!important;color:#fff}
+.smchip.on b{color:#fff}
+.smsep{width:1px;background:var(--line);margin:2px 4px}
+.smtip{border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:13px;line-height:1.7;background:var(--warn-weak);color:var(--text)}
+.smtip a{color:var(--accent);cursor:pointer;text-decoration:underline}
+.smsel{position:sticky;top:-12px;z-index:2;display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:8px 10px;margin:0 -4px 6px;
+  border-radius:10px;background:var(--panel2);border:1px solid var(--line)}
+.smsel.has{background:var(--accent-weak);border-color:var(--accent)}
+.smsel .cnt{font-weight:600;margin:0 6px 0 2px}
+.smsel input[type=checkbox],.smrow input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:var(--accent)}
+.smsel .sp{flex:1}
+.smsel button{font-size:13px}
+.smsel button.warnb{background:var(--warn-weak)!important;color:var(--warn)}
+.smsel button.danger{background:var(--bad-weak)!important;color:var(--bad)}
+.smrow{cursor:pointer}
+.smrow.sel{background:var(--accent-weak)}
+.smag{flex-shrink:0;font-size:11px;font-weight:600;border-radius:6px;padding:1px 6px;margin-top:2px;min-width:44px;text-align:center}
+.smag.claude{background:#f3e3d9;color:#b4532a}.smag.codex{background:#dff0e6;color:#1f7a4c}
+@media (prefers-color-scheme:dark){.smag.claude{background:#3b2a20;color:#f0a27a}.smag.codex{background:#173126;color:#6fd3a0}}
+:root[data-theme=dark] .smag.claude{background:#3b2a20;color:#f0a27a}:root[data-theme=dark] .smag.codex{background:#173126;color:#6fd3a0}
+:root[data-theme=light] .smag.claude{background:#f3e3d9;color:#b4532a}:root[data-theme=light] .smag.codex{background:#dff0e6;color:#1f7a4c}
+.smrow .acts button{background:transparent!important;border:1px solid var(--line)!important}
+.smrow .acts button:hover{border-color:var(--accent)!important}
+@media (max-width:640px){.smrow .acts{flex-direction:column}.dlg.wide .box{height:92vh}}
 .step{padding:2px 0}
 .step.ok{color:var(--ok)}.step.bad{color:var(--bad)}
 body.phone .admin{display:none!important}
@@ -202,7 +258,121 @@ body.simple .simplehint{display:block}
 code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 5px;border-radius:4px}
 
 .mob{display:none!important}
+/* SVG 图标：跟着字号和文字颜色走 */
+.ic{width:1.1em;height:1.1em;vertical-align:-.18em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ic.logo{width:1.05em;height:1.05em;margin-right:4px;fill:currentColor;stroke:none}
+.menu .list button{display:flex;align-items:center;gap:9px}
+.menu .list button .ic{color:var(--muted)}
+.menu .list button .ic.ok{margin-left:auto;color:var(--ok)}
+#dlgTitle{display:inline-flex;align-items:center;gap:8px}
+.toast{align-items:center;gap:8px}
+.toast[style*="block"]{display:flex!important}
 .mnav{display:none}
+
+/* ---------- 风格：照 Open WebUI —— 纯中性灰、大圆角、淡边框；你说的话是右侧圆角气泡，AI 的回复不套框；底部圆角输入浮层 ---------- */
+:root{
+  --bg:#ffffff;--panel:#ffffff;--panel2:#f9f9f9;--side:#f9f9f9;--hover:#ececec;--hover2:#e3e3e3;--bubble:#f4f4f4;
+  --line:#e3e3e3;--line2:#ececec;--text:#0d0d0d;--muted:#676767;--faint:#9b9b9b;
+  --accent:#2563eb;--accent-weak:#eff4ff;--ink:#0d0d0d;--ink-on:#ffffff;
+  --shadow:0 4px 18px rgba(0,0,0,.08);--r:12px;--r2:20px;
+  font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI","Microsoft YaHei",ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#171717;--panel:#171717;--panel2:#212121;--side:#0f0f0f;--hover:#262626;--hover2:#333333;--bubble:#262626;
+  --line:#2a2a2a;--line2:#222222;--text:#ececec;--muted:#b4b4b4;--faint:#7c7c7c;
+  --accent:#7aa2ff;--accent-weak:#1c2333;--ink:#ececec;--ink-on:#0d0d0d;--shadow:0 6px 24px rgba(0,0,0,.5);}}
+:root[data-theme="dark"]{
+  --bg:#171717;--panel:#171717;--panel2:#212121;--side:#0f0f0f;--hover:#262626;--hover2:#333333;--bubble:#262626;
+  --line:#2a2a2a;--line2:#222222;--text:#ececec;--muted:#b4b4b4;--faint:#7c7c7c;
+  --accent:#7aa2ff;--accent-weak:#1c2333;--ink:#ececec;--ink-on:#0d0d0d;--shadow:0 6px 24px rgba(0,0,0,.5);}
+body{font-family:inherit;-webkit-font-smoothing:antialiased}
+*{scrollbar-width:thin;scrollbar-color:var(--hover2) transparent}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--hover2);border-radius:8px}::-webkit-scrollbar-track{background:transparent}
+/* 按钮 / 输入：无框浅底、大圆角；主按钮是墨色（浅色主题黑、深色主题白） */
+button{border:0;background:var(--hover);border-radius:10px;padding:5px 12px;transition:background .15s}
+button:hover{border-color:transparent;background:var(--hover2)}
+button.primary{background:var(--ink);color:var(--ink-on);border:0}
+button.primary:hover{opacity:.88;background:var(--ink)}
+button.ghost{background:transparent}
+button.ghost:hover{background:var(--hover);color:var(--text)}
+input,select,textarea{border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+input:focus,select:focus,textarea:focus{border-color:var(--faint)}
+/* 顶栏融进背景 */
+.top{background:var(--bg);border-bottom:0;padding:10px 16px}
+.brand{font-weight:600;letter-spacing:.2px}
+.pill{border-radius:999px;border-color:var(--line)}
+.menu .list{border-radius:14px;padding:6px;border-color:var(--line)}
+.menu .list button{border-radius:9px;padding:7px 10px}
+.menu .list button:hover{background:var(--hover)}
+.banner{border-bottom:0;margin:0 16px 6px;border-radius:var(--r)}
+/* 两侧栏：浅灰底、无分隔线，行是圆角块 */
+.side{background:var(--side);border-left:0}
+.sideL{border-right:0}
+.card{border-bottom:0;padding:10px 10px 6px}
+.card h3{font-size:12px;color:var(--faint);font-weight:500;padding:0 6px}
+.srow{border-radius:var(--r);padding:8px 10px;gap:12px;align-items:center}
+.srow .nm{font-size:14px}
+.srow .sub{font-size:11.5px;margin-top:1px}
+.bbw .dot{width:10px;height:10px;right:-1px;bottom:0}
+.srow:hover{background:var(--hover)}
+.srow.sel{background:var(--hover2)}
+.srow.is-main{box-shadow:inset 3px 0 var(--ink)}
+.srow .nm{font-weight:500}
+.r-main{background:var(--ink);color:var(--ink-on)}
+.r-aux{background:var(--hover);border-color:transparent}
+.bbw .dot{box-shadow:0 0 0 2px var(--side)}
+/* 中间：标签页是圆角药丸；总线消息是淡边大圆角卡片 */
+.vtabs{background:var(--bg);border-bottom:0;padding:6px 14px 4px;gap:4px}
+.vtab{border:0;border-radius:999px;padding:5px 12px}
+.vtab:hover{background:var(--hover)}
+.vtab.on{background:var(--hover2);margin-bottom:0}
+.filters{border-bottom:0;padding:6px 16px}
+.chip{border:0;background:var(--hover);border-radius:999px}
+.chip.on{background:var(--ink);color:var(--ink-on)}
+.trhead{border-bottom:0;padding:10px 18px}
+.stream{padding:12px 18px 22px;gap:10px}
+.msg{border-radius:var(--r2);border-color:var(--line2);background:var(--bg);padding:10px 16px 11px;max-width:860px;align-self:center;width:100%}
+.msg.mine,.msg.task,.msg.result,.msg.result.fail{border-left-width:1px;border-left-color:var(--line2)}
+.msg.mine{background:var(--bubble);border-color:transparent}
+.msg.task{box-shadow:inset 3px 0 var(--warn)}
+.msg.result{box-shadow:inset 3px 0 var(--ok)}
+.msg.result.fail{box-shadow:inset 3px 0 var(--bad)}
+.linked{border-radius:var(--r);border-style:solid;border-color:var(--line2)}
+.badge{border-radius:999px}
+code{background:var(--hover);border-radius:6px}
+/* 会话记录：你 = 右侧圆角气泡；AI = 不套框的正文 */
+/* 会话记录：照 Grok Bot —— AI 回复也是左侧灰色圆角气泡，你的话在右侧；连续几条挨得近，气泡下只留时间 */
+.trv{max-width:860px;width:100%;margin:0 auto;gap:5px;padding-top:16px}
+.bub{border:0;border-radius:18px;padding:9px 15px;line-height:1.6}
+.bub.a{align-self:flex-start;background:var(--bubble);max-width:min(640px,82%);border-radius:18px}
+.bub.u{align-self:flex-end;background:var(--hover2);max-width:min(560px,78%);border-radius:18px}
+.bub .bt{font-size:11px;color:var(--faint);margin-top:2px;opacity:.85}
+.bub + .bub.u, .bub.u + .bub.a, .tools + .bub{margin-top:8px}
+.tools{margin:2px 0 2px 4px}
+.tools summary{border-radius:999px;background:transparent;border:1px solid var(--line);padding:2px 10px}
+.trv .day{margin:10px 0 6px;font-size:12px}
+/* 发送区：底部一个圆角浮层，输入框和发送键在里面 */
+.compose{border-top:0;background:var(--bg);padding:6px 18px 16px}
+.crow{max-width:860px;margin:0 auto 6px}
+.seg{border:0;border-radius:999px;background:var(--hover);padding:2px}
+.seg button{border-radius:999px;background:transparent;padding:3px 12px}
+.seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.cin{max-width:860px;margin:0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:26px;padding:6px 6px 6px 16px;
+  box-shadow:var(--shadow);align-items:flex-end}
+.cin textarea{border:0;background:transparent;padding:8px 0;min-height:24px}
+.cin textarea:focus{border:0}
+.cin button{border-radius:999px;padding:8px 16px}
+.newpill{background:var(--ink);color:var(--ink-on);border-radius:999px}
+/* 弹窗 / 提示 */
+.dlg{background:rgba(0,0,0,.45);backdrop-filter:blur(2px)}
+.dlg .box{border-radius:22px;border:1px solid var(--line2)}
+.dlg .hd{border-bottom:0;padding:16px 20px 6px;font-weight:600}
+.dlg .bd{padding:8px 20px 12px}
+.dlg .ft{border-top:0;padding:10px 20px 18px}
+.devrow{border-top-color:var(--line2)}
+.toast{border-radius:999px;padding:8px 18px}
+.trow{border-radius:var(--r);border-color:var(--line2)}
+.trow:hover{border-color:var(--line);background:var(--hover)}
 
 /* ---------- 手机：一屏一个视图 + 底部导航 ---------- */
 @media (max-width:860px){
@@ -293,30 +463,31 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
 <body>
 <div class="app">
   <header class="top">
-    <span class="brand">📨<span class="btx"> 会话消息总线</span><span id="phoneTag" style="display:none;font-weight:400;font-size:12px;color:var(--muted)"> · 手机</span></span>
+    <span class="brand"><i data-ic="messages"></i><span class="btx"> 会话消息总线</span><span id="phoneTag" style="display:none;font-weight:400;font-size:12px;color:var(--muted)"> · 手机</span></span>
     <select class="projsel" id="projSel" title="切换项目"></select>
     <button class="stdot mob" id="stDot" title="状态"></button>
     <div class="pills" id="pills"></div>
     <div class="topact">
-      <button class="rf" id="refreshAll" data-refresh title="刷新（会话、消息、任务、当前会话记录）" style="font-size:17px">⟳</button>
+      <button class="rf" id="refreshAll" data-refresh title="刷新（会话、消息、任务、当前会话记录）" style="font-size:17px"><i data-ic="refresh"></i></button>
       <button class="primary admin" id="instBtn" style="display:none"></button>
       <div class="menu" id="menu">
-        <button class="ghost" id="menuBtn" title="更多">⋯</button>
+        <button class="ghost" id="menuBtn" title="更多"><i data-ic="more"></i></button>
         <div class="list">
-          <button id="mPhone" class="admin">📱 手机端（扫码）…</button>
-          <button id="mAdd" class="admin">＋ 添加项目…</button>
-          <button id="mCSync" class="admin">🔄 同步 Claude 会话到当前账号…</button>
-          <button id="mXSync" class="admin">📥 把 Codex 对话同步进 Claude…</button>
-          <button id="mInst" class="admin">安装 / 升级 / 修复</button>
-          <button id="mTest" class="admin">自检</button>
-          <button id="mRm" class="admin">从列表移除</button>
-          <button id="mUninst" class="danger admin">卸载…</button>
+          <button id="mPhone" class="admin"><i data-ic="phone"></i>手机端（扫码）…</button>
+          <button id="mAdd" class="admin"><i data-ic="plus"></i>添加项目…</button>
+          <button id="mSM" class="admin"><i data-ic="listx"></i>会话管理（搜索 / 归档 / 删除 / 还原）…</button>
+          <button id="mCSync" class="admin"><i data-ic="sync"></i>同步 Claude 会话到当前账号…</button>
+          <button id="mXSync" class="admin"><i data-ic="download"></i>把 Codex 对话同步进 Claude…</button>
+          <button id="mInst" class="admin"><i data-ic="wrench"></i>安装 / 升级 / 修复</button>
+          <button id="mTest" class="admin"><i data-ic="activity"></i>自检</button>
+          <button id="mRm" class="admin"><i data-ic="listx"></i>从列表移除</button>
+          <button id="mUninst" class="danger admin"><i data-ic="trash"></i>卸载…</button>
           <hr style="border:0;border-top:1px solid var(--line);margin:4px 0">
           <button id="mFx" class="admin">桌面信件动画：…</button>
-          <button id="mFxTest" class="admin">试放信件动画</button>
+          <button id="mFxTest" class="admin"><i data-ic="play"></i>试放信件动画</button>
           <button id="mWebFx">网页信件动画：开 ✓</button>
           <button id="mSimple">完整模式</button>
-          <button id="mTheme">切换深浅色</button>
+          <button id="mTheme"><i data-ic="contrast"></i>切换深浅色</button>
         </div>
       </div>
     </div>
@@ -335,14 +506,14 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
           <span class="chip" data-f="msg">消息<span class="n" id="nMsg"></span></span>
           <span class="chip" data-f="task">任务<span class="n" id="nTask"></span></span>
           <span class="chip" data-f="wait">待完成<span class="n" id="nWait"></span></span>
-          <button class="ghost mob" id="qBtn" title="搜索">🔍</button>
+          <button class="ghost mob" id="qBtn" title="搜索"><i data-ic="search"></i></button>
           <span class="focus" id="focus"></span>
           <input id="q" placeholder="搜索消息内容 / 编号 / 会话名">
         </div>
       </div>
       <div class="stream" id="stream"><div class="empty">正在加载…</div></div>
       <div class="stream trv" id="trView" style="display:none"></div>
-      <button class="newpill" id="newPill">有新消息 ↓</button>
+      <button class="newpill" id="newPill">有新消息 <i data-ic="down"></i></button>
       <div class="compose" id="compose">
         <div class="crow">
           <div class="seg" id="kindSeg"><button data-k="msg" class="on">消息</button><button data-k="task">任务</button></div>
@@ -360,13 +531,13 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
 
     <aside class="side" id="colR">
       <div class="card sesscard" id="cardClaude">
-        <h3><span class="a-claude">Claude</span> 会话 <span id="nClaude"></span><button class="rf" data-refresh title="刷新会话列表">⟳</button><span class="sp winpos" id="posClaude"></span></h3>
+        <h3><span class="a-claude"><i data-ic="claude" data-cls="logo"></i>Claude</span> 会话 <span id="nClaude"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><span class="sp winpos" id="posClaude"></span></h3>
         <div id="sessClaude"><div class="grp">加载中…</div></div>
         <div class="legend"><span><i class="dot d-stand"></i>待命</span><span><i class="dot d-active"></i>活跃</span><span><i class="dot d-idle"></i>空闲</span></div>
         <div class="rlegend"><span><span class="rb r-main">主</span>派活的</span><span><span class="rb r-aux">辅</span>干活的</span></div>
       </div>
       <div class="card sesscard" id="cardCodex">
-        <h3><span class="a-codex">Codex</span> 会话 <span id="nCodex"></span><button class="rf" data-refresh title="刷新会话列表">⟳</button><span class="sp winpos" id="posCodex"></span></h3>
+        <h3><span class="a-codex"><i data-ic="codex" data-cls="logo"></i>Codex</span> 会话 <span id="nCodex"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><span class="sp winpos" id="posCodex"></span></h3>
         <div id="codexSt" class="grp" style="margin:0 0 4px"></div>
         <div id="sessCodex"><div class="grp">加载中…</div></div>
         <div class="legend"><span><i class="dot d-stand"></i>待命</span><span><i class="dot d-active"></i>活跃</span><span><i class="dot d-idle"></i>空闲</span></div>
@@ -379,21 +550,66 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
     </aside>
   </div>
   <nav class="mnav" id="mnav">
-    <button data-m="bus" class="on">💬<span>消息</span><i id="bNav"></i></button>
-    <button data-m="sess">👥<span>会话</span><i id="sNav"></i></button>
-    <button data-m="tasks">📋<span>任务</span><i id="tNav"></i></button>
+    <button data-m="bus" class="on"><i data-ic="chat"></i><span>消息</span><i id="bNav"></i></button>
+    <button data-m="sess"><i data-ic="users"></i><span>会话</span><i id="sNav"></i></button>
+    <button data-m="tasks"><i data-ic="clipboard"></i><span>任务</span><i id="tNav"></i></button>
   </nav>
 </div>
 
 <div class="toast" id="toast"></div>
 <div class="dlg" id="dlg"><div class="box">
-  <div class="hd"><span id="dlgTitle"></span><button class="ghost" onclick="closeDlg()">✕</button></div>
+  <div class="hd"><span id="dlgTitle"></span><button class="ghost" onclick="closeDlg()"><i data-ic="x"></i></button></div>
   <div class="bd" id="dlgBody"></div>
   <div class="ft" id="dlgFt"><button onclick="closeDlg()">关闭</button></div>
 </div></div>
 
 <script>
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+// ---------- SVG 图标（Lucide，ISC 许可；Claude / Codex / Cursor 用官方 logo）----------
+const ICON = {
+  messages: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
+  refresh: '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+  more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+  phone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  sync: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  listx: '<path d="M11 12H3"/><path d="M16 6H3"/><path d="M16 18H3"/><path d="m19 10-4 4"/><path d="m15 10 4 4"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  play: '<path d="M6 3l14 9-14 9z"/>',
+  sparkles: '<path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/>',
+  layout: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  contrast: '<circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  back: '<path d="m15 18-6-6 6-6"/>',
+  down: '<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>',
+  pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  ok: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  err: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  handoff: '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
+  tool: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  clipboard: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+  // 三家标识：官方 logo（路径取自 Simple Icons；商标归各公司，这里只在本机工具里作识别用）
+  claude: '<path d="m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z"/>',
+  codex: '<path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>',
+  cursor: '<path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/>',
+  user: '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>'
+};
+function ic(name, cls){ return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICON[name] || ""}</svg>`; }
+const logo = agent => ic({claude: "claude", codex: "codex", cursor: "cursor"}[agent] || "user", "logo");
+// 提示条 / 弹窗标题里开头的 emoji 换成 SVG（其余照文字转义）
+const EMO = {"✅": "ok", "❌": "err", "⚠": "warn", "📱": "phone", "🔄": "sync", "📥": "download", "🤝": "handoff", "⏸": "pause", "🖥": "monitor", "🔧": "tool", "📨": "messages"};
+function emoIcons(t){ let out = esc(String(t)); for (const [e, n] of Object.entries(EMO)) out = out.split(e).join(ic(n)); return out.replace(/\uFE0F/g, ""); }
+$$("[data-ic]").forEach(e => { e.outerHTML = ic(e.dataset.ic, e.dataset.cls); });
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 let projects = [], cur = null, offset = -1, msgs = [], sessList = [], tasks = [], timers = [];
@@ -405,9 +621,9 @@ async function api(path, body){
   const r = await fetch(path, opt); const j = await r.json();
   if (!r.ok) throw new Error(j.error || r.status); return j;
 }
-let toastT; function toast(t, ms=2600){ const el=$("#toast"); el.textContent=t; el.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display="none", ms); }
-function openDlg(title, html, footer){ $("#dlgTitle").textContent=title; $("#dlgBody").innerHTML=html; $("#dlgFt").innerHTML=footer||'<button onclick="closeDlg()">关闭</button>'; $("#dlg").classList.add("open"); }
-function closeDlg(){ $("#dlg").classList.remove("open"); }
+let toastT; function toast(t, ms=2600){ const el=$("#toast"); el.innerHTML=emoIcons(t); el.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display="none", ms); }
+function openDlg(title, html, footer){ $("#dlgTitle").innerHTML=emoIcons(title); $("#dlgBody").innerHTML=html; $("#dlgFt").innerHTML=footer||'<button onclick="closeDlg()">关闭</button>'; $("#dlg").classList.add("open"); }
+function closeDlg(){ $("#dlg").classList.remove("open", "wide"); }
 $("#dlg").onclick = e => { if (e.target.id === "dlg") closeDlg(); };
 const pad = n => String(n).padStart(2,"0");
 function hm(ts){ const d=new Date(ts*1000); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
@@ -521,7 +737,7 @@ $("#mTheme").onclick = () => { const r=document.documentElement; const dark = r.
   r.dataset.theme = dark ? "light" : "dark"; store.set("msgbus.theme", r.dataset.theme); };
 { const t = store.get("msgbus.theme"); if (t) document.documentElement.dataset.theme = t; }
 let fxOn = true;
-async function loadFx(){ try { fxOn = (await api("/api/settings")).fx; } catch(e) {} $("#mFx").textContent = "桌面信件动画：" + (fxOn ? "开 ✓" : "关"); }
+async function loadFx(){ try { fxOn = (await api("/api/settings")).fx; } catch(e) {} $("#mFx").innerHTML = ic("mail") + "桌面信件动画：" + (fxOn ? "开" + ic("check", "ok") : "关"); }
 $("#mFx").onclick = async () => { try { fxOn = (await api("/api/settings", {fx: !fxOn})).fx; toast("信件动画已" + (fxOn ? "打开" : "关闭")); } catch(e){ toast("❌ " + e.message); } loadFx(); };
 $("#mFxTest").onclick = async () => { await api("/api/fx/test", {dir:"c2x", kind:"task"}); setTimeout(() => api("/api/fx/test", {dir:"x2c", kind:"result"}), 300);
   const c = sessList.find(s => s.agent === "claude"), x = sessList.find(s => s.agent === "codex");
@@ -540,7 +756,7 @@ async function loadMe(){
 function fmtDay(ts){ const d=new Date(ts*1000); return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 async function devicesHtml(){
   const l = await api("/api/lan");
-  const rows = l.devices.map(d => `<div class="devrow"><span>📱</span><div class="grow"><b>${esc(d.name)}</b>
+  const rows = l.devices.map(d => `<div class="devrow"><span>${ic("phone")}</span><div class="grow"><b>${esc(d.name)}</b>
       <div style="color:var(--muted);font-size:12px">配对于 ${fmtDay(d.created)} · 最近 ${fmtDay(d.last_seen)} · ${Math.max(0,Math.round((d.expires-Date.now()/1000)/86400))} 天后失效</div></div>
       <button data-revoke="${esc(d.id)}">移除</button></div>`).join("");
   return {l, html: rows || `<div style="color:var(--muted);font-size:13px;padding:6px 0">还没有配对过的手机</div>`};
@@ -581,7 +797,7 @@ async function openPhone(){
   }, 1500);
 }
 $("#mPhone").onclick = openPhone;
-function applySimple(on){ document.body.classList.toggle("simple", on); $("#mSimple").textContent = on ? "完整模式（显示全部）" : "简洁模式";
+function applySimple(on){ document.body.classList.toggle("simple", on); $("#mSimple").innerHTML = ic("layout") + (on ? "完整模式（显示全部）" : "简洁模式");
   store.set("msgbus.simple", on ? "1" : "0"); if (on && !view) setFilterAll(); }
 function setFilterAll(){ filter = "all"; query = ""; const q = $("#q"); if (q) q.value = ""; $$(".filters .chip").forEach(c => c.classList.toggle("on", c.dataset.f === "all")); }
 $("#mSimple").onclick = () => { applySimple(!document.body.classList.contains("simple")); renderStream(true); pollSessions(); };
@@ -593,11 +809,12 @@ setTimeout(() => setWebFx(webFx), 0);
 function pickBar(n){ return n ? `<div class="pickbar" style="display:flex;gap:8px;align-items:center;margin:6px 0">
   <button class="ghost" data-pick="all">全选</button><button class="ghost" data-pick="invert">反选</button>
   <span style="color:var(--muted);font-size:13px" id="pickN"></span></div>` : ""; }
-function wirePick(goId, label){
+function wirePick(goId, label, extra = 0){   // extra：不用勾、总会一起做的条数（如要刷新的）
   const boxes = () => $$("#dlg input[data-pickrow]:not(:disabled)");
   const sync = () => { const n = boxes().filter(b => b.checked).length, total = boxes().length;
     if ($("#pickN")) $("#pickN").textContent = `已选 ${n} / ${total}`;
-    const go = $("#" + goId); if (go) { go.disabled = !n; go.textContent = `${label} ${n} 个`; } };
+    const go = $("#" + goId); if (go) { go.disabled = !n && !extra;
+      go.textContent = n ? `${label} ${n} 个` + (extra ? `，刷新 ${extra} 个` : "") : `刷新 ${extra} 个`; } };
   $$("#dlg [data-pick]").forEach(b => b.onclick = () => {
     boxes().forEach(x => x.checked = b.dataset.pick === "all" ? true : !x.checked); sync(); });
   boxes().forEach(x => x.onchange = sync);
@@ -615,16 +832,232 @@ $("#mCSync").onclick = async () => {
       这里把别的账号里的会话补进当前账号的列表：只补缺的，不覆盖、不删除，写之前整个目录先备份。</div>
     <div style="margin:10px 0 4px">当前账号 / 组织：<code>${esc(p.target.key.split("/").map(x=>x.slice(0,8)).join(" / "))}</code>（已有 ${p.target.count} 个）</div>
     <div style="font-weight:600;margin:8px 0 4px">可以补进来 ${p.add.length} 个${p.skip_missing?`（另有 ${p.skip_missing} 个对话记录已不在，跳过）`:""}（已归档的缺省不勾）：</div>
+    ${p.update&&p.update.length?`<div style="margin:4px 0">另有 <b>${p.update.length}</b> 个当前账号里已有、但别的账号里是更新的版本，会一并刷新成最新：${p.update.slice(0,6).map(u=>esc(u.title)).join("、")}${p.update.length>6?" 等":""}</div>`:""}
     ${pickBar(p.add.length)}<div style="max-height:46vh;overflow:auto">${rows || '<div style="color:var(--muted)">没有要补的，别的账号里的会话都已经在了。</div>'}</div>
     <div style="margin-top:10px;color:var(--warn);font-size:13px">补完要<b>重启 Claude 桌面端</b>才会出现在列表里（它只在启动时读一次）。</div>`,
-    p.add.length ? `<button onclick="closeDlg()">取消</button><button class="primary" id="csGo">补齐 ${p.add.length} 个</button>` : `<button onclick="closeDlg()">关闭</button>`);
-  const pickedC = wirePick("csGo", "补齐");
+    (p.add.length || (p.update||[]).length) ? `<button onclick="closeDlg()">取消</button><button class="primary" id="csGo">补齐 ${p.add.length} 个</button>` : `<button onclick="closeDlg()">关闭</button>`);
+  const pickedC = wirePick("csGo", "补齐", (p.update||[]).length);
   if ($("#csGo")) $("#csGo").onclick = async () => {
-    const only = pickedC(); if (!only.length) return toast("一个都没勾");
-    try { const r = await api("/api/claude-sync", {only}); openDlg("✅ 已补齐", `<div>补进来 ${r.done} 个会话。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
+    const only = pickedC(); if (!only.length && !(p.update||[]).length) return toast("一个都没勾");
+    try { const r = await api("/api/claude-sync", {only}); if (r.deferred) return openDlg("⏳ 已排队", deferHtml(r));
+      openDlg("✅ 已补齐", `<div>补进来 ${r.done} 个会话${r.updated?`，刷新 ${r.updated} 个`:""}。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
       <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到。</div>`); }
     catch(e){ toast("❌ " + e.message, 5000); } };
 };
+
+
+// ---------- 会话管理器（借鉴 cc-switch：统一列表、搜索、恢复命令、导出、批量归档 / 删除、回收站、同步与还原） ----------
+const SM = {tab: "list", items: [], q: "", agent: "all", vis: "all", hits: null, sel: new Set(), meta: null};
+const smKey = it => it.agent + ":" + it.id;
+const smSplit = k => { const i = k.indexOf(":"); return {agent: k.slice(0, i), id: k.slice(i + 1)}; };
+function deferHtml(r){ return `<div style="line-height:1.8">${esc(r.hint || "")}</div>
+  <div class="smnote" style="margin-top:8px">排队的活在「会话管理 → 排队」里看，可以取消；做完的结果也在那里。</div>`; }
+function smDeferred(res){
+  const rs = res.results ? Object.values(res.results) : [res];
+  const d = rs.filter(r => r && r.deferred);
+  if (d.length) { toast("⏳ " + d.map(r => r.app).join("、") + " 开着：已排队，退出后自动做", 6000); return true; }
+  return false;
+}
+function smOpen(){
+  openDlg("会话管理", `<div class="smtabs">
+      ${[["list","会话"],["sync","同步与还原"],["trash","回收站"],["jobs","排队"]].map(([k,t]) =>
+        `<button class="ghost${SM.tab===k?" on":""}" data-smtab="${k}">${t}</button>`).join("")}
+      <span id="smApps" class="smnote" style="margin-left:auto;align-self:center"></span></div>
+    <div id="smBody">正在读…</div>`, `<button onclick="closeDlg()">关闭</button>`);
+  $("#dlg").classList.add("wide");
+  $$("[data-smtab]").forEach(b => b.onclick = () => { SM.tab = b.dataset.smtab; smOpen(); });
+  ({list: smList, sync: smSync, trash: smTrash, jobs: smJobs})[SM.tab]();
+}
+function smAppsLine(a){ const el = $("#smApps"); if (!a || !el) return;
+  el.innerHTML = ["claude","codex"].map(k => `${k === "claude" ? "Claude" : "Codex"} 桌面端：${a[k] ? '<b style="color:var(--warn)">开着</b>' : "没开"}`).join(" · ")
+    + (a.claude || a.codex ? "（开着的那边，改动排到它退出后做）" : ""); }
+async function smList(force){
+  if (force || !SM.meta) { $("#smBody").textContent = "正在读会话…";
+    try { SM.meta = await api("/api/sm/list"); SM.items = SM.meta.items; } catch(e){ $("#smBody").textContent = "❌ " + e.message; return; } }
+  smAppsLine(SM.meta.apps);
+  $("#smBody").innerHTML = `
+    <div class="smchips" id="smChips"></div>
+    <div class="smbar">
+      <input type="search" id="smQ" placeholder="🔍 搜标题、第一句话、目录、会话号" value="${esc(SM.q)}">
+      <button id="smFull" title="在会话记录正文里找（最多 20 秒）">全文搜</button>
+      <button class="ghost" id="smRe" title="重新读一遍">${ic("refresh")} 刷新</button></div>
+    <div id="smTip"></div>
+    <div class="smsel" id="smSelBar"></div>
+    <div id="smRows"></div>`;
+  $("#smQ").oninput = e => { SM.q = e.target.value; SM.hits = null; smRows(); };
+  $("#smRe").onclick = () => smList(true);
+  $("#smFull").onclick = async () => { if (!SM.q.trim()) return toast("先在框里写要找的字");
+    $("#smFull").disabled = true; toast("正在全文搜…", 20000);
+    try { const r = await api("/api/sm/search?q=" + encodeURIComponent(SM.q)); SM.hits = new Set(r.hits.map(smKey));
+      toast(`全文命中 ${r.hits.length} 个${r.partial ? "（超时，只搜了一部分）" : ""}`); smRows(); }
+    catch(e){ toast("❌ " + e.message); } finally { $("#smFull").disabled = false; } };
+  smRows();
+}
+// 两组筛选：来源（全部 / Claude / Codex）× 状态（全部 / 看得见 / 看不见 / 已归档）
+const SM_VIS = [["all","全部"],["visible","看得见"],["hidden","看不见"],["archived","已归档"]];
+const SM_AG = [["all","全部来源"],["claude","Claude"],["codex","Codex"]];
+const smVisOk = (it, v) => v === "all" || (v === "visible" ? it.visible : v === "hidden" ? !it.visible : it.archived);
+function smFiltered(){
+  const q = SM.q.trim().toLowerCase();
+  return SM.items.filter(it => {
+    if (SM.agent !== "all" && it.agent !== SM.agent) return false;
+    if (!smVisOk(it, SM.vis)) return false;
+    if (SM.hits) return SM.hits.has(smKey(it));
+    if (!q) return true;
+    return [it.title, it.first, it.cwd, it.id].some(x => (x || "").toLowerCase().includes(q));
+  });
+}
+function smChips(){
+  const byAg = a => SM.items.filter(it => a === "all" || it.agent === a);
+  const pool = byAg(SM.agent);
+  $("#smChips").innerHTML =
+    SM_AG.map(([k,t]) => `<button class="smchip${SM.agent===k?" on":""}" data-smag="${k}">${t}<b>${byAg(k).length}</b></button>`).join("")
+    + '<span class="smsep"></span>'
+    + SM_VIS.map(([k,t]) => `<button class="smchip${SM.vis===k?" on":""}" data-smvis="${k}">${t}<b>${pool.filter(it => smVisOk(it, k)).length}</b></button>`).join("");
+  $$("[data-smag]").forEach(b => b.onclick = () => { SM.agent = b.dataset.smag; smRows(); });
+  $$("[data-smvis]").forEach(b => b.onclick = () => { SM.vis = b.dataset.smvis; smRows(); });
+}
+function smTip(list){
+  // 看不见的会话：按原因给出找回办法
+  const hid = list.filter(it => !it.visible);
+  if (!hid.length || SM.vis === "visible") return $("#smTip").innerHTML = "";
+  const n = f => hid.filter(f).length;
+  const acc = n(it => it.why === "在别的账号里"), bucket = n(it => (it.why || "").startsWith("在供应商桶") || it.why === "建它的是别的 ChatGPT 账号"),
+        arch = n(it => it.why === "已归档"), unreg = n(it => (it.why || "").startsWith("没登记")), gone = n(it => it.why === "记录文件已不在");
+  const old = n(it => (it.why || "").startsWith("旧段"));
+  const parts = [];
+  if (acc) parts.push(`<b>${acc}</b> 个在别的 Claude 账号里 → <a data-smgo="sync">去「同步与还原」补到当前账号</a>`);
+  if (bucket) parts.push(`<b>${bucket}</b> 个 Codex 对话在别的供应商桶 / 账号 → <a data-smgo="sync">去「同步与还原」归桶</a>`);
+  if (arch) parts.push(`<b>${arch}</b> 个已归档 → 勾上后点「取消归档」`);
+  if (unreg) parts.push(`<b>${unreg}</b> 个是命令行 / 子代理开的，桌面端本来就不列，用「复制恢复命令」在终端里接着聊`);
+  if (old) parts.push(`<b>${old}</b> 个是会话续接前的旧记录段，当前账号里那条会话已经在了，不用管`);
+  if (gone) parts.push(`<b>${gone}</b> 个登记还在但记录文件没了，打不开，可以删掉`);
+  $("#smTip").innerHTML = parts.length ? `<div class="smtip">当前看不见的 ${hid.length} 个：<br>${parts.join("<br>")}</div>` : "";
+  $$("[data-smgo]").forEach(x => x.onclick = () => { SM.tab = x.dataset.smgo; smOpen(); });
+}
+function smRows(){
+  const list = smFiltered(), shown = list.slice(0, 300);
+  smChips(); smTip(list);
+  const ag = a => `<span class="smag ${a}">${a === "claude" ? "Claude" : "Codex"}</span>`;
+  const row = it => { const k = smKey(it), on = SM.sel.has(k);
+    return `<div class="smrow${on?" sel":""}" data-smrow="${esc(k)}"><input type="checkbox" data-smk="${esc(k)}" ${on?"checked":""}>${ag(it.agent)}
+    <div class="grow"><div class="t">${esc(it.title)}
+        ${it.visible ? '<span class="smtag ok">看得见</span>' : `<span class="smtag warn">${esc(it.why || "看不见")}</span>`}
+        ${it.archived && it.why !== "已归档" ? '<span class="smtag mut">已归档</span>' : ""}
+        ${it.source === "subagent" ? '<span class="smtag mut">子代理</span>' : ""}</div>
+      <div class="m">${it.last ? fmtDay(it.last) : "—"} · ${esc(it.cwd || "")} · ${esc(it.agent === "codex" ? it.id.slice(-6) : it.id.slice(0,8))}${it.size ? " · " + (it.size/1048576).toFixed(1) + "M" : ""}</div>
+      ${it.first && it.first !== it.title ? `<div class="m">“${esc(it.first)}”</div>` : ""}</div>
+    <div class="acts">${it.resume ? `<button data-smcopy="${esc(it.resume)}" title="${esc(it.resume)}">复制恢复命令</button>` : ""}
+      ${it.file ? `<button data-smexp="${esc(k)}">导出</button>` : ""}</div></div>`; };
+  $("#smRows").innerHTML = (shown.map(row).join("") + (list.length > shown.length ? `<div class="smnote" style="padding:8px">只显示前 300 个，还有 ${list.length - shown.length} 个，换个关键字缩小范围（「全选」会选中全部 ${list.length} 个）</div>` : ""))
+    || '<div class="smnote" style="padding:16px;text-align:center">没有符合条件的会话</div>';
+  // 整行点一下就勾 / 取消；点按钮不算
+  $$("[data-smrow]").forEach(r => r.onclick = e => { if (e.target.closest("button")) return;
+    const k = r.dataset.smrow; if (e.target.type !== "checkbox") { SM.sel.has(k) ? SM.sel.delete(k) : SM.sel.add(k); }
+    else { e.target.checked ? SM.sel.add(k) : SM.sel.delete(k); }
+    r.classList.toggle("sel", SM.sel.has(k)); r.querySelector("input").checked = SM.sel.has(k); smSelBar(list); });
+  $$("[data-smcopy]").forEach(b => b.onclick = () =>
+    navigator.clipboard?.writeText(b.dataset.smcopy).then(() => toast("已复制：" + b.dataset.smcopy)).catch(() => toast(b.dataset.smcopy, 8000)));
+  $$("[data-smexp]").forEach(b => b.onclick = async () => { const k = smSplit(b.dataset.smexp);
+    try { const r = await api("/api/sm/export", k); if (!r.ok) return toast("❌ " + r.error);
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([r.text], {type: "text/markdown"})); a.download = r.name; a.click();
+      toast("已导出，另存一份在 " + r.path, 6000); } catch(err){ toast("❌ " + err.message); } });
+  smSelBar(list);
+}
+function smSelBar(list){
+  list = list || smFiltered();
+  const keys = list.map(smKey), inView = keys.filter(k => SM.sel.has(k)).length, n = SM.sel.size;
+  const bar = $("#smSelBar");
+  bar.classList.toggle("has", n > 0);
+  bar.innerHTML = `<input type="checkbox" id="smHead" title="全选 / 全不选（当前筛出的）">
+    <span class="cnt">${n ? `已选 ${n} 个` : "未选"}</span><span class="smnote">（筛出 ${list.length} 个${n && inView !== n ? `，其中 ${inView} 个在当前筛选里` : ""}）</span>
+    <button id="smAll">全选</button><button id="smInv">反选</button><button id="smNone" ${n?"":"disabled"}>清空</button>
+    <span class="sp"></span>
+    <button class="primary" data-smact="unarchive" ${n?"":"disabled"}>取消归档</button>
+    <button class="warnb" data-smact="archive" ${n?"":"disabled"}>归档</button>
+    <button class="danger" data-smact="delete" ${n?"":"disabled"}>删除</button>`;
+  const head = $("#smHead");
+  head.checked = list.length > 0 && inView === list.length;
+  head.indeterminate = inView > 0 && inView < list.length;
+  head.onchange = () => { head.checked ? keys.forEach(k => SM.sel.add(k)) : keys.forEach(k => SM.sel.delete(k)); smRows(); };
+  $("#smAll").onclick = () => { keys.forEach(k => SM.sel.add(k)); smRows(); };
+  $("#smInv").onclick = () => { keys.forEach(k => SM.sel.has(k) ? SM.sel.delete(k) : SM.sel.add(k)); smRows(); };
+  $("#smNone").onclick = () => { SM.sel.clear(); smRows(); };
+  $$("[data-smact]").forEach(b => b.onclick = async () => {
+    const action = b.dataset.smact, items = [...SM.sel].map(smSplit);
+    const word = {archive:"归档", unarchive:"取消归档", delete:"删除"}[action];
+    const msg = action === "delete"
+      ? `把选中的 ${items.length} 个会话挪进回收站？\n会话记录、子代理记录和各账号里的登记一起挪走，可以在「回收站」整批还原。`
+      : `${word}选中的 ${items.length} 个会话？`;
+    if (!confirm(msg)) return;
+    try { const r = await api("/api/sm/batch", {action, items});
+      if (!smDeferred(r)) toast(`✓ 已${word} ` + Object.values(r.results).map(x => x.done || 0).reduce((a,b)=>a+b,0) + " 个", 4000);
+      SM.sel.clear(); smList(true); } catch(e){ toast("❌ " + e.message, 5000); } });
+}
+async function smSync(){
+  let d; try { d = await api("/api/sm/sync"); } catch(e){ $("#smBody").textContent = "❌ " + e.message; return; }
+  smAppsLine(d.apps);
+  const c = d.claude, x = d.codex;
+  const short = k => (k || "").split("/").map(s => s.slice(0,8)).join(" / ");
+  const bk = (c.backups || []).map(b => `<div class="smrow"><div class="grow"><div class="t">${esc(b.id)}
+      <span class="smtag mut">${b.ledger ? (b.ledger.what === "sync" ? `补 ${b.added} · 刷新 ${b.updated}` : "还原前的备份") : "老备份（没账本：只补回现在缺的，不覆盖）"}</span></div>
+      <div class="m">${esc(short(b.key))} · 备份里 ${b.count} 个登记</div></div>
+      <div class="acts"><button class="ghost" data-crest="${esc(b.id)}">撤回到这次之前</button></div></div>`).join("");
+  const lg = (x.ledgers || []).map(l => `<div class="smrow"><div class="grow"><div class="t">${esc(l.id)} → ${esc(l.to_provider)}
+      ${l.restored ? `<span class="smtag mut">${esc(l.restored)} 已还原</span>` : ""}</div>
+      <div class="m">线程 ${l.threads} 条 · 文件 ${l.files} 个</div></div>
+      <div class="acts">${l.restored ? "" : `<button class="ghost" data-xrest="${esc(l.id)}">还原</button>`}</div></div>`).join("");
+  const bp = Object.entries(x.by_provider || {}).map(([k,v]) => `「${esc(k)}」${v} 条`).join("、");
+  const ba = Object.values(x.by_account || {}).reduce((a,b) => a + b, 0);
+  $("#smBody").innerHTML = `
+    <div class="smcard"><h4><span class="smag claude">Claude</span> 换了账号，旧会话找回来</h4>
+      <div class="smbig">${c.ok ? `<span><b>${c.add}</b>个可找回</span><span><b>${c.update}</b>个要更新到最新</span>` : ""}
+        <button class="primary" id="smCGo" ${c.add || c.update ? "" : "disabled"}>${c.add || c.update ? "一键找回" : "不用找回"}</button></div>
+      <div class="smnote">${c.ok ? `当前账号 / 组织 <code>${esc(short(c.target?.key))}</code>：可以补进来 <b>${c.add}</b> 个（其中已归档 ${c.add_archived}），已有但别处版本更新、要刷新 <b>${c.update}</b> 个。` : esc(c.error)}
+        同一会话在几个旧账号里都有时取最新的那份；在当前账号里删过的（墓碑）不复活。要逐个勾选，用 ⋯ 菜单里的「同步 Claude 会话到当前账号」。</div>
+      <details style="margin-top:8px"><summary class="smnote" style="cursor:pointer">历次备份（${(c.backups||[]).length} 个，可撤回某次同步）</summary>${bk || '<div class="smnote">还没有</div>'}</details></div>
+    <div class="smcard"><h4><span class="smag codex">Codex</span> 换了账号 / 供应商，老对话找回来</h4>
+      <div class="smbig"><span><b>${x.threads}</b>条不在当前桶</span><span><b>${x.archived}</b>条其中已归档</span>
+        <label class="smnote"><input type="checkbox" id="smXAcct" checked> 别的 ChatGPT 账号建的也归过来</label>
+        <button class="primary" id="smXGo" ${x.threads || x.files ? "" : "disabled"}>${x.threads || x.files ? "一键归桶" : "不用归桶"}</button></div>
+      <div class="smnote">当前供应商「${esc(x.provider)}」、账号 ${esc((x.account || "（没登录 ChatGPT）").slice(0,8))}。
+        ${x.threads || x.files ? `有 <b>${x.threads}</b> 条线程不在当前桶：${bp || "—"}${ba ? `；别的账号建的 ${ba} 条` : ""}（其中已归档 ${x.archived}，归桶后还要在「会话」里取消归档才会出现在列表里）；rollout 文件头要改 ${x.files} 个。` : "所有对话都在当前桶里，不用归桶。"}
+        改之前整份备份 state 库和每个要改的文件，记账本，可整次还原；文件修改时间保持不变，列表顺序不乱。</div>
+      <details style="margin-top:8px"><summary class="smnote" style="cursor:pointer">历次账本（${(x.ledgers||[]).length} 个，可还原某次归桶）</summary>${lg || '<div class="smnote">还没有</div>'}</details></div>
+    <div class="smnote">${d.apps.claude || d.apps.codex ? "⏳ 对应的桌面端开着时，点了会先排队，等你把它完全退出（托盘里也退）后自动做完、再把它打开。" : ""}</div>`;
+  const after = r => { if (!smDeferred(r)) toast(r.ok === false ? "❌ " + (r.error || "没做成") : "✓ 做完了", 5000); SM.meta = null; smSync(); };
+  $("#smCGo").onclick = async () => { try { after(await api("/api/claude-sync", {})); } catch(e){ toast("❌ " + e.message); } };
+  $("#smXGo").onclick = async () => { try { after(await api("/api/sm/codex-unify", {fix_account: $("#smXAcct").checked})); } catch(e){ toast("❌ " + e.message); } };
+  $$("[data-crest]").forEach(b => b.onclick = async () => { if (!confirm(`撤回 ${b.dataset.crest} 那次同步？补进来的挪进回收站，刷新过的换回原样（撤回前会再备份一次）。`)) return;
+    try { after(await api("/api/sm/claude-restore", {id: b.dataset.crest})); } catch(e){ toast("❌ " + e.message); } });
+  $$("[data-xrest]").forEach(b => b.onclick = async () => { if (!confirm(`还原 Codex 归桶 ${b.dataset.xrest}？`)) return;
+    try { after(await api("/api/sm/codex-restore", {id: b.dataset.xrest})); } catch(e){ toast("❌ " + e.message); } });
+}
+async function smTrash(){
+  let d; try { d = await api("/api/sm/trash"); } catch(e){ $("#smBody").textContent = "❌ " + e.message; return; }
+  $("#smBody").innerHTML = `<div class="smnote" style="margin-bottom:8px">删除的会话都在 ~/.agent-bridge/trash/ 里，按批次整批还原；确定不要了可以自己去那里删掉。</div>` +
+    (d.items.map(t => `<div class="smrow"><span style="margin-top:2px">${ic(t.items[0]?.agent || "trash")}</span><div class="grow"><div class="t">${esc(t.id)}
+        ${t.restored ? `<span class="smtag mut">${esc(t.restored)} 已还原</span>` : ""}</div>
+      <div class="m">${t.items.length} 个：${esc(t.items.map(i => i.agent === "codex" ? i.id.slice(-6) : i.id.slice(0,8)).join("、"))}</div></div>
+      <div class="acts">${t.restored ? "" : `<button class="ghost" data-trest="${esc(t.id)}">整批还原</button>`}</div></div>`).join("") || '<div class="smnote">回收站是空的</div>');
+  $$("[data-trest]").forEach(b => b.onclick = async () => {
+    try { const r = await api("/api/sm/trash/restore", {id: b.dataset.trest});
+      if (!smDeferred(r)) toast(r.ok ? `✓ 还原 ${r.restored} 个` : "⚠ " + (r.errors || []).join("；"), 5000);
+      SM.meta = null; smTrash(); } catch(e){ toast("❌ " + e.message); } });
+}
+async function smJobs(){
+  let d; try { d = await api("/api/jobs"); } catch(e){ $("#smBody").textContent = "❌ " + e.message; return; }
+  smAppsLine(d.apps);
+  const lab = {waiting: "等桌面端退出", done: "做完了", failed: "没做成", cancelled: "已取消"};
+  $("#smBody").innerHTML = `<div class="smnote" style="margin-bottom:8px">桌面端开着的时候不能改它的会话数据（它退出时会把内存里的旧状态写回去）。
+      这些活排在这里，后台等它完全退出（托盘里也要退）再做，做完自动把它重新打开。</div>` +
+    ([...d.jobs].reverse().map(j => `<div class="smrow"><span style="margin-top:2px">${ic(j.kind)}</span><div class="grow"><div class="t">${esc(j.title)}
+        <span class="smtag ${j.state === "done" ? "ok" : j.state === "failed" ? "warn" : "mut"}">${lab[j.state] || j.state}</span></div>
+      <div class="m">${fmtDay(j.queued)} 排队${j.finished ? " · " + fmtDay(j.finished) + " 完成" : ""}${j.result ? " · " + esc(j.result) : ""}</div></div>
+      <div class="acts">${j.state === "waiting" ? `<button class="ghost" data-jcancel="${esc(j.id)}">取消</button>` : ""}</div></div>`).join("") || '<div class="smnote">没有排队的活</div>');
+  $$("[data-jcancel]").forEach(b => b.onclick = async () => { await api("/api/jobs/cancel", {id: b.dataset.jcancel}); smJobs(); });
+}
+$("#mSM").onclick = () => { SM.meta = null; SM.sel.clear(); smOpen(); };
 
 $("#mXSync").onclick = async () => {
   const root = cur && cur.root ? cur.root : "";
@@ -646,7 +1079,8 @@ $("#mXSync").onclick = async () => {
   const pickedX = wirePick("xsGo", "同步");
   if ($("#xsGo")) $("#xsGo").onclick = async () => {
     const only = pickedX(); if (!only.length) return toast("一个都没勾");
-    try { const r = await api("/api/codex-sync", {days: 14, root, only}); openDlg("✅ 已同步", `<div>写了 ${r.done} 个。${(r.errors||[]).length?"失败："+esc(r.errors.join("；")):""}备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
+    try { const r = await api("/api/codex-sync", {days: 14, root, only}); if (r.deferred) return openDlg("⏳ 已排队", deferHtml(r));
+      openDlg("✅ 已同步", `<div>写了 ${r.done} 个。${(r.errors||[]).length?"失败："+esc(r.errors.join("；")):""}备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
       <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到（标题前带「（Codex）」）。</div>`); }
     catch(e){ toast("❌ " + e.message, 5000); } };
 };
@@ -696,7 +1130,7 @@ function msgHtml(m){
   if (k==="task" && t && t.result) linked = `<div class="linked"><span class="badge ${t.status==="没做成"?"b-bad":"b-ok"}">↳ ${esc(nameOf(t.by))}</span><div class="txt">${esc(t.result.length>300?t.result.slice(0,300)+"…":t.result)}</div></div>`;
   const cls = ["msg", a==="user"?"mine":"", k==="task"?"task":"", k==="result"?"result":"", fail?"fail":""].join(" ");
   return `<div class="${cls}" id="m-${esc(m.id)}">
-    <div class="meta">${badge}<span class="who a-${esc(a)}">${esc(nameOf(m.from.name))}</span>
+    <div class="meta">${badge}<span class="who a-${esc(a)}">${logo(a)}${esc(nameOf(m.from.name))}</span>
       <span>→ ${esc(m.to)}</span><span title="${esc(new Date(m.ts*1000).toLocaleString())}">${hm(m.ts)}</span><span>#${esc(m.id.slice(0,6))}</span></div>
     <div class="txt ${long?"clamp":""}">${esc(m.text)}</div>
     ${long?`<a class="link more" data-more>展开全文</a>`:""}${linked}
@@ -736,7 +1170,7 @@ function renderFocus(){
   const f = $("#focus");
   if (!focusKey) { f.style.display="none"; $$(".srow").forEach(r=>r.classList.remove("sel")); return; }
   const s = sessList.find(x => keyOf(x.agent,x.short) === focusKey);
-  f.style.display="inline"; f.innerHTML = `只看：${esc(s ? (s.alias||s.title||"未命名") : focusKey)} <button class="ghost" id="unfocus">✕</button>`;
+  f.style.display="inline"; f.innerHTML = `只看：${esc(s ? (s.alias||s.title||"未命名") : focusKey)} <button class="ghost" id="unfocus">${ic("x")}</button>`;
   $("#unfocus").onclick = () => { focusKey=null; renderFocus(); renderStream(); };
   $$(".srow").forEach(r=>r.classList.toggle("sel", r.dataset.key===focusKey));
 }
@@ -761,8 +1195,47 @@ async function pollMessages(){
   } catch(e) {}
 }
 
+// ---------- 会话头像（bloub：MIT，Jérémy Perret）----------
+// 身形、颜色按会话号定（同一个会话永远长一样）；活跃的会动（呼吸 / 眨眼 / 眼神漂移），
+// 待命的静止「专注」脸，空闲的静止「犯困」脸。数据由 tools/gen_bloub_icons.ts 用 bloub 的引擎导出。
+let BB = null, bbSeq = 0;
+const BB_COLORS = ["rouge","orange","ambre","vert","turquoise","bleu","violet","rose","brun","gris"];  // 不用纯黑 / 米白：深浅主题下会看不见
+fetch("/bloub-icons.json").then(r => r.json()).then(d => {
+  BB = d;
+  const st = document.createElement("style");
+  st.textContent = Object.entries(d.anim).map(([sh, a]) => {
+    const pct = i => (i * 100 / a.scale.length).toFixed(2) + "%";
+    const kf = (name, val) => `@keyframes ${name}{${a.scale.map((_, i) => `${pct(i)}{transform:${val(i)}}`).join("")}100%{transform:${val(0)}}}`;
+    return kf(`bb-${sh}-b`, i => `scale(${a.scale[i]})`) + [0, 1].map(k => kf(`bb-${sh}-${k}`, i => `matrix(${a.eyes[i][k]})`)).join("");
+  }).join("");
+  document.head.appendChild(st);
+  if (typeof pollSessions === "function") pollSessions();
+}).catch(() => {});
+function bbHash(s){ let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function bbAvatar(x, st, size){
+  if (!BB) return `<i class="dot d-${st}"></i>`;
+  const h = bbHash(x.agent + ":" + x.sid), shapes = Object.keys(BB.shapes);
+  const sh = shapes[h % shapes.length], color = BB.colors[BB_COLORS[(h >>> 4) % BB_COLORS.length]];
+  // 收紧画布：原数据留了给特效的大边（±158），身体最宽约 ±115，按 118 取，头像在小格子里才显得够大
+  const vb = 118, id = "bbm" + (++bbSeq), live = st === "active";
+  let eyes;
+  if (live) {
+    // 按当前时间定播放位置：列表几秒重画一次，这样动画能接着播、不会跳回开头；再按会话号错开，别一起眨眼
+    const a = BB.anim[sh], delay = -((Date.now() / 1000 + ((h >>> 8) % 1000) / 1000 * a.secs) % a.secs);
+    eyes = a.d.map((d, k) => `<path class="bb-a" d="${d}" fill="#000" style="animation-name:bb-${sh}-${k};animation-duration:${a.secs}s;animation-delay:${delay}s"/>`).join("");
+  } else {
+    const ex = st === "stand" ? "attentif" : "somnolent";
+    eyes = BB.eyes[sh][ex].map(([d, m]) => `<path d="${d}" transform="matrix(${m})" fill="#000"/>`).join("");
+  }
+  const body = live ? `class="bb-a" style="animation-name:bb-${sh}-b;animation-duration:${BB.anim[sh].secs}s;animation-delay:${-((Date.now() / 1000) % BB.anim[sh].secs)}s"` : "";
+  const px = size || 26;
+  return `<span class="bbw${live ? " live" : ""}" style="width:${px}px;height:${px}px" title="${st === "active" ? "活跃" : st === "stand" ? "待命" : "空闲"}"><svg width="${px}" height="${px}" viewBox="${-vb} ${-vb} ${vb * 2} ${vb * 2}" aria-hidden="true">
+    <defs><mask id="${id}" maskUnits="userSpaceOnUse" x="${-vb}" y="${-vb}" width="${vb * 2}" height="${vb * 2}"><g ${body}><path d="${BB.shapes[sh]}" fill="#fff"/>${eyes}</g></mask></defs>
+    <rect x="${-vb}" y="${-vb}" width="${vb * 2}" height="${vb * 2}" fill="${color}" mask="url(#${id})"/></svg><i class="dot d-${st}"></i></span>`;
+}
+
 // ---------- 会话 ----------
-function sessState(x){ if (x.listening) return ["stand","待命"]; if (x.age < 180) return ["active","活跃"]; return ["idle", "空闲"]; }
+function sessState(x){ if (x.busy) return ["active","活跃"]; if (x.listening) return ["stand","待命"]; if (x.age < 180) return ["active","活跃"]; return ["idle", "空闲"]; }
 async function pollSessions(){
   if (!cur || !cur.bus_dir) return; const root = cur.root;
   try {
@@ -770,7 +1243,7 @@ async function pollSessions(){
     if (!cur || cur.root !== root) return;
     const row = x => { const [st, label] = sessState(x), key = keyOf(x.agent, x.short);
       return `<div class="srow ${x.role==="main"?"is-main":""}" data-key="${esc(key)}" data-sid="${esc(x.sid)}" data-agent="${esc(x.agent)}" title="点击：打开它的会话记录">
-        <i class="dot d-${st}"></i><div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x, true)}${x.agent==="cursor"?'<span class="a-cursor" style="font-size:11px;font-weight:600;margin-right:4px">Cursor</span>':""}${esc(x.alias||x.title||"未命名")}</div>
+        ${bbAvatar(x, st, 36)}<div class="grow"><div class="nm a-${esc(x.agent)}">${roleBadge(x, true)}${x.agent==="cursor"?'<span class="a-cursor" style="font-size:11px;font-weight:600;margin-right:4px">Cursor</span>':""}${esc(x.alias||x.title||"未命名")}</div>
         ${x.role_note?`<div class="rn">${esc(x.role_note)}</div>`:""}
         <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div>
         <button class="to ghost" data-focus="${esc(key)}" title="总线消息里只看和它有关的">筛选</button></div>`; };
@@ -778,7 +1251,8 @@ async function pollSessions(){
     // 简洁模式：不显示以前后台新开的对话、标了「别派」的对话（它们不会再接活）
     const g = a => sessList.filter(x => (x.agent === a || (a === "claude" && x.agent === "cursor")) && !(document.body.classList.contains("simple") && (x.managed || x.ignore)));
     $("#sessClaude").innerHTML = g("claude").map(row).join("") || '<div class="grp">没有在线的 Claude 会话</div>';
-    $("#cardClaude h3 .a-claude").textContent = sessList.some(x => x.agent === "cursor") ? "Claude / Cursor" : "Claude";
+    $("#cardClaude h3 .a-claude").innerHTML = logo("claude") + "Claude" +
+      (sessList.some(x => x.agent === "cursor") ? " / " + logo("cursor") + "Cursor" : "");
     $("#sessCodex").innerHTML = g("codex").map(row).join("") || '<div class="grp">没有在线的 Codex 会话</div>';
     $("#nClaude").textContent = g("claude").length ? `（${g("claude").length}）` : "";
     if (view) { const lv = sessList.find(s => s.agent === view.agent && s.sid === view.sid); const hb = $("#trHead .rb");
@@ -797,7 +1271,7 @@ function renderPauseBanner(){
   const b = $("#pauseBanner"); if (!b) return;
   if (!codexPause) { b.style.display = "none"; return; }
   b.style.display = "";
-  b.innerHTML = `⏸ 暂停往 Codex 派活（约 ${codexPause.left} 分钟后自动再试）：${esc(String(codexPause.reason||"").slice(0,120))}
+  b.innerHTML = `${ic("pause")} 暂停往 Codex 派活（约 ${codexPause.left} 分钟后自动再试）：${esc(String(codexPause.reason||"").slice(0,120))}
     <button class="ghost" id="resumeCodex" style="margin-left:8px">恢复</button>`;
   $("#resumeCodex").onclick = async () => { try { await api("/api/codex/resume", {root: cur.root}); toast("已恢复往 Codex 派活"); pollCodex(); } catch(e){ toast("❌ " + e.message); } };
 }
@@ -859,8 +1333,8 @@ function placeCards(){
   else if (claudeSide === "left") { L.appendChild(cl); R.insertBefore(cx, R.firstChild); }
   else { L.appendChild(cx); R.insertBefore(cl, R.firstChild); }
   const tip = layoutSrc === "windows" ? "跟着窗口：" : "缺省：";
-  $("#posClaude").textContent = isMobile() ? "" : (layoutSrc === "windows" ? "🖥 窗口在" + (claudeSide==="left"?"左":"右") : "");
-  $("#posCodex").textContent = isMobile() ? "" : (layoutSrc === "windows" ? "🖥 窗口在" + (claudeSide==="left"?"右":"左") : "");
+  $("#posClaude").innerHTML = isMobile() ? "" : (layoutSrc === "windows" ? ic("monitor") + " 窗口在" + (claudeSide==="left"?"左":"右") : "");
+  $("#posCodex").innerHTML = isMobile() ? "" : (layoutSrc === "windows" ? ic("monitor") + " 窗口在" + (claudeSide==="left"?"右":"左") : "");
 }
 async function pollLayout(){
   try { const l = await api("/api/layout");
@@ -922,17 +1396,17 @@ function flyMail(m){
         if (land) { land.classList.remove("landed"); void land.offsetWidth; land.classList.add("landed"); setTimeout(() => land.classList.remove("landed"), 1400); } };
     }, i * 180));
 }
-function setWebFx(on){ webFx = on; store.set("msgbus.webfx", on ? "1" : "0"); $("#mWebFx").textContent = "网页信件动画：" + (on ? "开 ✓" : "关"); }
+function setWebFx(on){ webFx = on; store.set("msgbus.webfx", on ? "1" : "0"); $("#mWebFx").innerHTML = ic("sparkles") + "网页信件动画：" + (on ? "开" + ic("check", "ok") : "关"); }
 
 // ---------- 会话视图（看记录、直接回复、派活） ----------
 let view = null, openTabs = [], trOffset = -1, trEntries = [], trBusy = false;
 const tabKey = x => x.agent + ":" + x.sid;
 function renderTabs(){
   const live = k => sessList.find(s => tabKey(s) === k);
-  $("#vtabs").innerHTML = `<div class="vtab ${view?"":"on"}" data-t="bus">📨 总线消息</div>` + openTabs.map(t => {
-    const s = live(tabKey(t)) || t, st = s.listening ? "stand" : (s.age < 180 ? "active" : "idle");
-    return `<div class="vtab ${view && tabKey(view)===tabKey(t)?"on":""}" data-t="${esc(tabKey(t))}"><i class="dot d-${st}"></i>
-      ${roleBadge(s)}<span class="a-${esc(t.agent)}">${esc(s.alias||s.title||"未命名")}</span><button class="x" data-close="${esc(tabKey(t))}" title="关闭">✕</button></div>`; }).join("");
+  $("#vtabs").innerHTML = `<div class="vtab ${view?"":"on"}" data-t="bus">${ic("messages")} 总线消息</div>` + openTabs.map(t => {
+    const s = live(tabKey(t)) || t, st = sessState(s)[0];
+    return `<div class="vtab ${view && tabKey(view)===tabKey(t)?"on":""}" data-t="${esc(tabKey(t))}">${bbAvatar(s, st, 18)}
+      ${roleBadge(s)}<span class="a-${esc(t.agent)}">${esc(s.alias||s.title||"未命名")}</span><button class="x" data-close="${esc(tabKey(t))}" title="关闭">${ic("x")}</button></div>`; }).join("");
   $$(".vtab").forEach(el => el.onclick = e => {
     if (e.target.dataset.close) { closeTab(e.target.dataset.close); e.stopPropagation(); return; }
     if (el.dataset.t === "bus") showBus(); else { const t = openTabs.find(x => tabKey(x) === el.dataset.t); if (t) openSession(t); }
@@ -960,12 +1434,12 @@ function openSession(x){
   const nm = x.alias || x.title || "未命名";
   if (isMobile()) setM("bus");
   const live = sessList.find(s => s.agent === x.agent && s.sid === x.sid) || x;
-  $("#trHead").innerHTML = `<button class="mback mob" onclick="mBack()" title="返回">‹</button>${roleBadge(live)}<span class="nm a-${esc(x.agent)}">${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
+  $("#trHead").innerHTML = `<button class="mback mob" onclick="mBack()" title="返回">${ic("back")}</button>${bbAvatar(live, sessState(live)[0], 30)}${roleBadge(live)}<span class="nm a-${esc(x.agent)}">${logo(x.agent)}${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
     ${live.role_note?`<span style="color:var(--muted)">${esc(live.role_note)}</span>`:""}
     <span class="seg rolesel" title="手动设这个会话是主还是辅；自动 = 按派活关系判断">
       <button data-role="main" class="${live.role_set==="main"?"on":""}">主</button><button data-role="aux" class="${live.role_set==="aux"?"on":""}">辅</button><button data-role="auto" class="${!live.role_set?"on":""}">自动</button></span>
-    <button class="rf" id="trRefresh" title="从头重读这个会话的记录">⟳</button>
-    ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">🤝 交给 Claude</button>` : ""}
+    <button class="rf" id="trRefresh" title="从头重读这个会话的记录">${ic("refresh")}</button>
+    ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">${ic("handoff")} 交给 Claude</button>` : ""}
     <span class="note" style="color:var(--muted)">${x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : x.agent==="cursor" ? "回复经总线送达 Cursor：它下次提交消息、调用工具或一轮结束时收到，闲着叫不醒；要它当成你本人的指令，最稳还是在 Cursor 里直接说" : "回复经总线送达 Claude（闲着会被叫醒）；要它当成你本人的指令，最稳还是在 Claude 里直接说"}</span>`;
   $("#toFixed").innerHTML = `发给 <b class="a-${esc(x.agent)}">${esc(nm)}</b>`;
   if ($("#toClaude")) $("#toClaude").onclick = () => handToClaude(x);
@@ -977,8 +1451,8 @@ function openSession(x){
 function trHtml(){
   let html = "", tools = [], lastDay = "";
   const flush = () => { if (!tools.length) return;
-    html += tools.length === 1 ? `<div class="tools"><div class="tl">🔧 ${esc(tools[0].text)}</div></div>`
-      : `<details class="tools"><summary>🔧 ${tools.length} 次工具调用 · 最后：${esc(tools[tools.length-1].text.slice(0,60))}</summary>${tools.map(t=>`<div class="tl" title="${esc(t.text)}">${esc(t.text)}</div>`).join("")}</details>`;
+    html += tools.length === 1 ? `<div class="tools"><div class="tl">${ic("tool")} ${esc(tools[0].text)}</div></div>`
+      : `<details class="tools"><summary>${ic("tool")} ${tools.length} 次工具调用 · 最后：${esc(tools[tools.length-1].text.slice(0,60))}</summary>${tools.map(t=>`<div class="tl" title="${esc(t.text)}">${esc(t.text)}</div>`).join("")}</details>`;
     tools = []; };
   for (const e of trEntries) {
     const d = e.ts ? dayOf(e.ts) : ""; if (d && d !== lastDay) { flush(); html += `<div class="day">${d}</div>`; lastDay = d; }
@@ -986,7 +1460,7 @@ function trHtml(){
     flush();
     const long = e.text.length > 700 || e.text.split("\n").length > 14;
     html += `<div class="bub ${e.role==="user"?"u":"a"} ${long?"clamp":""}"><div class="bx">${esc(e.text)}</div>
-      ${long?'<a class="link more" data-bmore>展开全文</a>':""}<div class="bt">${e.role==="user"?"你":(AGENT_NAME[view.agent]||"Claude")} · ${e.ts?hm(e.ts):""}</div></div>`;
+      ${long?'<a class="link more" data-bmore>展开全文</a>':""}${e.ts?`<div class="bt">${hm(e.ts)}</div>`:""}</div>`;
   }
   flush();
   return html || `<div class="empty">这段时间没有对话内容</div>`;
