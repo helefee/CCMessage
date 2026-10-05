@@ -97,6 +97,8 @@ def _claude_registry() -> dict[str, list[dict]]:
 def claude_sessions() -> list[dict]:
     cur = claude_sync.current_key()
     reg = _claude_registry()
+    # 当前账号里已有的桌面端会话（按 local_ 号）：别的账号里同号登记指着的老记录，是这条会话续接前的旧段，不用补
+    cur_local = {Path(r["path"]).stem for rs in reg.values() for r in rs if r["key"] == cur}
     out, seen = [], set()
     for f in (paths.CLAUDE_HOME / "projects").glob("*/*.jsonl"):
         sid = f.stem
@@ -109,6 +111,8 @@ def claude_sessions() -> list[dict]:
         st = f.stat()
         if mine:
             why = "已归档" if d.get("_archived") else None
+        elif regs and any(Path(r["path"]).stem in cur_local for r in regs):
+            why = "旧段（这条会话当前账号里已有，续到了新记录）"
         elif regs:
             why = "在别的账号里"
         else:
