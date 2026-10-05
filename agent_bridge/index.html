@@ -761,11 +761,12 @@ setTimeout(() => setWebFx(webFx), 0);
 function pickBar(n){ return n ? `<div class="pickbar" style="display:flex;gap:8px;align-items:center;margin:6px 0">
   <button class="ghost" data-pick="all">全选</button><button class="ghost" data-pick="invert">反选</button>
   <span style="color:var(--muted);font-size:13px" id="pickN"></span></div>` : ""; }
-function wirePick(goId, label){
+function wirePick(goId, label, extra = 0){   // extra：不用勾、总会一起做的条数（如要刷新的）
   const boxes = () => $$("#dlg input[data-pickrow]:not(:disabled)");
   const sync = () => { const n = boxes().filter(b => b.checked).length, total = boxes().length;
     if ($("#pickN")) $("#pickN").textContent = `已选 ${n} / ${total}`;
-    const go = $("#" + goId); if (go) { go.disabled = !n; go.textContent = `${label} ${n} 个`; } };
+    const go = $("#" + goId); if (go) { go.disabled = !n && !extra;
+      go.textContent = n ? `${label} ${n} 个` + (extra ? `，刷新 ${extra} 个` : "") : `刷新 ${extra} 个`; } };
   $$("#dlg [data-pick]").forEach(b => b.onclick = () => {
     boxes().forEach(x => x.checked = b.dataset.pick === "all" ? true : !x.checked); sync(); });
   boxes().forEach(x => x.onchange = sync);
@@ -783,13 +784,14 @@ $("#mCSync").onclick = async () => {
       这里把别的账号里的会话补进当前账号的列表：只补缺的，不覆盖、不删除，写之前整个目录先备份。</div>
     <div style="margin:10px 0 4px">当前账号 / 组织：<code>${esc(p.target.key.split("/").map(x=>x.slice(0,8)).join(" / "))}</code>（已有 ${p.target.count} 个）</div>
     <div style="font-weight:600;margin:8px 0 4px">可以补进来 ${p.add.length} 个${p.skip_missing?`（另有 ${p.skip_missing} 个对话记录已不在，跳过）`:""}（已归档的缺省不勾）：</div>
+    ${p.update&&p.update.length?`<div style="margin:4px 0">另有 <b>${p.update.length}</b> 个当前账号里已有、但别的账号里是更新的版本，会一并刷新成最新：${p.update.slice(0,6).map(u=>esc(u.title)).join("、")}${p.update.length>6?" 等":""}</div>`:""}
     ${pickBar(p.add.length)}<div style="max-height:46vh;overflow:auto">${rows || '<div style="color:var(--muted)">没有要补的，别的账号里的会话都已经在了。</div>'}</div>
     <div style="margin-top:10px;color:var(--warn);font-size:13px">补完要<b>重启 Claude 桌面端</b>才会出现在列表里（它只在启动时读一次）。</div>`,
-    p.add.length ? `<button onclick="closeDlg()">取消</button><button class="primary" id="csGo">补齐 ${p.add.length} 个</button>` : `<button onclick="closeDlg()">关闭</button>`);
-  const pickedC = wirePick("csGo", "补齐");
+    (p.add.length || (p.update||[]).length) ? `<button onclick="closeDlg()">取消</button><button class="primary" id="csGo">补齐 ${p.add.length} 个</button>` : `<button onclick="closeDlg()">关闭</button>`);
+  const pickedC = wirePick("csGo", "补齐", (p.update||[]).length);
   if ($("#csGo")) $("#csGo").onclick = async () => {
-    const only = pickedC(); if (!only.length) return toast("一个都没勾");
-    try { const r = await api("/api/claude-sync", {only}); openDlg("✅ 已补齐", `<div>补进来 ${r.done} 个会话。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
+    const only = pickedC(); if (!only.length && !(p.update||[]).length) return toast("一个都没勾");
+    try { const r = await api("/api/claude-sync", {only}); openDlg("✅ 已补齐", `<div>补进来 ${r.done} 个会话${r.updated?`，刷新 ${r.updated} 个`:""}。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
       <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到。</div>`); }
     catch(e){ toast("❌ " + e.message, 5000); } };
 };
