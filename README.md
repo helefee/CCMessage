@@ -226,6 +226,25 @@ Claude Code 的记忆按项目存在 `~/.claude/projects/<项目>/memory/`（不
 
 只给位置和提示，不把整份记忆塞进上下文；都叮嘱了「冲突以代码 / 文件现状为准、别改对方的记忆」。
 
+## 会话管理（借鉴 cc-switch）
+
+界面 ⋯ →「会话管理」，四页：
+
+- **会话**：Claude（桌面端登记 + 命令行 / 子代理开的）和 Codex 的会话放在一张表里，每条标出当前账号下**看不看得见**，
+  看不见的写明原因（在别的账号里 / 没登记 / 在别的供应商桶 / 别的 ChatGPT 账号建的 / 已归档 / 记录文件已不在）。
+  按标题、第一句话、目录、会话号筛；「全文搜」在会话记录正文里找（限时 20 秒）。每条可**复制恢复命令**
+  （`claude --resume <会话>` / `codex resume <线程>`，带 `cd` 到原目录）、**导出 Markdown**。
+  勾选多条可**归档 / 取消归档 / 删除**：删除是挪进 `~/.agent-bridge/trash/<批次>/`（会话记录、子代理目录、各账号里的登记、Codex 库里那一行一起挪），可整批还原。
+- **同步与还原**：Claude 换号补齐、Codex 归桶（见下），以及历次备份 / 账本的撤回。
+- **回收站**：按批次还原。
+- **排队**：等桌面端退出后再做的活，可取消。
+
+**桌面端开着时不直接改它的数据。** 两个桌面端都把会话登记放在内存里、退出时写回磁盘，开着时改的东西会在它退出那一下被盖回去
+（2026-10-05 实测：Claude 同步写完 44 秒后桌面端退出，开着的 10 个会话被写回了旧版本）。所以所有改动都先看对应桌面端开没开：
+没开就立刻做；开着就排队，起一个独立的后台进程等它**完全退出**（托盘里也要退）再做，做完自动把它重新打开。
+
+    python -m agent_bridge jobs                     # 排队的活
+
 ## 切换 Claude 账号后会话「不见了」
 
 Claude 桌面端的会话列表按「账号 / 组织」分文件夹记（`<Claude 数据目录>/claude-code-sessions/<账号>/<组织>/local_*.json`），
@@ -233,11 +252,33 @@ Claude 桌面端的会话列表按「账号 / 组织」分文件夹记（`<Claud
 
     python -m agent_bridge claude-sync --list      # 各账号 / 组织下有多少会话
     python -m agent_bridge claude-sync --dry-run   # 看看会补进来哪些
-    python -m agent_bridge claude-sync             # 补齐到当前账号（最近有会话在写的那个文件夹）
+    python -m agent_bridge claude-sync             # 补齐到当前账号（~/.claude.json 里当前登录的那个）
+    python -m agent_bridge claude-sync --backups   # 历次备份
+    python -m agent_bridge claude-sync --restore <备份>   # 撤回某次同步
 
-或界面 ⋯ →「🔄 同步 Claude 会话到当前账号」。只补缺的，不覆盖、不删除；对话记录已不在的跳过；写之前整个目录备份到
-`~/.agent-bridge/claude-sync-bak/`。**补完要重启 Claude 桌面端**才会出现在列表里（它只在启动时读一次）。
-会话里绑过的 PR、远程控制等是跟原账号走的，换账号后可能不可用；对话本身能接着聊。
+或界面 ⋯ →「同步 Claude 会话到当前账号」/「会话管理 → 同步与还原」。
+
+- 同一个会话在几个旧账号里都有登记（换过不止一次号）时，取**最后活动时间最新**的那份；当前账号里已有、但别处版本更新的，一并刷新
+  （保留当前账号里的收藏 / 归档 / 点开时间，去掉旧账号被停用时留下的报错）。只取第一份会补进旧版本，桌面端按里面记的「最后一条回复」读，看到的就不是最新的。
+- 在当前账号里删过的（文件夹里的 `deleted_<会话号>` 墓碑）不复活；归档状态两处都认（登记里的 `isArchived` 和 `archived-sessions.idx`）。
+- 写之前整个目录备份到 `~/.agent-bridge/claude-sync-bak/<时间>/`，旁边 `ledger.json` 记这次补了哪些、刷新了哪些。撤回：补进来的挪进回收站，刷新过的换回原样；
+  之后你自己新开的会话不动。没有账本的老备份只补回现在缺的，不覆盖。
+- 会话里绑过的 PR、远程控制等是跟原账号走的，换账号后可能不可用；对话本身能接着聊。
+
+## Codex 换号 / 换供应商后老对话「不见了」
+
+Codex 的对话列表按两样东西筛：建对话时的供应商 `model_provider`（rollout 文件第一行 `session_meta` + `state_*.sqlite` 的 `threads` 表），
+和建对话的账号 `creator_account_id`。`config.toml` 的 `model_provider` 一改（哪怕只是 `openai` → `OpenAI` 大小写），老对话就全落进别的桶。
+
+    python -m agent_bridge codex-unify --dry-run    # 看有多少不在当前桶
+    python -m agent_bridge codex-unify [--no-account]   # 归到当前供应商（和当前 ChatGPT 账号）
+    python -m agent_bridge codex-unify --list       # 历次账本
+    python -m agent_bridge codex-unify --restore <账本>
+
+- 写之前 state 库整份在线备份、每个要改的 rollout 文件原样备份，账本记每条线程原来的值，都在 `~/.agent-bridge/codex-unify-bak/<时间>/`；
+- 改文件前后各核一次大小和修改时间，中途被写过就跳过；改完把修改时间还原，列表顺序不变；`creator_account_id` 为空的老对话不动；
+- 还原：线程字段改回原值；文件之后没动过就整份换回备份，动过（又聊过）就只把那一行的供应商改回去，新内容留着；
+- 归桶不改归档状态：已归档的要在「会话」页取消归档才会出现在列表里。
 
 ## 数据放哪
 

@@ -174,6 +174,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .dlg .bd{padding:12px 16px;overflow:auto}
 .dlg .ft{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
 .dlg pre{white-space:pre-wrap;font-family:var(--mono);font-size:12.5px;margin:0}
+.dlg.wide .box{width:min(1100px,100%);height:88vh;max-height:88vh}
+.smtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.smtabs button.on{background:var(--accent-weak);color:var(--accent);border-color:var(--accent)}
+.smbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.smbar input[type=search]{flex:1;min-width:180px}
+.smrow{display:flex;gap:10px;align-items:flex-start;padding:8px 6px;border-bottom:1px solid var(--line2)}
+.smrow:hover{background:var(--panel2)}
+.smrow .grow{flex:1;min-width:0}
+.smrow .t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smrow .m{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.smrow .acts{display:flex;gap:4px;flex-shrink:0}
+.smrow .acts button{padding:2px 8px;font-size:12px}
+.smtag{display:inline-block;font-size:11px;padding:0 6px;border-radius:8px;margin-left:6px;font-weight:400;vertical-align:1px}
+.smtag.ok{background:var(--ok-weak);color:var(--ok)}.smtag.warn{background:var(--warn-weak);color:var(--warn)}.smtag.mut{background:var(--line2);color:var(--muted)}
+.smcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.smcard h4{margin:0 0 6px;font-size:14px}
+.smnote{color:var(--muted);font-size:12.5px;line-height:1.7}
+@media (max-width:640px){.smrow .acts{flex-direction:column}.dlg.wide .box{height:92vh}}
 .step{padding:2px 0}
 .step.ok{color:var(--ok)}.step.bad{color:var(--bad)}
 body.phone .admin{display:none!important}
@@ -428,6 +446,7 @@ code{background:var(--hover);border-radius:6px}
         <div class="list">
           <button id="mPhone" class="admin"><i data-ic="phone"></i>手机端（扫码）…</button>
           <button id="mAdd" class="admin"><i data-ic="plus"></i>添加项目…</button>
+          <button id="mSM" class="admin"><i data-ic="listx"></i>会话管理（搜索 / 归档 / 删除 / 还原）…</button>
           <button id="mCSync" class="admin"><i data-ic="sync"></i>同步 Claude 会话到当前账号…</button>
           <button id="mXSync" class="admin"><i data-ic="download"></i>把 Codex 对话同步进 Claude…</button>
           <button id="mInst" class="admin"><i data-ic="wrench"></i>安装 / 升级 / 修复</button>
@@ -575,7 +594,7 @@ async function api(path, body){
 }
 let toastT; function toast(t, ms=2600){ const el=$("#toast"); el.innerHTML=emoIcons(t); el.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display="none", ms); }
 function openDlg(title, html, footer){ $("#dlgTitle").innerHTML=emoIcons(title); $("#dlgBody").innerHTML=html; $("#dlgFt").innerHTML=footer||'<button onclick="closeDlg()">关闭</button>'; $("#dlg").classList.add("open"); }
-function closeDlg(){ $("#dlg").classList.remove("open"); }
+function closeDlg(){ $("#dlg").classList.remove("open", "wide"); }
 $("#dlg").onclick = e => { if (e.target.id === "dlg") closeDlg(); };
 const pad = n => String(n).padStart(2,"0");
 function hm(ts){ const d=new Date(ts*1000); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
@@ -791,10 +810,178 @@ $("#mCSync").onclick = async () => {
   const pickedC = wirePick("csGo", "补齐", (p.update||[]).length);
   if ($("#csGo")) $("#csGo").onclick = async () => {
     const only = pickedC(); if (!only.length && !(p.update||[]).length) return toast("一个都没勾");
-    try { const r = await api("/api/claude-sync", {only}); openDlg("✅ 已补齐", `<div>补进来 ${r.done} 个会话${r.updated?`，刷新 ${r.updated} 个`:""}。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
+    try { const r = await api("/api/claude-sync", {only}); if (r.deferred) return openDlg("⏳ 已排队", deferHtml(r));
+      openDlg("✅ 已补齐", `<div>补进来 ${r.done} 个会话${r.updated?`，刷新 ${r.updated} 个`:""}。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
       <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到。</div>`); }
     catch(e){ toast("❌ " + e.message, 5000); } };
 };
+
+
+// ---------- 会话管理器（借鉴 cc-switch：统一列表、搜索、恢复命令、导出、批量归档 / 删除、回收站、同步与还原） ----------
+const SM = {tab: "list", items: [], q: "", agent: "all", vis: "all", hits: null, sel: new Set(), meta: null};
+const smKey = it => it.agent + ":" + it.id;
+const smSplit = k => { const i = k.indexOf(":"); return {agent: k.slice(0, i), id: k.slice(i + 1)}; };
+function deferHtml(r){ return `<div style="line-height:1.8">${esc(r.hint || "")}</div>
+  <div class="smnote" style="margin-top:8px">排队的活在「会话管理 → 排队」里看，可以取消；做完的结果也在那里。</div>`; }
+function smDeferred(res){
+  const rs = res.results ? Object.values(res.results) : [res];
+  const d = rs.filter(r => r && r.deferred);
+  if (d.length) { toast("⏳ " + d.map(r => r.app).join("、") + " 开着：已排队，退出后自动做", 6000); return true; }
+  return false;
+}
+function smOpen(){
+  openDlg("会话管理", `<div class="smtabs">
+      ${[["list","会话"],["sync","同步与还原"],["trash","回收站"],["jobs","排队"]].map(([k,t]) =>
+        `<button class="ghost${SM.tab===k?" on":""}" data-smtab="${k}">${t}</button>`).join("")}
+      <span id="smApps" class="smnote" style="margin-left:auto;align-self:center"></span></div>
+    <div id="smBody">正在读…</div>`, `<button onclick="closeDlg()">关闭</button>`);
+  $("#dlg").classList.add("wide");
+  $$("[data-smtab]").forEach(b => b.onclick = () => { SM.tab = b.dataset.smtab; smOpen(); });
+  ({list: smList, sync: smSync, trash: smTrash, jobs: smJobs})[SM.tab]();
+}
+function smAppsLine(a){ const el = $("#smApps"); if (!a || !el) return;
+  el.innerHTML = ["claude","codex"].map(k => `${k === "claude" ? "Claude" : "Codex"} 桌面端：${a[k] ? '<b style="color:var(--warn)">开着</b>' : "没开"}`).join(" · ")
+    + (a.claude || a.codex ? "（开着的那边，改动排到它退出后做）" : ""); }
+async function smList(force){
+  if (force || !SM.meta) { $("#smBody").textContent = "正在读会话…";
+    try { SM.meta = await api("/api/sm/list"); SM.items = SM.meta.items; } catch(e){ $("#smBody").textContent = "❌ " + e.message; return; } }
+  smAppsLine(SM.meta.apps);
+  $("#smBody").innerHTML = `<div class="smbar">
+      <input type="search" id="smQ" placeholder="搜标题 / 第一句话 / 目录 / 会话号" value="${esc(SM.q)}">
+      <button class="ghost" id="smFull" title="在会话记录正文里找（限时 20 秒）">${ic("search")} 全文搜</button>
+      <select id="smAgent"><option value="all">全部</option><option value="claude">Claude</option><option value="codex">Codex</option></select>
+      <select id="smVis"><option value="all">都看</option><option value="hidden">只看当前账号看不见的</option><option value="visible">只看看得见的</option>
+        <option value="archived">只看已归档</option><option value="reg">只看桌面端登记过的</option></select>
+      <button class="ghost" id="smRe" title="重新读">${ic("refresh")}</button></div>
+    <div class="smbar" id="smSelBar"></div>
+    <div id="smRows"></div>`;
+  $("#smAgent").value = SM.agent; $("#smVis").value = SM.vis;
+  $("#smQ").oninput = e => { SM.q = e.target.value; SM.hits = null; smRows(); };
+  $("#smAgent").onchange = e => { SM.agent = e.target.value; smRows(); };
+  $("#smVis").onchange = e => { SM.vis = e.target.value; smRows(); };
+  $("#smRe").onclick = () => smList(true);
+  $("#smFull").onclick = async () => { if (!SM.q.trim()) return toast("先在框里写要找的字");
+    $("#smFull").disabled = true; toast("正在全文搜…", 20000);
+    try { const r = await api("/api/sm/search?q=" + encodeURIComponent(SM.q)); SM.hits = new Set(r.hits.map(smKey));
+      toast(`全文命中 ${r.hits.length} 个${r.partial ? "（超时，只搜了一部分）" : ""}`); smRows(); }
+    catch(e){ toast("❌ " + e.message); } finally { $("#smFull").disabled = false; } };
+  smRows();
+}
+function smFiltered(){
+  const q = SM.q.trim().toLowerCase();
+  return SM.items.filter(it => {
+    if (SM.agent !== "all" && it.agent !== SM.agent) return false;
+    if (SM.vis === "hidden" && it.visible) return false;
+    if (SM.vis === "visible" && !it.visible) return false;
+    if (SM.vis === "archived" && !it.archived) return false;
+    if (SM.vis === "reg" && !it.registered) return false;
+    if (SM.hits) return SM.hits.has(smKey(it));
+    if (!q) return true;
+    return [it.title, it.first, it.cwd, it.id].some(x => (x || "").toLowerCase().includes(q));
+  });
+}
+function smRows(){
+  const list = smFiltered(), shown = list.slice(0, 300);
+  const row = it => `<label class="smrow"><input type="checkbox" data-smk="${esc(smKey(it))}" ${SM.sel.has(smKey(it))?"checked":""}>
+    <span style="flex-shrink:0;margin-top:2px">${ic(it.agent)}</span>
+    <div class="grow"><div class="t">${esc(it.title)}
+        ${it.visible ? '<span class="smtag ok">看得见</span>' : `<span class="smtag warn">${esc(it.why || "看不见")}</span>`}
+        ${it.archived && it.why !== "已归档" ? '<span class="smtag mut">已归档</span>' : ""}
+        ${it.source === "subagent" ? '<span class="smtag mut">子代理</span>' : ""}</div>
+      <div class="m">${it.last ? fmtDay(it.last) : "—"} · ${esc(it.cwd || "")} · ${esc(it.agent === "codex" ? it.id.slice(-6) : it.id.slice(0,8))}${it.size ? " · " + (it.size/1048576).toFixed(1) + "M" : ""}</div>
+      ${it.first && it.first !== it.title ? `<div class="m">“${esc(it.first)}”</div>` : ""}</div>
+    <div class="acts">${it.resume ? `<button class="ghost" data-smcopy="${esc(it.resume)}" title="${esc(it.resume)}">复制恢复命令</button>` : ""}
+      ${it.file ? `<button class="ghost" data-smexp="${esc(smKey(it))}">导出</button>` : ""}</div></label>`;
+  $("#smRows").innerHTML = (shown.map(row).join("") + (list.length > shown.length ? `<div class="smnote" style="padding:8px">还有 ${list.length - shown.length} 个，换个关键字缩小范围</div>` : ""))
+    || '<div class="smnote" style="padding:8px">没有符合条件的会话</div>';
+  $$("[data-smk]").forEach(b => b.onchange = () => { b.checked ? SM.sel.add(b.dataset.smk) : SM.sel.delete(b.dataset.smk); smSelBar(); });
+  $$("[data-smcopy]").forEach(b => b.onclick = e => { e.preventDefault();
+    navigator.clipboard?.writeText(b.dataset.smcopy).then(() => toast("已复制：" + b.dataset.smcopy)).catch(() => toast(b.dataset.smcopy, 8000)); });
+  $$("[data-smexp]").forEach(b => b.onclick = async e => { e.preventDefault(); const k = smSplit(b.dataset.smexp);
+    try { const r = await api("/api/sm/export", k); if (!r.ok) return toast("❌ " + r.error);
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([r.text], {type: "text/markdown"})); a.download = r.name; a.click();
+      toast("已导出，另存一份在 " + r.path, 6000); } catch(err){ toast("❌ " + err.message); } });
+  smSelBar(list);
+}
+function smSelBar(list){
+  list = list || smFiltered();
+  const n = SM.sel.size;
+  $("#smSelBar").innerHTML = `<span class="smnote">共 ${SM.items.length} 个，筛出 ${list.length} 个；已选 ${n} 个</span>
+    <button class="ghost" id="smAll">全选筛出的</button><button class="ghost" id="smNone">清空</button>
+    <span style="margin-left:auto"></span>
+    <button ${n?"":"disabled"} data-smact="unarchive">取消归档</button><button ${n?"":"disabled"} data-smact="archive">归档</button>
+    <button ${n?"":"disabled"} class="danger" data-smact="delete">删除（进回收站）</button>`;
+  $("#smAll").onclick = () => { list.forEach(it => SM.sel.add(smKey(it))); smRows(); };
+  $("#smNone").onclick = () => { SM.sel.clear(); smRows(); };
+  $$("[data-smact]").forEach(b => b.onclick = async () => {
+    const action = b.dataset.smact, items = [...SM.sel].map(smSplit);
+    const word = {archive:"归档", unarchive:"取消归档", delete:"删除"}[action];
+    if (action === "delete" && !confirm(`把选中的 ${items.length} 个会话挪进回收站？（会话记录和各账号里的登记一起挪走，可在「回收站」整批还原）`)) return;
+    try { const r = await api("/api/sm/batch", {action, items});
+      if (!smDeferred(r)) toast(`✓ 已${word} ` + Object.values(r.results).map(x => x.done || 0).reduce((a,b)=>a+b,0) + " 个", 4000);
+      SM.sel.clear(); smList(true); } catch(e){ toast("❌ " + e.message, 5000); } });
+}
+async function smSync(){
+  let d; try { d = await api("/api/sm/sync"); } catch(e){ $("#smBody").textContent = "❌ " + e.message; return; }
+  smAppsLine(d.apps);
+  const c = d.claude, x = d.codex;
+  const short = k => (k || "").split("/").map(s => s.slice(0,8)).join(" / ");
+  const bk = (c.backups || []).map(b => `<div class="smrow"><div class="grow"><div class="t">${esc(b.id)}
+      <span class="smtag mut">${b.ledger ? (b.ledger.what === "sync" ? `补 ${b.added} · 刷新 ${b.updated}` : "还原前的备份") : "老备份（没账本：只补回现在缺的，不覆盖）"}</span></div>
+      <div class="m">${esc(short(b.key))} · 备份里 ${b.count} 个登记</div></div>
+      <div class="acts"><button class="ghost" data-crest="${esc(b.id)}">撤回到这次之前</button></div></div>`).join("");
+  const lg = (x.ledgers || []).map(l => `<div class="smrow"><div class="grow"><div class="t">${esc(l.id)} → ${esc(l.to_provider)}
+      ${l.restored ? `<span class="smtag mut">${esc(l.restored)} 已还原</span>` : ""}</div>
+      <div class="m">线程 ${l.threads} 条 · 文件 ${l.files} 个</div></div>
+      <div class="acts">${l.restored ? "" : `<button class="ghost" data-xrest="${esc(l.id)}">还原</button>`}</div></div>`).join("");
+  const bp = Object.entries(x.by_provider || {}).map(([k,v]) => `「${esc(k)}」${v} 条`).join("、");
+  const ba = Object.values(x.by_account || {}).reduce((a,b) => a + b, 0);
+  $("#smBody").innerHTML = `
+    <div class="smcard"><h4>${ic("claude")} Claude 桌面端：别的账号里的会话补到当前账号</h4>
+      <div class="smnote">${c.ok ? `当前账号 / 组织 <code>${esc(short(c.target?.key))}</code>：可以补进来 <b>${c.add}</b> 个（其中已归档 ${c.add_archived}），已有但别处版本更新、要刷新 <b>${c.update}</b> 个。` : esc(c.error)}
+        同一会话在几个旧账号里都有时取最新的那份；在当前账号里删过的（墓碑）不复活。要逐个勾选，用 ⋯ 菜单里的「同步 Claude 会话到当前账号」。</div>
+      <div style="margin-top:8px"><button class="primary" id="smCGo" ${c.add || c.update ? "" : "disabled"}>全部补齐 / 刷新</button></div>
+      <h4 style="margin-top:12px">历次备份（可撤回）</h4>${bk || '<div class="smnote">还没有</div>'}</div>
+    <div class="smcard"><h4>${ic("codex")} Codex：换号 / 换供应商后看不见的老对话归桶</h4>
+      <div class="smnote">当前供应商「${esc(x.provider)}」、账号 ${esc((x.account || "（没登录 ChatGPT）").slice(0,8))}。
+        ${x.threads || x.files ? `有 <b>${x.threads}</b> 条线程不在当前桶：${bp || "—"}${ba ? `；别的账号建的 ${ba} 条` : ""}（其中已归档 ${x.archived}，归桶后还要在「会话」里取消归档才会出现在列表里）；rollout 文件头要改 ${x.files} 个。` : "所有对话都在当前桶里，不用归桶。"}
+        改之前整份备份 state 库和每个要改的文件，记账本，可整次还原；文件修改时间保持不变，列表顺序不乱。</div>
+      <div style="margin-top:8px"><label class="smnote"><input type="checkbox" id="smXAcct" checked> 别的 ChatGPT 账号建的也归到当前账号</label>
+        <button class="primary" id="smXGo" ${x.threads || x.files ? "" : "disabled"} style="margin-left:8px">归桶</button></div>
+      <h4 style="margin-top:12px">历次账本（可还原）</h4>${lg || '<div class="smnote">还没有</div>'}</div>`;
+  const after = r => { if (!smDeferred(r)) toast(r.ok === false ? "❌ " + (r.error || "没做成") : "✓ 做完了", 5000); SM.meta = null; smSync(); };
+  $("#smCGo").onclick = async () => { try { after(await api("/api/claude-sync", {})); } catch(e){ toast("❌ " + e.message); } };
+  $("#smXGo").onclick = async () => { try { after(await api("/api/sm/codex-unify", {fix_account: $("#smXAcct").checked})); } catch(e){ toast("❌ " + e.message); } };
+  $$("[data-crest]").forEach(b => b.onclick = async () => { if (!confirm(`撤回 ${b.dataset.crest} 那次同步？补进来的挪进回收站，刷新过的换回原样（撤回前会再备份一次）。`)) return;
+    try { after(await api("/api/sm/claude-restore", {id: b.dataset.crest})); } catch(e){ toast("❌ " + e.message); } });
+  $$("[data-xrest]").forEach(b => b.onclick = async () => { if (!confirm(`还原 Codex 归桶 ${b.dataset.xrest}？`)) return;
+    try { after(await api("/api/sm/codex-restore", {id: b.dataset.xrest})); } catch(e){ toast("❌ " + e.message); } });
+}
+async function smTrash(){
+  let d; try { d = await api("/api/sm/trash"); } catch(e){ $("#smBody").textContent = "❌ " + e.message; return; }
+  $("#smBody").innerHTML = `<div class="smnote" style="margin-bottom:8px">删除的会话都在 ~/.agent-bridge/trash/ 里，按批次整批还原；确定不要了可以自己去那里删掉。</div>` +
+    (d.items.map(t => `<div class="smrow"><span style="margin-top:2px">${ic(t.items[0]?.agent || "trash")}</span><div class="grow"><div class="t">${esc(t.id)}
+        ${t.restored ? `<span class="smtag mut">${esc(t.restored)} 已还原</span>` : ""}</div>
+      <div class="m">${t.items.length} 个：${esc(t.items.map(i => i.agent === "codex" ? i.id.slice(-6) : i.id.slice(0,8)).join("、"))}</div></div>
+      <div class="acts">${t.restored ? "" : `<button class="ghost" data-trest="${esc(t.id)}">整批还原</button>`}</div></div>`).join("") || '<div class="smnote">回收站是空的</div>');
+  $$("[data-trest]").forEach(b => b.onclick = async () => {
+    try { const r = await api("/api/sm/trash/restore", {id: b.dataset.trest});
+      if (!smDeferred(r)) toast(r.ok ? `✓ 还原 ${r.restored} 个` : "⚠ " + (r.errors || []).join("；"), 5000);
+      SM.meta = null; smTrash(); } catch(e){ toast("❌ " + e.message); } });
+}
+async function smJobs(){
+  let d; try { d = await api("/api/jobs"); } catch(e){ $("#smBody").textContent = "❌ " + e.message; return; }
+  smAppsLine(d.apps);
+  const lab = {waiting: "等桌面端退出", done: "做完了", failed: "没做成", cancelled: "已取消"};
+  $("#smBody").innerHTML = `<div class="smnote" style="margin-bottom:8px">桌面端开着的时候不能改它的会话数据（它退出时会把内存里的旧状态写回去）。
+      这些活排在这里，后台等它完全退出（托盘里也要退）再做，做完自动把它重新打开。</div>` +
+    ([...d.jobs].reverse().map(j => `<div class="smrow"><span style="margin-top:2px">${ic(j.kind)}</span><div class="grow"><div class="t">${esc(j.title)}
+        <span class="smtag ${j.state === "done" ? "ok" : j.state === "failed" ? "warn" : "mut"}">${lab[j.state] || j.state}</span></div>
+      <div class="m">${fmtDay(j.queued)} 排队${j.finished ? " · " + fmtDay(j.finished) + " 完成" : ""}${j.result ? " · " + esc(j.result) : ""}</div></div>
+      <div class="acts">${j.state === "waiting" ? `<button class="ghost" data-jcancel="${esc(j.id)}">取消</button>` : ""}</div></div>`).join("") || '<div class="smnote">没有排队的活</div>');
+  $$("[data-jcancel]").forEach(b => b.onclick = async () => { await api("/api/jobs/cancel", {id: b.dataset.jcancel}); smJobs(); });
+}
+$("#mSM").onclick = () => { SM.meta = null; SM.sel.clear(); smOpen(); };
 
 $("#mXSync").onclick = async () => {
   const root = cur && cur.root ? cur.root : "";
@@ -816,7 +1003,8 @@ $("#mXSync").onclick = async () => {
   const pickedX = wirePick("xsGo", "同步");
   if ($("#xsGo")) $("#xsGo").onclick = async () => {
     const only = pickedX(); if (!only.length) return toast("一个都没勾");
-    try { const r = await api("/api/codex-sync", {days: 14, root, only}); openDlg("✅ 已同步", `<div>写了 ${r.done} 个。${(r.errors||[]).length?"失败："+esc(r.errors.join("；")):""}备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
+    try { const r = await api("/api/codex-sync", {days: 14, root, only}); if (r.deferred) return openDlg("⏳ 已排队", deferHtml(r));
+      openDlg("✅ 已同步", `<div>写了 ${r.done} 个。${(r.errors||[]).length?"失败："+esc(r.errors.join("；")):""}备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
       <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到（标题前带「（Codex）」）。</div>`); }
     catch(e){ toast("❌ " + e.message, 5000); } };
 };

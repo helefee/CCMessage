@@ -12,6 +12,10 @@
     python -m agent_bridge claude-sync [--dry-run] [--list] [--to 账号/组织]
     python -m agent_bridge codex-sync [--dry-run] [--days 14] [--cwd 项目] [--to 账号/组织]   把 Codex 对话同步进 Claude 桌面端列表
                                                切换账号后看不到的 Claude 桌面端会话，补齐到当前账号的列表里
+    python -m agent_bridge codex-unify [--dry-run] [--no-account] [--list] [--restore 账本]
+                                               Codex 换号 / 换供应商后看不见的老对话归到当前供应商和账号（可还原）
+    python -m agent_bridge jobs                排队等桌面端退出后再做的活
+    python -m agent_bridge after-quit <claude|codex>   （内部用）等桌面端退出后做排队的活、再把它打开
 """
 from __future__ import annotations
 
@@ -118,6 +122,18 @@ def main(argv=None):
     if cmd == "claude-sync":
         from . import claude_sync
         return claude_sync.main(rest)
+    if cmd == "codex-unify":
+        from . import codex_unify
+        return codex_unify.main(rest)
+    if cmd == "after-quit":
+        from . import apps
+        return apps.watch(rest[0] if rest else "claude")
+    if cmd == "jobs":
+        from . import apps
+        sys.stdout.reconfigure(encoding="utf-8")
+        for j in apps.pending():
+            print(f"{j['id']}  {j['state']:<9} {apps.NAMES[j['kind']]}  {j['title']}  {j.get('result') or ''}")
+        return 0
     if cmd == "codex-sync":
         from . import codex_sync
         return codex_sync.main(rest)

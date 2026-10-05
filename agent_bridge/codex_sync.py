@@ -201,6 +201,14 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--to", help="写进哪个账号 / 组织文件夹（缺省当前在用的）")
     ap.add_argument("--only", help="只同步这几个 Codex 对话（号或末 6 位，逗号分隔）")
     a = ap.parse_args(argv)
+    if not a.dry_run:
+        from . import apps
+        if apps.running("claude"):          # 开着写会在它退出时被盖回去
+            r = apps.run_or_defer("claude", "codex-sync", {"days": a.days, "root": a.cwd,
+                                                           "only": a.only.split(",") if a.only else None},
+                                  "把 Codex 对话同步进 Claude")
+            print(r["hint"])
+            return 0
     r = run(a.days, a.cwd, a.to, a.dry_run, a.only.split(",") if a.only else None)
     if not r["ok"]:
         print(r["error"])
