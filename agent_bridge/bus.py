@@ -482,7 +482,7 @@ def match_target(to: str, rec: dict) -> bool:
     sid = rec.get("sid", "").lower()
     if len(to_l) >= 4 and (sid.startswith(to_l) or sid.endswith(to_l)):
         return True
-    if f"{rec.get('agent')}:{short_id(rec)}".lower() == to_l:
+    if f"{rec.get('agent')}:{short_id(rec)}".lower() == to_l or f"{rec.get('agent')}:{sid}" == to_l:
         return True
     for nm in (rec.get("alias"), rec.get("title")):
         if nm and to in nm:
@@ -538,6 +538,9 @@ def post(agent: str, sid: str, me: dict, to: str, text: str, kind="msg", reply_t
         if r["agent"] == "codex":
             res = "跳过（--no-wake）" if no_wake else wake_codex(r, msg)
             print(f"  叫醒 {display_name(r)}：{res}")
+            if not no_wake and not res.startswith("跳过"):
+                with open(BUS / "woken.txt", "a", encoding="utf-8") as f:     # 提醒已排进 Codex 的输入：这条撤不回了
+                    f.write(msg["id"] + "\n")
     idle_claude = [r for r in live if r["agent"] == "claude" and t - r.get("listening", 0) > LISTEN_FRESH]
     if idle_claude:
         print("Claude 会话在下一次提交消息或调用工具时收到；没在待命（listen）的闲着的会话要等它下次动起来。")
@@ -602,7 +605,8 @@ NO_CODEX_EXIT = 3
 
 
 def results_by_task() -> set[str]:
-    return {m.get("reply_to") for m in iter_log() if m.get("kind") == "result"}
+    """交了结果的、或撤回了的任务（都不算手上的活）。"""
+    return {m.get("reply_to") for m in iter_log() if m.get("kind") in ("result", "recall")}
 
 
 def worker_recs() -> list[dict]:
@@ -912,6 +916,123 @@ def cmd_set_role(args) -> None:
     print(f"已设：{display_name(rec)} → {label}")
     if not args.quiet:
         post(agent, sid, me, f"{r['agent']}:{short_id(r)}", ROLE_TEXT[role], to_keys=[key_of(r["agent"], r["sid"])])
+
+
+# ---------- 连线：用户在界面上把一个 Claude 会话和一个 Codex 会话连起来 ----------
+# links.json：{"links": [{"claude": <sid>, "codex": <sid>, "dir": c2x|x2c|both, "at": 时间}]}
+# c2x = Claude 给 Codex 派活，x2c = Codex 给 Claude 派活，both = 互相派。
+# 连了线的会话 task --to codex / --to claude（不写具体会话）直接派给连着的那个；写了 --to codex:<会话> 照写的来。
+LINKS = BUS / "links.json"
+LINK_DIRS = ("c2x", "x2c", "both")
+
+
+def load_links() -> list[dict]:
+    return [x for x in load_json(LINKS).get("links", [])
+            if x.get("claude") and x.get("codex") and x.get("dir") in LINK_DIRS]
+
+
+def save_links(links: list[dict]) -> None:
+    save_json(LINKS, {"links": links})
+
+
+def link_peers(agent: str, sid: str) -> list[dict]:
+    """我的连线（新连的在前）：[{agent, sid, out: 我能派给它, in: 它能派给我}]"""
+    out = []
+    for x in sorted(load_links(), key=lambda x: -x.get("at", 0)):
+        if agent == "claude" and x["claude"] == sid:
+            out.append({"agent": "codex", "sid": x["codex"], "out": x["dir"] in ("c2x", "both"), "in": x["dir"] in ("x2c", "both")})
+        elif agent == "codex" and x["codex"] == sid:
+            out.append({"agent": "claude", "sid": x["claude"], "out": x["dir"] in ("x2c", "both"), "in": x["dir"] in ("c2x", "both")})
+    return out
+
+
+def _peer_rec(p: dict) -> dict:
+    return load_json(SESS / f"{key_of(p['agent'], p['sid'])}.json") or {"agent": p["agent"], "sid": p["sid"]}
+
+
+def link_target(agent: str, sid: str, kind: str) -> dict | None:
+    """task --to <kind> 时连着的会话（我能派给它的）；没连线就 None，照老规矩挑。
+    连了好几个：先挑手上没活的（Claude 还要在待命），都忙就轮流（记在 link_rr.json）。"""
+    ps = [p for p in link_peers(agent, sid) if p["agent"] == kind and p["out"]]
+    if not ps:
+        return None
+    if len(ps) == 1:
+        return _peer_rec(ps[0])
+    done, t = results_by_task(), now_ts()
+    recs = [_peer_rec(p) for p in ps]
+    idle = [r for r in recs if not pending_for(r["sid"], done, agent=kind)
+            and (kind == "codex" or t - r.get("listening", 0) <= LISTEN_FRESH)]
+    idle = idle or [r for r in recs if not pending_for(r["sid"], done, agent=kind)]
+    rr_p, me = BUS / "link_rr.json", key_of(agent, sid)
+    rr = load_json(rr_p)
+    pool = idle or recs
+    last = rr.get(me)
+    order = [r["sid"] for r in recs]
+    nxt = next((r for r in pool if last in order and order.index(r["sid"]) > order.index(last)), None) or pool[0]
+    rr[me] = nxt["sid"]
+    save_json(rr_p, rr)
+    return nxt
+
+
+def link_note(agent: str, sid: str) -> tuple[str, str]:
+    """（指纹, 给会话看的说明）：连线变了 / 会话刚开始时注入一次。"""
+    peers = link_peers(agent, sid)
+    sig = ";".join(sorted(f"{p['agent']}:{p['sid']}:{int(p['out'])}{int(p['in'])}" for p in peers))
+    lines = []
+    for p in peers:
+        rec = _peer_rec(p)
+        nm, disp = f"{p['agent']}:{short_id(rec)}", display_name(rec)
+        who = disp if nm in disp else f"{nm}（{disp}）"
+        if p["out"]:
+            lines.append(f"你已与 {who} 连线，可以给它派活：task --to {nm}")
+        if p["in"]:
+            lines.append(f"{who} 会给你派任务：收到【任务 …】就做，做完用 done 交回。")
+    outs = sorted({p["agent"] for p in peers if p["out"]})
+    if outs:
+        lines.append("不写具体会话的 " + " / ".join(f"task --to {a}" for a in outs) + " 会派给上面连着的会话"
+                     + ("（连了几个就先挑闲着的，都忙就轮流）" if sum(p["out"] for p in peers) > 1 else "")
+                     + "；task --to linked 给每个连着的都派一份；写明 --to <别的会话> 的照写的派。")
+    return sig, ("🔗 连线（用户在 CC Msg 里设的）：\n" + "\n".join(lines)) if lines else ""
+
+
+def _find_one(t: str, kind: str) -> dict:
+    bare = t.split(":", 1)[1] if t.lower().startswith(kind + ":") else t
+    hits = [r for r in all_sessions() if r["agent"] == kind and (r["sid"] == bare or match_target(t, r) or match_target(bare, r))]
+    if len(hits) != 1:
+        sys.exit(f"「{t}」对上了 {len(hits)} 个 {kind} 会话，写具体些（claude:前6位 / codex:末6位）")
+    return hits[0]
+
+
+def cmd_link(args) -> None:
+    """连线 / 取消连线：link claude:<会话> codex:<会话> [--dir c2x|x2c|both]；unlink 其中一个或一对。"""
+    ts = [t for t in (args.a, args.b) if t]
+    kinds = {t.split(":", 1)[0].lower(): t for t in ts}
+    links = load_links()
+    if args.cmd == "unlink":
+        def sid_of(kind):            # 连线里记着的完整会话号直接认（会话记录清掉了也能取消）
+            if kind not in kinds:
+                return None
+            v = kinds[kind].split(":", 1)[1] if ":" in kinds[kind] else kinds[kind]
+            return v if any(l[kind] == v for l in links) else _find_one(kinds[kind], kind)["sid"]
+        c, x = sid_of("claude"), sid_of("codex")
+        if not (c or x):
+            sys.exit("写要取消的会话：claude:<会话> 和 / 或 codex:<会话>")
+        keep = [l for l in links if not ((c is None or l["claude"] == c) and (x is None or l["codex"] == x))]
+        save_links(keep)
+        n = len(links) - len(keep)
+        print(json.dumps({"ok": True, "removed": n, "links": keep}, ensure_ascii=False) if args.json else f"已取消 {n} 条连线")
+        return
+    if set(kinds) != {"claude", "codex"}:
+        sys.exit("连线要一个 Claude 会话和一个 Codex 会话：link claude:<会话> codex:<会话>")
+    if args.dir not in LINK_DIRS:
+        sys.exit("方向只能是 c2x（Claude 派给 Codex）/ x2c（Codex 派给 Claude）/ both")
+    c, x = _find_one(kinds["claude"], "claude"), _find_one(kinds["codex"], "codex")
+    links = [l for l in links if not (l["claude"] == c["sid"] and l["codex"] == x["sid"])]
+    links.append({"claude": c["sid"], "codex": x["sid"], "dir": args.dir, "at": now_ts()})
+    save_links(links)
+    arrow = {"c2x": "→", "x2c": "←", "both": "⇄"}[args.dir]
+    print(json.dumps({"ok": True, "links": links}, ensure_ascii=False) if args.json
+          else f"已连线：{display_name(c)} {arrow} {display_name(x)}")
 
 
 def cursor_agent_exe() -> str | None:
@@ -1460,6 +1581,31 @@ def cmd_task(args) -> None:
     me_key = key_of(agent, sid)
     to, to_keys, how = args.to, None, None
     tl = to.lower()
+    if tl in ("linked", "linked:codex", "linked:claude"):
+        # 群发：给每个连着的、我能派活的会话各派一份
+        kind = tl.split(":", 1)[1] if ":" in tl else None
+        peers = [p for p in link_peers(agent, sid) if p["out"] and (not kind or p["agent"] == kind)]
+        if not peers:
+            print("✗ 没派：你没有能派活的连线（用户在 CC Msg 里把会话连起来才有）。用 task --to codex / claude 照常派。")
+            sys.exit(NO_CODEX_EXIT)
+        text, ok = read_text(args.text), 0
+        for p in peers:
+            a2 = argparse.Namespace(**vars(args))
+            a2.to, a2.text, a2.wait, a2.force = f"{p['agent']}:{short_id(_peer_rec(p))}", text, 0, True
+            try:
+                cmd_task(a2)
+                ok += 1
+            except SystemExit as e:
+                print(f"  ✗ {display_name(_peer_rec(p))}：{e.code}")
+        print(f"群发给连线的 {len(peers)} 个会话，派出 {ok} 份。")
+        if not ok:
+            sys.exit(NO_CODEX_EXIT)
+        return
+    # 用户在界面上连了线：不写具体会话的 --to codex / --to claude 直接派给连着的那个（连了几个就挑闲的，都忙就轮流）
+    linked = link_target(agent, sid, tl) if tl in ("codex", "claude") and agent in ("claude", "codex") else None
+    if linked:
+        busy = pending_for(linked["sid"], results_by_task(), agent=tl)
+        print(f"  按连线派给 {display_name(linked)}" + (f"（它手上还有 {len(busy)} 件没交，排在后面）" if busy else ""))
     if tl in ("codex", "codex:new", "codex:bg") or tl.startswith("codex:"):
         # 交给 Codex 前先看它开没开：没开就不交，退出码 3，调用方改交给 Claude
         if not codex_app_running():
@@ -1474,7 +1620,9 @@ def cmd_task(args) -> None:
         s = codex_slots(me_key)
         desk_busy = sum(1 for wr in worker_recs() if wr.get("kind") == "desktop" and wr.get("app") != "claude"
                         and wr.get("task") not in results_by_task() and now_ts() - wr.get("created", 0) < WORKER_TIMEOUT)
-        if tl == "codex" and s["pick"]:
+        if linked:
+            how = ("existing", linked)
+        elif tl == "codex" and s["pick"]:
             how = ("existing", s["pick"]["rec"])
         elif tl in ("codex", "codex:new") and CODEX_DESKTOP_NEW and os.name == "nt":
             if desk_busy >= MAX_NEW_CODEX:
@@ -1495,6 +1643,9 @@ def cmd_task(args) -> None:
             how = ("new", None)
         else:
             hit = next((x for x in s["rows"] if match_target(to, x["rec"])), None)
+            lp = [r for r in (_peer_rec(p) for p in link_peers(agent, sid) if p["agent"] == "codex" and p["out"]) if match_target(to, r)]
+            if lp and (not hit or hit["owner"] and not hit["mine"] or hit["busy"]):
+                hit = {"rec": lp[0], "owner": None, "mine": True, "busy": []}      # 连着的会话：用户指定的，不管归属 / 忙闲
             if not hit:
                 sys.exit(f"没找到 Codex 对话「{to}」。先跑 {CMD} codex-status 看看。")
             if hit["owner"] and not hit["mine"] and not args.force:
@@ -1512,8 +1663,8 @@ def cmd_task(args) -> None:
         # 派给 Claude：先挑归我 / 没人认领的、闲着的「总线新开」或「辅」会话；没有就在 Claude 桌面端新开一个
         cs = claude_slots(me_key)
         text = read_text(args.text)
-        if tl == "claude" and cs["pick"]:
-            r = cs["pick"]
+        if tl == "claude" and (linked or cs["pick"]):
+            r = linked or cs["pick"]
             msg = post(agent, sid, me, f"claude:{short_id(r)}", text, kind="task", to_keys=[key_of("claude", r["sid"])])
             claim(r, me_key)
         else:
@@ -1584,6 +1735,59 @@ def cmd_task(args) -> None:
         wait_result(msg["id"], args.wait)
 
 
+def recall_task(tid: str, who: dict) -> tuple[bool, str]:
+    """撤回还没送到的任务：收件会话都还没读到它（读到位置在它前面）、也没叫醒 Codex、没起后台进程 → 记一条撤回。"""
+    with FileLock():
+        off, task = 0, None
+        if MSGS.exists():
+            with open(MSGS, "rb") as f:
+                for raw in f:
+                    if b'"task"' in raw and tid.encode() in raw:
+                        try:
+                            m = json.loads(raw)
+                        except Exception:
+                            m = {}
+                        if m.get("kind") == "task" and m.get("id", "").startswith(tid):
+                            task, toff = m, off
+                    off += len(raw)
+        if not task:
+            return False, f"没找到任务 {tid}"
+        tid = task["id"]
+        if tid in results_by_task():
+            return False, "这件活已经交回结果或撤回过了"
+        if any(w.get("task") == tid for w in worker_recs()) or not task.get("to_keys") and task.get("to_keys") is not None:
+            return False, "已经交给后台 / 新开的会话在做了，撤不回"
+        try:
+            woken = tid in (BUS / "woken.txt").read_text(encoding="utf-8").split()
+        except OSError:
+            woken = False
+        if woken:
+            return False, "已经叫醒了 Codex（提醒已排进它的输入），撤不回"
+        keys = task.get("to_keys")
+        if keys is None:
+            keys = [key_of(r["agent"], r["sid"]) for r in all_sessions() if match_target(task.get("to", ""), r)]
+        for k in keys:
+            try:
+                if int((CURS / k).read_text()) > toff:
+                    return False, "对方已经收到了，撤不回"
+            except (OSError, ValueError):
+                pass
+        msg = {"id": uuid.uuid4().hex[:12], "ts": now_ts(), "kind": "recall", "from": who, "to": task.get("to"),
+               "to_keys": [], "reply_to": tid, "text": "撤回任务 #" + tid}
+        with open(MSGS, "ab") as f:
+            f.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8"))
+    return True, f"已撤回任务 {tid}（对方不会收到）"
+
+
+def cmd_recall(args) -> None:
+    agent, sid = detect_self(args.as_)
+    me = touch_presence(agent, sid, os.getcwd(), None, force=True)
+    ok, text = recall_task(args.id, {"agent": agent, "sid": sid, "name": display_name(me)})
+    print(("✓ " if ok else "✗ ") + text)
+    if not ok:
+        sys.exit(3)
+
+
 def cmd_done(args) -> None:
     agent, sid = detect_self(args.as_)
     me = touch_presence(agent, sid, os.getcwd(), None, force=True)
@@ -1603,13 +1807,15 @@ def task_rows() -> list[dict]:
     for m in iter_log():
         if m.get("kind") == "task":
             tasks[m["id"]] = m
-        elif m.get("kind") == "result" and m.get("reply_to"):
+        elif m.get("kind") in ("result", "recall") and m.get("reply_to"):
             results.setdefault(m["reply_to"], []).append(m)
     rows = []
     for tid, t in tasks.items():
         rs = results.get(tid, [])
         status = "等待中"
-        if rs:
+        if rs and rs[-1].get("kind") == "recall":
+            status = "已撤回"
+        elif rs:
             status = "没做成" if rs[-1]["text"].startswith("【没做成】") else "已完成"
         rows.append({"id": tid, "ts": t["ts"], "from": t["from"]["name"], "to": t.get("to"),
                      "text": t["text"], "status": status,
@@ -1711,14 +1917,17 @@ def _pull_new(agent: str, sid: str, me: dict, peek=False) -> list[dict]:
         chunk = f.read(size - pos)
     # 只消费到最后一个完整行
     end = chunk.rfind(b"\n") + 1
-    out = []
+    out, recalled = [], set()
     for raw in chunk[:end].splitlines():
         try:
             m = json.loads(raw)
         except Exception:
             continue
-        if is_for_me(m, agent, sid, me):
+        if m.get("kind") == "recall":
+            recalled.add(m.get("reply_to"))
+        elif is_for_me(m, agent, sid, me):
             out.append(m)
+    out = [m for m in out if m["id"] not in recalled]       # 送到之前就被撤回的任务：不交
     if not peek:
         cp.write_text(str(pos + end))
     return out
@@ -2069,6 +2278,9 @@ USAGE = (
     "都没有就不派（退出码 3），留给 Claude；确实要新开写 --to codex:bg（后台无界面跑，桌面版里看不到）。Codex 额度用完 / 服务报错时总线会自动暂停往 Codex 派 30 分钟（同样退出码 3）；"
     "派过你活的对话归你用，别的会话不会往里派，手上有活没交的也不会再接新活。{cmd} codex-status 看各对话忙闲 / 归属；"
     "Codex 桌面端没开时 task 会拒绝（退出码 3），这件活就留给 Claude（自带子代理，或派给别的 Claude 会话）。\n"
+    "连线：用户可以在 CC Msg 里把你和别的会话连起来；连了线，task --to codex / --to claude 直接派给连着的会话（连了几个就先挑闲的、都忙就轮流），"
+    "task --to linked 给每个连着的都派一份（--to linked:codex / linked:claude 只派给那一家）；写明 --to <具体会话> 的照写的派。"
+    "派错了、对方还没收到的任务可以撤回：{cmd} recall <任务号>。\n"
     "什么时候派活（项目 AGENTS.md 里有「什么时候派活」就以它为准）：适合派 —— 可并行、不改同一批文件的独立单元；"
     "换一个模型交叉复核 diff；耗时的验证（全量测试、长探针）；调研（交回结论+出处）。不派 —— 动共享资源（生产 / 测试服、主干分支、别人的分支、共享配置）、"
     "两边会改同一批文件、要用户拍板的、几分钟能自己做完的。派活写清：做什么、在哪个分支/目录、交回什么、不许碰什么。\n"
@@ -2274,6 +2486,20 @@ def cmd_hook(args) -> None:
             ctx.append(mem)
         if me.get("role_set") in ("main", "aux"):
             ctx.append(ROLE_TEXT[me["role_set"]])
+    if agent in ("claude", "codex"):
+        # 连线说明：会话开始时、连线变了时各说一次，别每轮都说
+        sig, note = link_note(agent, sid)
+        old = me.get("link_sig") or ""
+        if note and (event == "SessionStart" or sig != old):
+            ctx.append(note)
+        elif not note and old:
+            ctx.append("🔗 用户取消了你的连线：task --to claude / --to codex 恢复按总线自动挑选。")
+        if sig != old:
+            p = SESS / f"{key_of(agent, sid)}.json"
+            rec = load_json(p)
+            if rec:
+                rec["link_sig"] = sig
+                save_json(p, rec)
     if msgs:
         ctx.append("📨 msgbus：" + deliver_head(msgs) + "\n\n" + render(msgs))
     if not ctx:
@@ -2321,6 +2547,15 @@ def main() -> None:
     sr.add_argument("target")
     sr.add_argument("role", help="主 / 辅 / 自动（main / aux / auto）")
     sr.add_argument("--quiet", action="store_true", help="只改标记，不给那个会话发消息")
+    for nm, hp in (("link", "把一个 Claude 会话和一个 Codex 会话连线（task --to codex/claude 直接派给连着的）"),
+                   ("unlink", "取消连线（写一个会话 = 取消它所有的连线）")):
+        lk = sub.add_parser(nm, help=hp)
+        lk.add_argument("a")
+        lk.add_argument("b", nargs="?")
+        lk.add_argument("--dir", default="c2x", help="c2x = Claude 派给 Codex，x2c = Codex 派给 Claude，both = 互相派")
+        lk.add_argument("--json", action="store_true")
+    rc = sub.add_parser("recall", help="撤回还没送到的任务（对方还没读到才行）")
+    rc.add_argument("id")
     cp_ = sub.add_parser("codex-pause", help="手动暂停往 Codex 派活")
     cp_.add_argument("--minutes", type=int, default=30)
     cp_.add_argument("--reason", default="")
@@ -2400,7 +2635,7 @@ def main() -> None:
     sys.stderr.reconfigure(encoding="utf-8")
     {"send": cmd_send, "notice": cmd_notice, "inbox": cmd_inbox, "who": cmd_who, "name": cmd_name, "show": cmd_show,
      "task": cmd_task, "done": cmd_done, "tasks": cmd_tasks, "wait": cmd_wait,
-     "listen": cmd_listen, "codex-status": cmd_codex_status, "release": cmd_release, "set-role": cmd_set_role,
+     "listen": cmd_listen, "codex-status": cmd_codex_status, "release": cmd_release, "set-role": cmd_set_role, "link": cmd_link, "unlink": cmd_link, "recall": cmd_recall,
      "codex-pause": cmd_codex_pause, "codex-resume": cmd_codex_resume, "codex-ignore": cmd_codex_ignore,
      "codex-worker": cmd_codex_worker, "cursor-worker": cmd_cursor_worker, "desktop-worker": cmd_desktop_worker, "lock": cmd_lock, "claim": cmd_claim}[args.cmd](args)
 

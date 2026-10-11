@@ -102,7 +102,7 @@ def _tool_line(name: str, inp) -> str:
 
 
 TOOL_IN, TOOL_OUT = 800, 1200      # 工具的输入 / 输出只带个头，展开时看个大概
-TOOL_PATCH = 8000                  # Codex 的 apply_patch 补丁多带点：网页上要按 diff 画出来、数 +N −M
+TOOL_PATCH = 40000                 # Codex 的 apply_patch 补丁多带点：网页上要按 diff 画出来、数 +N −M
 
 
 def _cut(t: str, n: int) -> str:
@@ -130,10 +130,40 @@ def _tool_input(inp) -> str:
         return ""
 
 
+FILE_EDIT = 20000                  # Edit / Write 的前后文本：网页「看差异」要用，单边最多带这么多
+
+
+def _tool_file(name: str, a: dict) -> dict | None:
+    """Claude 的 Read / Edit / MultiEdit / Write：文件路径 + 改了什么（网页里点文件名打开查看器、点 +N −M 看这次的差异）。"""
+    path = a.get("file_path") or a.get("notebook_path")
+    if not isinstance(path, str) or not path:
+        return None
+    cut = lambda t: t if len(t) <= FILE_EDIT else t[:FILE_EDIT]
+    if name == "Read":
+        return {"path": path, "op": "read", "line": a.get("offset") if isinstance(a.get("offset"), int) else None}
+    if name == "Edit":
+        o, n = str(a.get("old_string") or ""), str(a.get("new_string") or "")
+        return {"path": path, "op": "edit", "edits": [[cut(o), cut(n)]], "cut": len(o) > FILE_EDIT or len(n) > FILE_EDIT,
+                "all": bool(a.get("replace_all"))}
+    if name == "MultiEdit" and isinstance(a.get("edits"), list):
+        eds = [[str(x.get("old_string") or ""), str(x.get("new_string") or "")] for x in a["edits"] if isinstance(x, dict)]
+        big = sum(len(o) + len(n) for o, n in eds) > FILE_EDIT * 3
+        return {"path": path, "op": "edit", "edits": [[cut(o), cut(n)] for o, n in eds[:40]], "cut": big}
+    if name == "Write":
+        c = str(a.get("content") or "")
+        return {"path": path, "op": "write", "content": cut(c), "cut": len(c) > FILE_EDIT}
+    if name in ("NotebookEdit",):
+        return {"path": path, "op": "edit", "edits": [], "cut": True}
+    return None
+
+
 def _tool(name: str, inp, ts: float, tid=None) -> dict:
     e = {"ts": ts, "role": "tool", "text": _tool_line(name, inp), "name": name, "arg": _tool_brief(inp),
          "id": tid, "input": _tool_input(inp)}
     a = _tool_args(inp)
+    f = _tool_file(name, a)
+    if f:
+        e["file"] = f
     bus = _bus_cmds(a.get("command") or a.get("cmd") or "")
     if bus:
         e["bus"] = bus
