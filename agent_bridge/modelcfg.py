@@ -549,6 +549,50 @@ def _reason(st: int | None, txt: str, tool: str, base: str, model: str | None) -
     return f"HTTP {st}"
 
 
+def list_models(tool: str, base_url: str | None, key: str) -> dict:
+    """GET 模型列表（和「测试」一样带 User-Agent、给 /v1 提示）。key 是明文，只在内存里，结果里不会有。
+    Claude：GET <base>/v1/models（x-api-key + Authorization）；Codex：GET <base>/models。"""
+    t0 = time.time()
+    hint = ""
+    if tool == "claude":
+        base = (base_url or "https://api.anthropic.com").rstrip("/")
+        hd = {"x-api-key": key, "authorization": "Bearer " + key, "anthropic-version": "2023-06-01"}
+        url = base + "/v1/models"
+        st, txt = _http("GET", url + "?limit=1000", hd)
+        if st == 404 and base.endswith("/v1"):
+            s2, _ = _http("GET", base[:-3] + "/v1/models", hd)
+            if s2 and 200 <= s2 < 300:
+                hint = f"去掉末尾的 /v1（{base[:-3]}）就能连上"
+    else:
+        base = (base_url or "https://api.openai.com/v1").rstrip("/")
+        hd = {"authorization": "Bearer " + key}
+        url = base + "/models"
+        st, txt = _http("GET", url, hd)
+        if st == 404 and not base.endswith("/v1"):
+            s2, _ = _http("GET", base + "/v1/models", hd)
+            if s2 and 200 <= s2 < 300:
+                hint = f"Base URL 少了 /v1：改成 {base}/v1 就能连上"
+    txt = (txt or "").replace(key, "***")
+    ms = int((time.time() - t0) * 1000)
+    if not (st and 200 <= st < 300):
+        return {"ok": False, "status": st, "ms": ms, "url": url, "reason": _reason(st, txt, tool, base, None), "detail": _short(txt), "hint": hint}
+    try:
+        j = json.loads(txt)
+        rows = j.get("data") if isinstance(j, dict) else j
+        if not isinstance(rows, list) and isinstance(j, dict):
+            rows = j.get("models")
+        ids = []
+        for m in rows or []:
+            v = m.get("id") or m.get("name") if isinstance(m, dict) else m
+            if isinstance(v, str) and v and MODEL_RE.match(v) and v not in ids:
+                ids.append(v)
+    except (ValueError, AttributeError):
+        return {"ok": False, "status": st, "ms": ms, "url": url, "reason": "返回的不是模型列表", "detail": _short(txt), "hint": hint}
+    if not ids:
+        return {"ok": False, "status": st, "ms": ms, "url": url, "reason": "模型列表是空的", "detail": "", "hint": hint}
+    return {"ok": True, "status": st, "ms": ms, "url": url, "models": sorted(ids)}
+
+
 def test_connection(tool: str, base_url: str | None, key_name: str | None, model: str | None, use_settings_key: bool = False) -> dict:
     """发一个最小请求，只回状态码 / 耗时 / 简短原因（会把 key 从错误文本里抹掉）。
     Codex：GET <base>/models（不花钱），再看模型在不在列表里；Claude：POST <base>/v1/messages，max_tokens=1。"""

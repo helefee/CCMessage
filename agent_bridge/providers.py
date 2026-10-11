@@ -723,6 +723,51 @@ def ccswitch_import(ids: list[str]) -> dict:
     return {"imported": done, "skipped": skipped}
 
 
+# ---------------- 模型列表（获取 + 缓存；缓存里只有模型名，没有 key） ----------------
+
+MODELS_CACHE = paths.HOME / "model_lists.json"
+
+
+def _mc_key(tool: str, base: str) -> str:
+    return f"{tool}|{(base or '').strip().rstrip('/')}"
+
+
+def _mc_load() -> dict:
+    try:
+        d = json.loads(MODELS_CACHE.read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def models(tool: str, pid: str | None, base_url: str | None, secret: str | None, cached_only: bool = False) -> dict:
+    """编辑供应商时「获取模型列表」。用表单里刚填的 key（不保存），没填就用这个供应商存着的 key。按 工具 + Base URL 缓存。"""
+    _tool(tool)
+    p = get(tool, pid) if pid else None
+    base = (base_url if base_url is not None else (p or {}).get("base_url") or "").strip().rstrip("/")
+    if base and not re.match(r"^https?://", base):
+        raise ValueError("Base URL 要以 http:// 或 https:// 开头")
+    if not base:
+        base = "https://api.anthropic.com" if tool == "claude" else "https://api.openai.com/v1"
+    ck = _mc_key(tool, base)
+    cache = _mc_load()
+    if cached_only:
+        c = cache.get(ck)
+        return {"ok": bool(c), "cached": True, **(c or {"models": []})}
+    key = (secret or "").strip() or (keystore.get(p["key"]) if p and p.get("key") else None)
+    if not key:
+        return {"ok": False, "status": None, "reason": "先填 key（或者先保存一次 key）才能获取模型列表"}
+    r = modelcfg.list_models(tool, base, key)
+    if r.get("ok"):
+        cache[ck] = {"models": r["models"], "at": time.time()}
+        if len(cache) > 50:
+            for k in sorted(cache, key=lambda k: cache[k].get("at") or 0)[:-50]:
+                cache.pop(k, None)
+        modelcfg.atomic_write(MODELS_CACHE, (json.dumps(cache, ensure_ascii=False, indent=1) + "\n").encode("utf-8"))
+        r["at"] = cache[ck]["at"]
+    return r
+
+
 # ---------------- 测试连接 ----------------
 
 def test(tool: str, pid: str) -> dict:

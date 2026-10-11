@@ -1903,6 +1903,8 @@ class Handler(BaseHTTPRequestHandler):
                         self._json(providers.ccswitch_import([str(x) for x in body.get("ids") or []]))
                     elif act == "test":
                         self._json(providers.test(tool, str(body["id"])))
+                    elif act == "models":
+                        self._json(providers.models(tool, body.get("id") or None, body.get("base_url"), body.get("secret") or None, bool(body.get("cached_only"))))
                     else:
                         self._err("not found", 404)
                 except providers.PlaintextError as e:
