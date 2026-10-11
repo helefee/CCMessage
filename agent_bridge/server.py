@@ -1623,6 +1623,13 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/apps/status":
                 from . import apps
                 self._json(apps.run_status())
+            elif u.path == "/api/modelcfg":
+                # 模型与 API：只给本机（局域网 / 手机一律 403；返回里只有打码后的 key）
+                if not self._local():
+                    return self._err("模型与 API 只能在电脑上看", 403)
+                from . import modelcfg
+                root = str(proj_root(q["root"])) if q.get("root") else None
+                self._json(modelcfg.overview(root))
             elif u.path.startswith("/api/usage/"):
                 # 用量统计：只给本机（局域网 8766 本来就不在 PHONE_GET 里，这里再挡一道）
                 if not self._local():
@@ -1829,6 +1836,36 @@ class Handler(BaseHTTPRequestHandler):
                         tray.autostart_set(bool(body["autostart"]), PORT["n"])
                     s["autostart"] = tray.autostart_get()
                 self._json(s)
+            elif path.startswith("/api/modelcfg/"):
+                if not self._local():
+                    return self._err("模型与 API 只能在电脑上改", 403)
+                from . import keystore, modelcfg
+                act = path.rsplit("/", 1)[1]
+                scope = body.get("scope") or "user"
+                if scope not in ("user", "project"):
+                    raise ValueError("scope 只能是 user / project")
+                root = str(proj_root(body["root"])) if scope == "project" or body.get("root") else None
+                if act == "claude":
+                    self._json(modelcfg.set_claude(scope, root, body.get("changes") or {}))
+                elif act == "codex":
+                    self._json(modelcfg.set_codex(scope, root, body.get("changes") or {}, body.get("provider_auth"),
+                                                  add_provider=body.get("add_provider")))
+                elif act == "key-set":
+                    keystore.put(body["name"], body["secret"], body.get("comment") or "")
+                    self._json({"ok": True, "name": keystore.check_name(body["name"]), "masked": keystore.mask(body["secret"])})
+                elif act == "key-delete":
+                    self._json({"ok": keystore.delete(body["name"])})
+                elif act == "restore":
+                    self._json(modelcfg.restore(str(body["id"])))
+                elif act == "migrate":
+                    self._json(modelcfg.migrate(body["tool"], body["field"], body["key"]))
+                elif act == "unify":
+                    self._json(modelcfg.unify_agents(list(body.get("files") or []), body["model"], root))
+                elif act == "test":
+                    self._json(modelcfg.test_connection(body.get("tool") or "claude", body.get("base_url"), body.get("key"),
+                                                        body.get("model"), bool(body.get("use_settings_key"))))
+                else:
+                    self._err("not found", 404)
             elif path.startswith("/api/usage/"):
                 if not self._local():
                     return self._err("用量统计只能在电脑上用", 403)

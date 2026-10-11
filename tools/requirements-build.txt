@@ -1,3 +1,4 @@
 nuitka==4.2.2
 pywebview>=5,<7
 qrcode>=7
+tomlkit>=0.12

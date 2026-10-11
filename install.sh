@@ -58,7 +58,7 @@ if [ ! -x "$VENV/bin/python" ]; then
 fi
 say "装依赖"
 "$VENV/bin/python" -m pip install --disable-pip-version-check -q --upgrade pip >/dev/null 2>&1 || true
-"$VENV/bin/python" -m pip install --disable-pip-version-check -q "qrcode>=7"
+"$VENV/bin/python" -m pip install --disable-pip-version-check -q "qrcode>=7" "tomlkit>=0.12"
 if [ "$DESKTOP" = 1 ]; then
   say "装 pywebview（桌面窗口模式）"
   "$VENV/bin/python" -m pip install --disable-pip-version-check -q "pywebview>=5,<7" || true
