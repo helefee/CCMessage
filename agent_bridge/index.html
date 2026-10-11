@@ -264,7 +264,7 @@ body:not(.nofx) .onlynofx{display:none}
 .pill{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trhead{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line2);font-size:13px;flex-wrap:wrap}
 .trhead .nm{font-weight:700;font-size:14px}
-.trv{gap:10px}
+.trv{gap:10px;--trg:10px}
 .bub{max-width:min(820px,88%);padding:8px 12px;border-radius:12px;word-break:break-word;border:1px solid var(--line)}
 .bub .bx{white-space:pre-wrap}
 .bub.u{align-self:flex-end;background:var(--accent-weak);border-color:transparent;border-bottom-right-radius:4px}
@@ -291,7 +291,7 @@ body:not(.nofx) .onlynofx{display:none}
 .subtask .sbd{border-top:1px solid var(--line);padding:8px 10px;display:flex;flex-direction:column;gap:6px}
 .subtask .lbl{font-size:12px;color:var(--muted);cursor:pointer}
 .subtask pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12.5px;max-height:18em;overflow:auto;background:var(--bg);border-radius:8px;padding:6px 8px;font-family:inherit}
-.subtask .sconv{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto;padding:6px;background:var(--bg);border-radius:8px}
+.subtask .sconv{display:flex;flex-direction:column;gap:6px;--trg:6px;max-height:50vh;overflow:auto;padding:6px;background:var(--bg);border-radius:8px}
 .subtask .sconv .bub{max-width:96%}
 .subtask .snow{font-size:12px;color:var(--muted);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .subtask.st-failed{border-color:var(--bad)}
@@ -390,12 +390,12 @@ input:focus,select:focus,textarea:focus{border-color:var(--faint)}
 code{background:var(--hover);border-radius:6px}
 /* 会话记录：你 = 右侧圆角气泡；AI = 不套框的正文 */
 /* 会话记录：照 Grok Bot —— AI 回复也是左侧灰色圆角气泡，你的话在右侧；连续几条挨得近，气泡下只留时间 */
-.trv{max-width:860px;width:100%;margin:0 auto;gap:5px;padding-top:16px}
+.trv{max-width:860px;width:100%;margin:0 auto;gap:5px;--trg:5px;padding-top:16px}
 .bub{border:0;border-radius:18px;padding:9px 15px;line-height:1.6}
 .bub.a{align-self:flex-start;background:var(--bubble);max-width:min(640px,82%);border-radius:18px}
 .bub.u{align-self:flex-end;background:var(--hover2);max-width:min(560px,78%);border-radius:18px}
 .bub .bt{font-size:11px;color:var(--faint);margin-top:2px;opacity:.85}
-.bub + .bub.u, .bub.u + .bub.a, .tools + .bub{margin-top:8px}
+.bub + .bub.u, .tacts + .bub.u, .bub.u + .bub.a, .tools + .bub{margin-top:8px}
 .tools{margin:2px 0 2px 4px}
 .tools summary{border-radius:999px;background:transparent;border:1px solid var(--line);padding:2px 10px}
 .trv .day{margin:10px 0 6px;font-size:12px}
@@ -481,7 +481,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .msg{max-width:760px;border-radius:12px;border-color:var(--line2)}
 .msg.mine{background:var(--bubble)}
 /* ---------- 会话记录 ---------- */
-.trv{max-width:none;margin:0;width:auto;padding:22px max(20px,calc((100% - 760px) / 2)) 32px;gap:6px;align-items:stretch}
+.trv{max-width:none;margin:0;width:auto;padding:22px max(20px,calc((100% - 760px) / 2)) 32px;gap:6px;--trg:6px;align-items:stretch}
 .trv .day{align-self:center;font-size:11.5px;color:var(--faint);margin:14px 0 6px;letter-spacing:.3px}
 .bub{line-height:1.65;font-size:15px}
 .bub.u{align-self:flex-end;background:var(--bubble);color:var(--text);max-width:min(600px,85%);border-radius:16px;padding:9px 15px;margin-top:14px;font-family:var(--sans)}
@@ -489,10 +489,13 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .bub .bt{font:11px var(--sans);color:var(--faint);opacity:0;transition:opacity .15s;margin-top:2px}
 .bub:hover .bt{opacity:1}
 .bub.u .bt{text-align:right}
+/* 悬停才出现的时间也不占高度：助手的时间在这一轮的动作条里，你的放在气泡左边、复制按钮旁 */
+.bub.a .bt{display:none}
+.bub.u .bt{position:absolute;right:calc(100% + 30px);bottom:6px;margin:0;white-space:nowrap}
 .bub.clamp .bx{max-height:14em}
 .bub.a.clamp .bx{max-height:32em}
 .bub .more{font:12.5px var(--sans)}
-.bub + .bub.u, .bub.u + .bub.a, .tools + .bub{margin-top:14px}
+.bub + .bub.u, .tacts + .bub.u, .bub.u + .bub.a, .tools + .bub{margin-top:14px}
 /* Markdown 正文 */
 .md{white-space:normal;word-break:break-word}
 .md p{margin:0 0 .8em}
@@ -633,7 +636,7 @@ code{font-family:var(--mono)}
 .spanel details.spsec>summary.lbl::before{content:"▸ "}
 .spanel details.spsec[open]>summary.lbl::before{content:"▾ "}
 .sppr{margin:0;background:var(--panel2);border:1px solid var(--line2);border-radius:9px;padding:9px 11px;font:13px/1.6 var(--sans);white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto}
-.spconv{display:flex;flex-direction:column;gap:5px;border:1px solid var(--line2);border-radius:10px;padding:8px 10px;background:var(--panel2)}
+.spconv{display:flex;flex-direction:column;gap:5px;--trg:5px;border:1px solid var(--line2);border-radius:10px;padding:8px 10px;background:var(--panel2)}
 .spconv .bub.a{font-size:14.5px;margin-top:4px}
 .spconv .bub.u{max-width:92%}
 .spconv .tools .tgl{max-width:200px}
@@ -804,7 +807,7 @@ code{font-family:var(--mono)}
 .cx .trhead code{background:var(--hover);color:var(--muted)}
 .cx .compose textarea,.cx .compose .cin{background:var(--panel)}
 /* Codex 会话正文：助手的话不带气泡、无衬线；用户的话浅灰圆角块 */
-.cx .trv{gap:4px}
+.cx .trv{gap:4px;--trg:4px}
 .cx .bub.a{font:14.5px/1.7 var(--sans);color:var(--text)}
 .cx .bub.u{background:var(--bubble);border-radius:14px;font-size:14px}
 .cx .md h2,.cx .md h3,.cx .md h4,.cx .md h5,.cx .md h6{font-family:var(--sans);font-weight:600}
@@ -928,7 +931,7 @@ code,pre,kbd,samp,.mono,.md code,.md pre,.tcall pre,.tcall .tn,.tcall .ta,.tools
 .center.cx .trhead .nm{font-weight:500;font-size:14px;color:var(--text)}
 .center.cx .trhead code{background:transparent;color:var(--faint);padding:0}
 /* 正文：居中阅读栏，助手纯文字，用户薄荷绿圆角气泡 */
-.center.cx .trv{gap:6px;padding-left:max(20px,calc((100% - 680px) / 2));padding-right:max(20px,calc((100% - 680px) / 2))}
+.center.cx .trv{gap:6px;--trg:6px;padding-left:max(20px,calc((100% - 680px) / 2));padding-right:max(20px,calc((100% - 680px) / 2))}
 .cx .bub.a{font:14px/1.75 var(--sans);color:var(--text);padding:2px 0}
 .cx .bub.u,.cx .bub.u.viabus{background:var(--bubble);color:var(--ubtext);border-radius:18px;padding:9px 15px;font:14px/1.6 var(--sans);max-width:min(560px,82%);box-shadow:none;margin-top:12px}
 .cx .bub.u .bvia{color:color-mix(in srgb,var(--ubtext) 62%,transparent)}
@@ -1399,16 +1402,20 @@ body.noanim .trun .trl.shim{animation:none;background:none;color:var(--text)}
 
 /* ---------- 消息动作条：悬停出现（触屏常显），Claude / Codex 两种样子 ---------- */
 .bub{position:relative}
-.macts{display:flex;align-items:center;gap:2px;margin-top:4px;opacity:0;transition:opacity .15s;min-height:24px}
-.macts.u{justify-content:flex-end}
+.macts{display:flex;align-items:center;gap:2px;opacity:0;transition:opacity .15s}
+.bub.u .macts{position:absolute;right:calc(100% + 2px);bottom:2px}
 .bub:hover .macts,.bub:focus-within .macts{opacity:1}
-@media (hover:none){.macts{opacity:1}}
+.tacts{position:relative;height:0;margin-top:calc(-1 * var(--trg,6px));align-self:stretch;flex:none}
+.tacts .tbar{position:absolute;left:-4px;top:4px;display:flex;align-items:center;gap:2px;padding:1px 3px;border-radius:8px;background:var(--bg);opacity:0;pointer-events:none;transition:opacity .15s;z-index:3}
+.tacts.on .tbar,.tacts:has(:focus-visible) .tbar{opacity:1;pointer-events:auto}
+@media (hover:none) and (pointer:coarse){.macts{opacity:1}.bub.u .macts{position:static;justify-content:flex-end;margin-top:2px}
+  .tacts{height:auto;margin-top:0}.tacts .tbar{position:static;opacity:1;pointer-events:auto;background:transparent}}
 .mact{display:inline-flex;align-items:center;justify-content:center;width:26px;height:24px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--faint);cursor:pointer}
 .mact:hover{background:var(--hover);color:var(--text)}
 .mact .ic{width:14px;height:14px}
 .mact.done{color:var(--ok)}
-.macts .mtime{font-size:11px;color:var(--faint);margin-left:6px;opacity:0;transition:opacity .15s}
-.macts:hover .mtime{opacity:1}
+.macts .mtime,.tbar .mtime{font-size:11px;color:var(--faint);margin-left:6px;opacity:0;transition:opacity .15s}
+.macts:hover .mtime,.tbar:hover .mtime{opacity:1}
 .cx .mact:hover,.center.cx .mact:hover{background:var(--hover2)}
 .md .cpy{display:inline-flex;align-items:center;gap:4px}.md .cpy .ic{width:12px;height:12px}.md .cpy.done{color:var(--ok)}
 .tcp{display:inline-flex;align-items:center;justify-content:center;width:22px;height:20px;padding:0;margin-left:6px;border:0;border-radius:5px;background:transparent;color:var(--faint);cursor:pointer;vertical-align:middle;opacity:.7}
@@ -1510,6 +1517,13 @@ body.noanim .trun .trl.shim{animation:none;background:none;color:var(--text)}
 .pvadv>summary{cursor:pointer;padding:8px 0;font-weight:600;font-size:13px;color:var(--muted)}
 .pvadv[open]>summary{color:var(--text)}
 .pvfh{margin-top:10px;font-size:12px;color:var(--faint)}
+.pvdd{position:fixed;z-index:1000;display:none;max-height:260px;overflow:auto;background:var(--panel,var(--bg));border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:4px;font-family:var(--mono);font-size:12.5px}
+.pvddi{padding:5px 8px;border-radius:5px;cursor:pointer;display:flex;justify-content:space-between;gap:12px}.pvddi:hover,.pvddi.on{background:var(--hover2,var(--hover))}
+.pvddi .dim{font-family:var(--sans);font-size:11px}.pvddh{padding:4px 8px;font-size:11px;color:var(--faint);font-family:var(--sans)}
+.pvmf{display:flex;gap:6px;align-items:center}.pvmf input{width:220px!important}
+.pvmst{padding:0 0 4px;font-size:12px}.pvmst:empty{display:none}.pvmst .miss{margin:4px 0}
+.pvmap{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:2px 10px 4px}
+.pvmh{display:flex;align-items:baseline;gap:4px;padding:8px 0 2px;font-size:13px}
 #mcBox .miss{margin-bottom:6px}
 .us input.pr{width:70px;padding:2px 5px;text-align:right}
 .us .more{display:flex;justify-content:center;padding:8px}
@@ -3362,12 +3376,28 @@ function mdHtml(src){
 // ---------- 每条消息的动作条（悬停出现，触屏常显）：复制 / 复制为纯文本 / 引用回复 / 转发到其他会话；只读，不改 Claude / Codex 的数据 ----------
 const trMsgs = {};
 function mbtn(act, icn, tip){ return `<button class="mact" data-mact="${act}" title="${tip}" aria-label="${tip}">${ic(icn)}</button>`; }
-function msgActs(e, isU){
-  const when = e.ts ? new Date(e.ts * 1000).toLocaleString("zh-CN", {hour12: false}) : "";
-  return `<div class="macts${isU ? " u" : ""}"${when ? ` title="${esc(when)}"` : ""}>${mbtn("copy", "clipboard", isU ? "复制" : "复制（Markdown）")}`
-    + (isU ? "" : mbtn("plain", "text", "复制为纯文本") + mbtn("quote", "quote", "引用回复") + mbtn("fwd", "forward", "转发到其他会话"))
-    + (when ? `<span class="mtime">${esc(when)}</span>` : "") + `</div>`;
+function msgActs(e, isU){       // 只给你的气泡：一个紧凑的复制按钮（悬停出现，不占高度）
+  return `<div class="macts u">${mbtn("copy", "clipboard", "复制")}</div>`;
 }
+// 一轮回复（下一条你的消息 / 总线来信之前）一个动作条：叠在这一轮末尾，悬停才出现，不占高度；复制 = 整轮的文字
+const trTurns = {};
+function turnBar(tk, t){
+  const when = t.ts ? new Date(t.ts * 1000).toLocaleString("zh-CN", {hour12: false}) : "";
+  return `<div class="tacts" data-tk="${esc(tk)}"><div class="tbar">${mbtn("copy", "clipboard", "复制这一轮（Markdown）")}${mbtn("plain", "text", "复制为纯文本")}${mbtn("quote", "quote", "引用回复")}${mbtn("fwd", "forward", "转发到其他会话")}${when ? `<span class="mtime">${esc(when)}</span>` : ""}</div></div>`;
+}
+// 鼠标在哪一轮里：往后找到这一轮的动作条（遇到你的消息 / 总线来信就停）
+let tactOn = null;
+function tactHover(t){
+  let bar = null;
+  const box = t && t.closest && t.closest("#trView, .sconv, .spconv");
+  if (box) { let el = t; while (el && el.parentElement !== box) el = el.parentElement;
+    for (let x = el; x; x = x.nextElementSibling) { if (x.classList.contains("tacts")) { bar = x; break; } if (x !== el && (x.matches(".bub.u, .buscard.in") )) break; if (x === el && x.matches(".bub.u, .buscard.in")) break; } }
+  if (bar === tactOn) return;
+  if (tactOn) tactOn.classList.remove("on");
+  tactOn = bar; if (bar) bar.classList.add("on");
+}
+document.addEventListener("mouseover", e => tactHover(e.target));
+document.documentElement.addEventListener("mouseleave", () => tactHover(null));
 function mdPlain(t){ const d = document.createElement("div"); d.innerHTML = mdHtml(t); d.querySelectorAll(".cbh").forEach(x => x.remove()); return (d.innerText || d.textContent || "").replace(/\n{3,}/g, "\n\n").trim(); }
 function copied(btn){
   if (!btn) return; if (!btn._old) btn._old = btn.innerHTML; btn.classList.add("done"); btn.innerHTML = ic("check");
@@ -3376,7 +3406,7 @@ function copied(btn){
 }
 function doCopy(text, btn){ return copyText(text).then(() => { copied(btn); }).catch(() => toast("没能复制，手动选中吧")); }
 function msgAct(btn){
-  const b = btn.closest(".bub"), e = b && trMsgs[b.dataset.bk]; if (!e) return;
+  const tb = btn.closest(".tacts"), b = btn.closest(".bub"), e = tb ? trTurns[tb.dataset.tk] : b && trMsgs[b.dataset.bk]; if (!e) return;
   const act = btn.dataset.mact, t = e.text || "";
   if (act === "copy") return doCopy(t, btn);
   if (act === "plain") return doCopy(mdPlain(t), btn);
@@ -3547,7 +3577,9 @@ function busWaitHtml(codex){ trCurSt = {k: "bus", full: "等待总线消息…"}
 setInterval(() => $$(".tsec[data-since]").forEach(el => { el.textContent = secTxt(+el.dataset.since); }), 1000);
 // kp：键前缀（子代理记录里的条目和主记录的字节位置会撞，前面加上子任务 id）；sub：子代理记录（提示词那条带 is_prompt 标记，不再画）
 function trListHtml(entries, kp, sub){
-  let html = "", tools = [], lastDay = "";
+  let html = "", tools = [], lastDay = "", turn = [];
+  const endTurn = () => { if (!turn.length) return; const tk = kp + "T" + turn[0].pos;
+    trTurns[tk] = {text: turn.map(x => x.text).join("\n\n"), ts: turn[turn.length - 1].ts}; html += turnBar(tk, trTurns[tk]); turn = []; };
   const cxMode = !sub && view && view.agent === "codex";
   const active = !sub && trActive(), runT = active ? trRunTool(entries) : null;
   const flush = () => { if (!tools.length) return;
@@ -3567,7 +3599,7 @@ function trListHtml(entries, kp, sub){
     if (e.role === "tool" && e.bus && e.bus.length) { flush(); html += busOutHtml(e, kp); continue; }
     if (e.role === "tool") { tools.push(e); continue; }
     flush();
-    if (e.role === "bus_in") { html += busInHtml(e, kp); continue; }
+    if (e.role === "bus_in") { endTurn(); html += busInHtml(e, kp); continue; }
     if (e.role === "subtask") {      // 同一轮里连着派出去的几个算一组（并行）
       const grp = [e]; while (i + 1 < entries.length && entries[i + 1].role === "subtask") grp.push(entries[++i]);
       if (grp.length === 1) { html += subCard(e, kp); continue; }
@@ -3577,12 +3609,14 @@ function trListHtml(entries, kp, sub){
     }
     if (e.role !== "user" && e.role !== "assistant") continue;
     const isU = e.role === "user", nl = e.text.split("\n").length;
+    if (isU) endTurn(); else turn.push(e);
     const bk = kp + e.pos, long = isU ? e.text.length > 700 || nl > 14 : e.text.length > 3000 || nl > 60, cl = long && !trUnclamp.has(bk);
     trMsgs[bk] = e;
     html += `<div class="bub ${isU?"u":"a"} ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bx${isU?"":" md"}">${isU ? frefLinkify(prLinkify(esc(e.text))) : mdHtml(e.text)}</div>${prCards(e.text)}
-      ${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}${e.ts?`<div class="bt">${hm(e.ts)}</div>`:""}${msgActs(e, isU)}</div>`;
+      ${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}${e.ts?`<div class="bt">${hm(e.ts)}</div>`:""}${isU ? msgActs(e, isU) : ""}</div>`;
   }
   flush();
+  if (sub || !active) endTurn();            // 还在回复的那一轮先不放（等它答完）
   if (!sub) trCurSt = null;
   if (runT) trCurSt = {k: toolState(runT, cxMode).k, full: (RUN_ST[toolState(runT, cxMode).k] || RUN_ST.other)[0] + " " + runLabel(runT, cxMode) + "…"};
   if (active && !runT) html += thinkRowHtml(entries, cxMode);
@@ -5097,30 +5131,41 @@ function pvSwitch(tool, p, drop){
 function pvEdit(tool, p, preset){
   const isNew = !p; p = p || {mode: "key", models: {}, wire_api: "responses"};
   const m = p.models || {}, cl = tool === "claude", login = cl ? "login" : "chatgpt";
-  const adv = cl ? [["opus","Opus 映射","opus 别名"],["sonnet","Sonnet 映射","sonnet 别名"],["haiku","Haiku 映射","也用于后台小任务"],["fable","Fable 映射","fable 别名"],["subagent","子代理模型","没单独指定模型的子代理 / 队友"]]
-                 : [["review_model","审查模型","/review 用"],["subagent","子代理模型","[agents] default_subagent_model"]];
+  const maps = cl ? [["opus","Opus","opus 别名用哪个模型"],["sonnet","Sonnet","sonnet 别名"],["haiku","Haiku","haiku 别名，也用于后台小任务"],["fable","Fable","fable 别名"],["subagent","子代理","没单独指定模型的子代理 / 队友"]]
+                  : [["review_model","审查（review_model）","/review 用"],["subagent","子代理","[agents] default_subagent_model"]];
   const efs = cl ? ["", "low", "medium", "high", "xhigh"] : ["", "minimal", "low", "medium", "high", "xhigh"];
   if (p.effort && !efs.includes(p.effort)) efs.push(p.effort);          // 导入来的少见值也留着，保存时不丢
-  const nAdv = adv.filter(([k]) => m[k]).length + (p.effort ? 1 : 0) + (!cl && p.wire_api && p.wire_api !== "responses" ? 1 : 0);
+  const nAdv = (p.effort ? 1 : 0) + (!cl && p.wire_api && p.wire_api !== "responses" ? 1 : 0);
+  const mi = (k, v) => `<input data-pvf="${k}" value="${esc(v || "")}" placeholder="（不设）" autocomplete="off" spellcheck="false" style="width:300px">`;
   let mode = p.mode;
   openDlg((isNew ? "添加" : "编辑") + " " + PV_TOOL[tool] + " 供应商", `<div class="us mc pve">
     <div class="ufl pvpre"><span class="dim">预设：</span>${pvPresets(tool).map(([k,t]) => `<button class="pvmini ghost" data-pre="${k}">${t}</button>`).join("")}</div>
     <div class="setlist">
     <div class="setrow"><div class="sl"><b>名称</b></div><input id="pvN" value="${esc(p.name || "")}" placeholder="比如：公司网关" style="width:300px"></div>
     <div class="setrow pvlg"><div class="sl"><div><b>官方登录</b><div class="sd">${cl ? "用 claude.ai 订阅登录，不需要地址和 key" : "用 codex login 的 ChatGPT 登录，不需要地址和 key"}</div></div></div><button class="ghost pvmini" id="pvToKey">改用 API key</button></div>
-    <div class="setrow pvk"><div class="sl"><div><b>Base URL</b><div class="sd">${cl ? "空 = https://api.anthropic.com" : "OpenAI 兼容地址，一般以 /v1 结尾"}</div></div></div><input id="pvU" value="${esc(p.base_url || "")}" placeholder="${cl ? "https://api.anthropic.com" : "https://api.openai.com/v1"}" style="width:300px"></div>
+    <div class="setrow pvk"><div class="sl"><div><b>Base URL</b><div class="sd">${cl ? "空 = https://api.anthropic.com（不带 /v1）" : "OpenAI 兼容地址，一般以 /v1 结尾"}</div></div></div><input id="pvU" value="${esc(p.base_url || "")}" placeholder="${cl ? "https://api.anthropic.com" : "https://api.openai.com/v1"}" style="width:300px"></div>
     <div class="setrow pvk"><div class="sl"><div><b>Key</b><div class="sd">存进凭据管理器，只写不读${p.key_masked ? "；已存 …" + esc(p.key_masked.slice(-4)) + "，留空不改" : ""}</div></div></div><input id="pvK" type="password" autocomplete="new-password" placeholder="${p.key_masked ? "（不改）" : "粘贴 key"}" style="width:300px"></div>
-    <div class="setrow"><div class="sl"><div><b>模型</b><div class="sd">${cl ? "主模型；留空 = 不改" : "model；留空 = 不改"}</div></div></div><input data-pvf="model" list="mcModels" value="${esc(m.model || "")}" placeholder="（不改）" style="width:300px"></div>
+    <div class="setrow"><div class="sl"><div><b>模型</b><div class="sd">${cl ? "主模型" : "model"}；可以直接输入，留空 = 不改</div></div></div><span class="pvmf">${mi("model", m.model)}<button class="pvmini" id="pvFetch" title="${cl ? "GET <Base URL>/v1/models" : "GET <Base URL>/models"}：拿到中转站有哪些模型，填进下拉">获取模型列表</button></span></div>
+    <div class="pvmst" id="pvMst"></div>
     </div>
+    <div class="pvmap"><div class="pvmh"><b>模型映射</b><span class="pvh">留空 = 不设${cl ? "；Claude Code 里的 opus / sonnet / haiku / fable 别名和子代理用哪个模型" : ""}</span></div><div class="setlist">
+    ${maps.map(([k, l, hint]) => `<div class="setrow"><div class="sl"><div><b>${l}</b><div class="sd">${hint}</div></div></div>${mi(k, m[k])}</div>`).join("")}
+    </div></div>
     <details class="pvadv" id="pvAdv"><summary>高级${nAdv ? `<span class="dim">（已设 ${nAdv} 项）</span>` : ""}</summary><div class="setlist">
-    ${adv.map(([k, l, hint]) => `<div class="setrow"><div class="sl"><div><b>${l}</b><div class="sd">${hint}</div></div></div><input data-pvf="${k}" list="mcModels" value="${esc(m[k] || "")}" placeholder="（不改）" style="width:300px"></div>`).join("")}
     <div class="setrow"><div class="sl"><div><b>思考强度</b><div class="sd">${cl ? "effortLevel" : "model_reasoning_effort"}</div></div></div><select id="pvE" style="width:300px">${efs.map(e => `<option value="${e}" ${(p.effort||"")===e?"selected":""}>${e || "（不改）"}</option>`).join("")}</select></div>
     ${cl ? "" : `<div class="setrow pvk"><div class="sl"><div><b>wire_api</b><div class="sd">大多数是 responses；老的 OpenAI 兼容网关用 chat</div></div></div><select id="pvW" style="width:300px">${["responses","chat"].map(w => `<option ${p.wire_api===w?"selected":""}>${w}</option>`).join("")}</select></div>`}
-    </div></details>${MC_DL}
+    </div></details>
     <div class="pvfh">${cl ? '<span class="pvk">用 API key 时按 API 计费，不走 claude.ai 订阅额度。</span>切换后对命令行 / VS Code 生效，Claude 桌面版不读。' : "切换后命令行和 Codex 桌面版都生效。"}</div></div>`,
     `${isNew ? "" : '<button class="ghost danger" id="pvDel" style="margin-right:auto">删除…</button>'}<button id="pvNo">取消</button><button class="primary" id="pvSave">保存</button>`);
   $("#dlg").classList.add("wide");
-  const sync = () => { $$("#dlgBody .pvk").forEach(r => r.style.display = mode === "key" ? "" : "none"); $$("#dlgBody .pvlg").forEach(r => r.style.display = mode === "key" ? "none" : ""); };
+  // 下拉：拿到的模型列表在前，常见名字垫底；输入框照样能随便填
+  let got = [];
+  const fillDL = list => { got = list || []; };
+  pvCombo($$("#dlgBody [data-pvf]"), () => got);
+  const showList = (r, cached) => { fillDL(r.models); $("#pvMst").innerHTML = `<span class="pvh" style="margin:0">${cached ? "上次" : "已"}获取 ${r.models.length} 个模型${r.at ? "（" + new Date(r.at * 1000).toLocaleString("zh-CN", {hour12: false}) + "）" : ""}，在下拉里选，也可以直接输入</span>`; };
+  fillDL(null);
+  const sync = () => { $$("#dlgBody .pvk").forEach(r => r.style.display = mode === "key" ? "" : "none"); $$("#dlgBody .pvlg").forEach(r => r.style.display = mode === "key" ? "none" : "");
+    $("#pvFetch").style.display = mode === "key" ? "" : "none"; };
   const okb = ((MC.d.codex.user.providers || []).find(x => /openkey/i.test((x.name || "") + (x.base_url || ""))) || {}).base_url;
   const pre = k => { mode = k === login ? login : "key";
     if (k === login && !$("#pvN").value) $("#pvN").value = cl ? "Claude 官方登录" : "ChatGPT 登录";
@@ -5131,12 +5176,43 @@ function pvEdit(tool, p, preset){
   $$("#dlgBody [data-pre]").forEach(b => b.onclick = () => pre(b.dataset.pre));
   $("#pvToKey").onclick = () => { mode = "key"; sync(); $("#pvU").focus(); };
   if (isNew && preset) pre(preset); else sync();
+  if (mode === "key") pvApi("models", {tool, id: p.id || null, base_url: $("#pvU").value.trim(), cached_only: true}).then(r => { if (r.ok && r.models && r.models.length) showList(r, true); }).catch(() => {});
+  $("#pvFetch").onclick = async () => { const b = $("#pvFetch"); b.disabled = true; $("#pvMst").innerHTML = '<span class="pvh" style="margin:0">获取中…</span>';
+    const r = await pvApi("models", {tool, id: p.id || null, base_url: $("#pvU").value.trim(), secret: $("#pvK").value || null}).catch(e => ({ok: false, error: e.message}));
+    b.disabled = false;
+    if (r.ok) { showList(r, false); pvCombo.refresh && pvCombo.refresh(); } else $("#pvMst").innerHTML = mcTestHtml(r); };
   $("#pvNo").onclick = () => mcOpen("list");
   if ($("#pvDel")) $("#pvDel").onclick = () => pvDelete(tool, p);
   $("#pvSave").onclick = async () => { const models = {}; $$("#dlgBody [data-pvf]").forEach(i => { if (i.value.trim()) models[i.dataset.pvf] = i.value.trim(); });
     const prov = {id: p.id, name: $("#pvN").value.trim(), mode, base_url: $("#pvU").value.trim(), wire_api: $("#pvW") ? $("#pvW").value : undefined, models, effort: $("#pvE").value || null, from: p.from};
     try { const r = await pvApi("save", {tool, provider: prov, secret: $("#pvK").value || null}); $("#pvK").value = ""; toast(`已保存 ${r.name}${r.key_masked ? "（key …" + r.key_masked.slice(-4) + "）" : ""}`); mcOpen("list"); }
     catch(e){ toast("没保存：" + e.message); } };
+}
+// 模型输入框的下拉：获取到的模型在前（可搜索），常见名字垫底；输入框本身照样能随便填
+function pvCombo(inputs, getList){
+  let dd = $("#pvDD"); if (!dd) { dd = document.createElement("div"); dd.id = "pvDD"; dd.className = "pvdd"; document.body.appendChild(dd);
+    document.addEventListener("scroll", e => { if (!dd.contains(e.target)) dd.style.display = "none"; }, true); }
+  let cur = null, sel = -1;
+  const hide = () => { dd.style.display = "none"; cur = null; sel = -1; };
+  const show = inp => { cur = inp; const q = inp.value.trim().toLowerCase(), got = getList(), seen = new Set(), rows = [];
+    for (const [x, g] of [...got.map(x => [x, 1]), ...MODEL_SUGG.map(x => [x, 0])]) if (!seen.has(x) && (!q || x.toLowerCase().includes(q))) { seen.add(x); rows.push([x, g]); }
+    if (!rows.length || (rows.length === 1 && rows[0][0] === inp.value)) { dd.style.display = "none"; return; }
+    const r = inp.getBoundingClientRect();
+    dd.style.cssText = `display:block;left:${r.left}px;top:${r.bottom + 2}px;min-width:${r.width}px`;
+    dd.innerHTML = (got.length ? "" : '<div class="pvddh">还没获取模型列表，下面是常见名字</div>') + rows.slice(0, 80).map(([x, g], i) => `<div class="pvddi${i === sel ? " on" : ""}" data-v="${esc(x)}">${esc(x)}${g ? "" : '<span class="dim">常见</span>'}</div>`).join("");
+    const b = dd.getBoundingClientRect(); if (b.bottom > innerHeight - 8) dd.style.top = Math.max(8, r.top - 2 - b.height) + "px"; };
+  dd.onmousedown = e => { const it = e.target.closest(".pvddi"); if (!it || !cur) return; e.preventDefault(); cur.value = it.dataset.v; cur.dispatchEvent(new Event("change")); hide(); };
+  for (const inp of inputs) {
+    inp.addEventListener("focus", () => { sel = -1; show(inp); });
+    inp.addEventListener("input", () => { sel = -1; show(inp); });
+    inp.addEventListener("blur", () => setTimeout(() => { if (cur === inp) hide(); }, 120));
+    inp.addEventListener("keydown", e => { const its = [...dd.querySelectorAll(".pvddi")]; if (dd.style.display !== "block" || !its.length) return;
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); sel = (sel + (e.key === "ArrowDown" ? 1 : its.length - 1)) % its.length; its.forEach((x, i) => x.classList.toggle("on", i === sel)); its[sel].scrollIntoView({block: "nearest"}); }
+      else if (e.key === "Enter" && sel >= 0) { e.preventDefault(); inp.value = its[sel].dataset.v; hide(); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); hide(); } });
+  }
+  pvCombo.refresh = () => { if (cur) show(cur); };
+  return hide;
 }
 function pvDelete(tool, p){
   openDlg("删除供应商", `删除 <b>${esc(p.name)}</b>？只删 CC Msg 里的这条记录，已经写进配置文件的不动。${p.key ? `<label style="display:block;margin-top:8px"><input type="checkbox" id="pvDk"> 同时从凭据管理器删掉它的 key（…${esc((p.key_masked || "").slice(-4))}）</label>` : ""}`, '<button id="pvNo">取消</button><button class="primary" id="mcGo">删除</button>');
