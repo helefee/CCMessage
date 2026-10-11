@@ -1517,6 +1517,10 @@ def cmd_codex_worker(args) -> None:
             cfg = ""
         sb = None if "sandbox_mode" in cfg else "workspace-write"
     sbx = ["-c", f'sandbox_mode="{sb}"'] if sb else []     # exec resume 不认 -s，-c 两边都认
+    # 项目在 CC Msg 里指定了 Codex 供应商：按它跑（Codex 不许项目配置改供应商，只能启动时 -c 覆盖；里面没有 key）
+    pa = load_json(BUS / "codex-provider.json")
+    if isinstance(pa, dict) and isinstance(pa.get("args"), list) and all(isinstance(a, str) for a in pa["args"]):
+        sbx = sbx + pa["args"]
     if args.thread:
         cmd = [exe, "exec", "resume", args.thread, "--skip-git-repo-check", *sbx, "--json", "-o", str(last), "-"]
     else:
