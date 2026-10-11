@@ -13,25 +13,63 @@ permissions:
 jobs:
   windows-desktop:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
+    env:
+      NUITKA_CACHE_DIR: ${{ github.workspace }}\.nuitka-cache
     steps:
       - uses: actions/checkout@v4.2.2
       - uses: actions/setup-python@v5.6.0
         with:
           python-version: "3.11"
           architecture: x64
-      - name: Cache embeddable Python
+          cache: pip
+          cache-dependency-path: tools/requirements-build.txt
+      - name: Cache Nuitka (C compile cache, downloads)
         uses: actions/cache@v4.2.3
         with:
-          path: build/python-*-embed-amd64.zip
-          key: py-embed-3.11.9
-      - name: Build dist\AgentBridge (+ zip, selftest with the embedded Python)
+          path: .nuitka-cache
+          key: nuitka-${{ runner.os }}-${{ hashFiles('tools/requirements-build.txt') }}-${{ hashFiles('agent_bridge/**') }}
+          restore-keys: |
+            nuitka-${{ runner.os }}-${{ hashFiles('tools/requirements-build.txt') }}-
+            nuitka-${{ runner.os }}-
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          $c = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          if (-not $c) {
+            foreach ($d in "${env:ProgramFiles(x86)}\Inno Setup 6", "$env:ProgramFiles\Inno Setup 6", "$env:ProgramFiles\Inno Setup 7") {
+              if (Test-Path "$d\ISCC.exe") { $c = "$d\ISCC.exe" }
+            }
+          } else { $c = $c.Source }
+          if (-not $c) {
+            choco install innosetup -y --no-progress
+            foreach ($d in "${env:ProgramFiles(x86)}\Inno Setup 6", "$env:ProgramFiles\Inno Setup 6", "$env:ProgramFiles\Inno Setup 7") {
+              if (Test-Path "$d\ISCC.exe") { $c = "$d\ISCC.exe" }
+            }
+          }
+          if (-not $c) { throw "no ISCC.exe" }
+          Write-Host "ISCC: $c"
+          "ISCC=$c" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Tag matches __version__
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $v = ([regex]'__version__\s*=\s*"([^"]+)"').Match((Get-Content agent_bridge\__init__.py -Raw)).Groups[1].Value
+          if ("v$v" -ne "${{ github.ref_name }}") { throw "tag ${{ github.ref_name }} != __version__ $v" }
+      - name: Build (Nuitka app + bus.exe, smoke test, Inno Setup installer, zip)
         shell: cmd
         run: build_desktop.cmd -Zip
       - uses: actions/upload-artifact@v4.6.2
         with:
+          name: AgentBridge-Setup
+          path: |
+            dist/AgentBridge-Setup-*.exe
+            dist/AgentBridge-Setup-*.exe.sha256
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4.6.2
+        with:
           name: AgentBridge-windows-x64
-          path: dist/AgentBridge-windows-x64.zip
+          path: dist/AgentBridge-*-windows-x64.zip
           if-no-files-found: error
 
   linux:
@@ -91,6 +129,7 @@ jobs:
       - uses: softprops/action-gh-release@v2.3.2
         with:
           files: |
-            out/AgentBridge-windows-x64.zip
+            out/AgentBridge-Setup-*.exe
+            out/AgentBridge-Setup-*.exe.sha256
             out/agent-bridge-linux.tar.gz
           generate_release_notes: true
