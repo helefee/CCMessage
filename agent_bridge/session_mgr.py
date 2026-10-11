@@ -228,6 +228,10 @@ def export_md(agent: str, sid: str) -> dict:
             except Exception:
                 continue
             for e in parse(d):
+                if e["role"] == "subtask":
+                    e = dict(e, role="tool", text=f"子任务（{e.get('subagent_type') or '子代理'}）· {e.get('description') or ''}")
+                if e["role"] not in ("user", "assistant", "tool"):      # 状态更新、工具输出不进导出
+                    continue
                 if e["role"] == "tool":
                     tools += 1
                     lines.append(f"> 🔧 {e['text']}")

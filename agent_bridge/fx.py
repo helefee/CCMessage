@@ -191,7 +191,7 @@ def run(direction: str, kind: str, label: str, duration: float):
     root.destroy()
 
 
-def main():
+def main(argv=None):
     ap = argparse.ArgumentParser(description="Claude ↔ Codex 信件动画")
     ap.add_argument("--dir", choices=["c2x", "x2c", "u2c", "u2x"], default="c2x",
                     help="c2x：Claude→Codex；x2c：Codex→Claude；u2c / u2x：你→Claude / Codex")
@@ -199,7 +199,7 @@ def main():
     ap.add_argument("--label", default="")
     ap.add_argument("--duration", type=float, default=1.15, help="飞行秒数")
     ap.add_argument("--probe", action="store_true", help="只打印找到的窗口位置")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     if sys.platform != "win32":
         return
     if a.probe:

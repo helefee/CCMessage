@@ -9,12 +9,22 @@
 - 对话记录文件已经不在的会话不复制（点开也续不上）；
 - 写之前把目标文件夹整个备份到 ~/.agent-bridge/claude-sync-bak/<时间>/。
 
-目标缺省是「最近有会话在写的那个文件夹」（= 当前登录的账号 / 组织）。桌面端要重启才会看到新补进来的会话。
+注意：桌面端和命令行（Claude Code CLI）是两套登录，可以登的不是同一个号：
+- 桌面端：从它自己的 Local Storage（<Claude 数据目录>/Local Storage/leveldb）里找最近一条带账号 / 组织的记录
+  （表文件里 snappy 压过的块先解开再找；每次都重新看文件，切号后刷新就能认出来）；
+- 命令行：~/.claude.json 的 oauthAccount。
+桌面端的邮箱 / 名字从它的 IndexedDB（claude.ai 页面缓存的账号信息）里读，读不到就借命令行的（同一个号时）或以前记下的（推测）。
+所以有两个「当前账号」，source='desktop' / 'cli' 分别对应，缺省按桌面端算（会话列表本来就是给桌面端看的）。
+老实说：命令行自己（claude --resume）直接读 ~/.claude/projects，根本不看这里按账号分的登记；
+「同步到 CLI 账号」只是把会话补进 CLI 那个号的文件夹，只有桌面端登的也是这个号时才看得到效果。
+
+目标缺省是对应来源的当前账号 / 组织；都认不出来就退回「最近有会话在写的那个文件夹」。桌面端要重启才会看到新补进来的会话。
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import sys
 from datetime import datetime
@@ -53,16 +63,354 @@ def folders() -> list[dict]:
     return sorted(out, key=lambda x: -x["latest"])
 
 
-def current_key() -> str | None:
-    """当前登录的账号 / 组织：~/.claude.json 的 oauthAccount；没有就 None（退回「最近有写入的文件夹」）。"""
+def _short(a: str | None) -> str:
+    return (a or "")[:8]
+
+
+def cli_account() -> dict:
+    """命令行（Claude Code CLI）登录的号：~/.claude.json 的 oauthAccount。"""
     try:
         o = json.loads((Path.home() / ".claude.json").read_text(encoding="utf-8")).get("oauthAccount") or {}
     except Exception:
-        return None
+        o = {}
     a, g = o.get("accountUuid"), o.get("organizationUuid")
-    if a and g and (sessions_root() / a / g).is_dir():
-        return f"{a}/{g}"
-    return None
+    name = o.get("displayName") or o.get("fullName")
+    _remember(a, o.get("emailAddress"), name, "cli")      # 记下来：以后桌面端登这个号、又认不出邮箱时拿来推测
+    return {"accountUuid": a, "organizationUuid": g, "email": o.get("emailAddress"), "name": name,
+            "key": f"{a}/{g}" if a and g else None, "via": "claude.json" if a and g else None}
+
+
+_UUID = rb"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+_ACC_RE = re.compile(rb'"(?:accountUuid|account_uuid)"\s*:\s*"(' + _UUID + rb')"')
+_ORG_RE = re.compile(rb'"(?:organizationUuid|organization_uuid)"\s*:\s*"(' + _UUID + rb')"')
+# eventTimestamp 在压缩块里常被截成「…Timestamp」，只认后半截
+_TS_RE = re.compile(rb'Timestamp"\s*:\s*"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z)"')
+_CUT_RE = re.compile(rb'"eventName"|"(?:accountUuid|account_uuid)"')
+
+
+# ---------- 读 Chromium 的 LevelDB（只读，不加锁） ----------
+# *.log 是没压缩的写入日志，直接扫字节；*.ldb 是整理过的表文件，数据块大多用 snappy 压过，
+# 压过的块里「accountUuid」这类字段名会被拆碎，硬扫字节就认不出来（桌面端整理一次 Local Storage 后就认不出当前账号了），
+# 所以按表格式把每个数据块解开再扫。值可能是 UTF-16 存的，统一去掉 \x00 再按 ASCII 找。
+# 按（文件、修改时间、大小）缓存，文件一变就重新读。
+
+_LDB_CACHE: dict = {}
+
+
+def _varint(b: bytes, i: int) -> tuple[int, int]:
+    n = shift = 0
+    while True:
+        x = b[i]
+        i += 1
+        n |= (x & 0x7F) << shift
+        if not x & 0x80:
+            return n, i
+        shift += 7
+
+
+def _unsnappy(b: bytes) -> bytes:
+    n, i = _varint(b, 0)
+    out = bytearray()
+    L = len(b)
+    while i < L:
+        tag = b[i]
+        i += 1
+        t = tag & 3
+        if t == 0:                                  # 原样的一段
+            ln = tag >> 2
+            if ln >= 60:
+                k = ln - 59
+                ln = int.from_bytes(b[i:i + k], "little")
+                i += k
+            ln += 1
+            out += b[i:i + ln]
+            i += ln
+            continue
+        if t == 1:
+            ln = ((tag >> 2) & 7) + 4
+            off = ((tag >> 5) << 8) | b[i]
+            i += 1
+        elif t == 2:
+            ln = (tag >> 2) + 1
+            off = int.from_bytes(b[i:i + 2], "little")
+            i += 2
+        else:
+            ln = (tag >> 2) + 1
+            off = int.from_bytes(b[i:i + 4], "little")
+            i += 4
+        if off <= 0 or off > len(out):
+            raise ValueError("bad snappy offset")
+        st = len(out) - off
+        if off >= ln:
+            out += out[st:st + ln]
+        else:                                       # 重叠复制
+            for k in range(ln):
+                out.append(out[st + k])
+    if len(out) != n:
+        raise ValueError("bad snappy length")
+    return bytes(out)
+
+
+def _ldb_blocks(b: bytes) -> list[bytes]:
+    """LevelDB 表文件 → 解开的各个数据块（解不开的块跳过）。"""
+    if len(b) < 48 or b[-8:] != bytes.fromhex("57fb808b247547db"):
+        return [b]
+    foot = b[-48:]
+    _, i = _varint(foot, 0)
+    _, i = _varint(foot, i)                         # metaindex
+    ioff, i = _varint(foot, i)
+    isz, i = _varint(foot, i)
+
+    def block(off: int, sz: int) -> bytes:
+        raw, typ = b[off:off + sz], b[off + sz]
+        return _unsnappy(raw) if typ == 1 else raw
+
+    idx = block(ioff, isz)
+    nres = int.from_bytes(idx[-4:], "little")
+    end = len(idx) - 4 - 4 * nres
+    out, i = [], 0
+    while i < end:
+        _, i = _varint(idx, i)                      # shared
+        nk, i = _varint(idx, i)
+        nv, i = _varint(idx, i)
+        i += nk
+        v = idx[i:i + nv]
+        i += nv
+        off, j = _varint(v, 0)
+        sz, _ = _varint(v, j)
+        try:
+            out.append(block(off, sz))
+        except Exception:
+            continue
+    return out
+
+
+def _ldb_text(f: Path) -> list[bytes]:
+    """一个 .log / .ldb 文件里能扫的字节（去掉 \x00）；读不了返回 []。"""
+    try:
+        st = f.stat()
+    except Exception:
+        return []
+    key = (str(f), st.st_mtime_ns, st.st_size)
+    hit = _LDB_CACHE.get(str(f))
+    if hit and hit[0] == key:
+        return hit[1]
+    try:
+        b = f.read_bytes()
+    except Exception:              # 桌面端开着时有的文件锁着
+        return []
+    try:
+        parts = _ldb_blocks(b) if f.suffix == ".ldb" else [b]
+    except Exception:
+        parts = [b]
+    parts = [p.replace(b"\x00", b"") for p in parts]
+    _LDB_CACHE[str(f)] = (key, parts)
+    return parts
+
+
+def _leveldb_pairs() -> list[tuple[str, float, str, str]]:
+    """桌面端 Local Storage 里所有（时间戳, 文件修改时间, 账号, 组织）。"""
+    d = claude_app_dir() / "Local Storage" / "leveldb"
+    out = []
+    try:
+        files = [f for f in d.iterdir() if f.suffix in (".log", ".ldb")]
+    except Exception:
+        return out
+    for f in files:
+        try:
+            mt = f.stat().st_mtime
+        except Exception:
+            continue
+        for b in _ldb_text(f):
+            for m in _ACC_RE.finditer(b):
+                # 组织号在账号号前后 300 字节内找，碰到下一条事件 / 下一个账号字段就停，免得串到别的事件上
+                after = b[m.end():m.end() + 300]
+                c = _CUT_RE.search(after)
+                after = after[:c.start()] if c else after
+                before = b[max(0, m.start() - 300):m.start()]
+                cuts = list(_CUT_RE.finditer(before))
+                if cuts and cuts[-1].group(0) != b'"eventName"':
+                    before = before[cuts[-1].end():]
+                og = _ORG_RE.search(after) or (list(_ORG_RE.finditer(before)) or [None])[-1]
+                if not og:
+                    continue
+                # 时间戳：同一条事件里，在账号字段前面（eventName 之后）
+                ev = before
+                k = ev.rfind(b'"eventName"')
+                ev = ev[k:] if k >= 0 else ev
+                ts = (list(_TS_RE.finditer(ev)) or [None])[-1]
+                out.append((ts.group(1).decode() if ts else "", mt, m.group(1).decode(), og.group(1).decode()))
+    return out
+
+
+def desktop_account(profile: bool = True) -> dict:
+    """桌面端登录的号：Local Storage 里时间戳最新的那条账号 / 组织；都没时间戳就取最近改过的文件里的。
+    认不出来 key 为 None（调用方自己退回）。profile=True 时再补邮箱 / 名字（见 _profile）。"""
+    ps = _leveldb_pairs()
+    if not ps:
+        return {"accountUuid": None, "organizationUuid": None, "email": None, "name": None, "key": None, "via": None}
+    with_ts = [p for p in ps if p[0]]
+    ts, _, a, g = max(with_ts) if with_ts else max(ps, key=lambda p: p[1])
+    d = {"accountUuid": a, "organizationUuid": g, "email": None, "name": None,
+         "key": f"{a}/{g}", "via": "leveldb", "seen": ts or None}
+    return dict(d, **_profile(a)) if profile else d
+
+
+# ---------- 账号的邮箱 / 名字 ----------
+# 桌面端里 claude.ai 页面把账号信息（react-query 缓存）存在 IndexedDB：
+#   <Claude 数据目录>/IndexedDB/https_claude.ai_0.indexeddb.blob/** 和 …indexeddb.leveldb/*.log|*.ldb
+# 是 V8 序列化的对象：…"uuid" <账号号> "email_address" <邮箱> "full_name" <名字> "display_name" <名字>…
+# 字段名后面紧跟类型字节（'"' 单字节串 / 'c' 双字节 UTF-16 / 'S' UTF-8）和长度，按这个读；
+# 被 snappy 压过、对不上的就跳过。只认紧跟在账号号后面的这几个字段，不碰 cookie / 令牌。
+# 认出来的（还有命令行登过的号）记进 ~/.agent-bridge/claude-accounts.json，以后认不出来时拿来推测。
+
+_EMAIL_OK = re.compile(r"[^@\s\x00-\x1f]+@[^@\s\x00-\x1f]+\.[A-Za-z]{2,}")
+NAMES_CACHE = paths.HOME / "claude-accounts.json"
+
+
+def _v8_str(b: bytes, i: int) -> str | None:
+    """b[i] 是类型字节，后面 varint 长度 + 内容。"""
+    if i >= len(b):
+        return None
+    tag, i = b[i:i + 1], i + 1
+    n = shift = 0
+    while i < len(b):
+        x = b[i]
+        i += 1
+        n |= (x & 0x7F) << shift
+        shift += 7
+        if not x & 0x80:
+            break
+    if not 0 < n <= 200:
+        return None
+    raw = b[i:i + n]
+    try:
+        t = {b'"': lambda r: r.decode("latin-1"), b"c": lambda r: r.decode("utf-16-le"),
+             b"S": lambda r: r.decode("utf-8")}[tag](raw)
+    except Exception:
+        return None
+    return t if t.isprintable() and len(raw) == n else None
+
+
+def _field(b: bytes, start: int, name: bytes, span: int = 400) -> str | None:
+    k = b.find(name, start, start + span)
+    return _v8_str(b, k + len(name)) if k >= 0 else None
+
+
+def _idb_profile(acct: str) -> dict | None:
+    d = claude_app_dir() / "IndexedDB"
+    files = []
+    for sub in ("https_claude.ai_0.indexeddb.blob", "https_claude.ai_0.indexeddb.leveldb"):
+        try:
+            files += [f for f in (d / sub).rglob("*") if f.is_file() and (sub.endswith(".blob") or f.suffix in (".log", ".ldb"))]
+        except Exception:
+            pass
+    needle = b'uuid"$' + acct.encode()
+    best = None
+    for f in files:
+        try:
+            if f.stat().st_size > 50_000_000:
+                continue
+            mt = f.stat().st_mtime
+            # 表文件按块解开（V8 序列化里本来就有 \x00，不能去掉，所以这里自己解）；读不了就算了
+            bs = [f.read_bytes()]
+            if f.suffix == ".ldb":
+                bs = _ldb_blocks(bs[0])
+        except Exception:          # 桌面端开着时有的文件锁着，读不了就算了
+            continue
+        for b in bs:
+            i = b.find(needle)
+            while i >= 0:
+                j = i + len(needle)
+                email = _field(b, j, b"email_address", 40)
+                if email and _EMAIL_OK.fullmatch(email):
+                    name = _field(b, j, b"full_name") or _field(b, j, b"display_name")
+                    if not best or mt > best[0]:
+                        best = (mt, email, name)
+                i = b.find(needle, j)
+    return {"email": best[1], "name": best[2]} if best else None
+
+
+def _load_names() -> dict:
+    try:
+        return json.loads(NAMES_CACHE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _remember(acct: str, email: str | None, name: str | None, src: str) -> None:
+    if not acct or not email:
+        return
+    c = _load_names()
+    old = c.get(acct) or {}
+    if old.get("email") == email and old.get("name") == (name or old.get("name")):
+        return
+    c[acct] = {"email": email, "name": name or old.get("name"), "from": src,
+               "seen": datetime.now().isoformat(timespec="seconds")}
+    try:
+        NAMES_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        NAMES_CACHE.write_text(json.dumps(c, ensure_ascii=False, indent=1), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _profile(acct: str | None) -> dict:
+    """账号号 → {email, name, email_from, email_guess}。
+    先看桌面端 IndexedDB（就是它现在登的号，可靠）；再看命令行是不是同一个号；都没有就查以前记下的（推测）。"""
+    if not acct:
+        return {"email": None, "name": None, "email_from": None, "email_guess": False}
+    p = _idb_profile(acct)
+    if p:
+        _remember(acct, p["email"], p["name"], "desktop")
+        return dict(p, email_from="desktop", email_guess=False)
+    c = cli_account()
+    if c["accountUuid"] == acct and c["email"]:
+        return {"email": c["email"], "name": c.get("name"), "email_from": "cli", "email_guess": False}
+    m = _load_names().get(acct)
+    if m and m.get("email"):
+        return {"email": m["email"], "name": m.get("name"), "email_from": "cache", "email_guess": True}
+    return {"email": None, "name": None, "email_from": None, "email_guess": False}
+
+
+def _with_folder(acc: dict) -> dict:
+    k = acc.get("key")
+    f = next((x for x in folders() if x["key"] == k), None) if k else None
+    return dict(acc, exists=bool(f), count=f["count"] if f else 0, path=f["path"] if f else None)
+
+
+def accounts() -> dict:
+    """两套登录各自的当前账号：{"desktop": {...}, "cli": {...}}，带 key / exists（文件夹在不在）/ count / email / name。
+    桌面端认不出来时按 current_key('desktop') 的退回规则补上，via 写明是怎么来的。"""
+    d = desktop_account()
+    if not d["key"]:
+        k = current_key("desktop")
+        if k:
+            a, _, g = k.partition("/")
+            c = cli_account()
+            d = dict({"accountUuid": a, "organizationUuid": g, "key": k,
+                      "via": "cli" if c["key"] == k else "newest-folder"}, **_profile(a))
+    c = cli_account()
+    if c["key"]:
+        c.update(email_from="cli", email_guess=False)
+    return {"desktop": _with_folder(d), "cli": _with_folder(c)}
+
+
+def current_key(source: str = "desktop") -> str | None:
+    """当前登录的账号 / 组织。
+    source='desktop'（缺省，会话列表都是给桌面端看的）：桌面端 Local Storage 里认出来的号；
+        认不出来就退回命令行的号（它的文件夹得在），再不行退回最近有写入的文件夹。
+    source='cli'：~/.claude.json 的 oauthAccount，没登就 None。
+    认出来的号哪怕还没有文件夹也照样返回（那就是「这个号在桌面端还没开过会话」）。"""
+    if source == "cli":
+        return cli_account()["key"]
+    k = desktop_account(profile=False)["key"]
+    if k:
+        return k
+    c = cli_account()["key"]
+    if c and (sessions_root() / c).is_dir():
+        return c
+    fs = folders()
+    return fs[0]["key"] if fs else None
 
 
 def _transcript_exists(cli_sid: str | None) -> bool:
@@ -79,14 +427,26 @@ def _fresh(d: dict) -> dict:
     return {k: v for k, v in d.items() if k not in _DROP}
 
 
-def plan(target: str | None = None) -> dict:
+SOURCES = {"desktop": "桌面端", "cli": "命令行（CLI）"}
+
+
+def plan(target: str | None = None, source: str = "desktop") -> dict:
+    if source not in SOURCES:
+        return {"ok": False, "error": f"不认识的来源：{source}（只能是 desktop / cli）", "source": source}
+    acc = accounts()[source]
+    base = {"source": source, "account": acc}
     fs = folders()
     if not fs:
-        return {"ok": False, "error": f"没找到 Claude 桌面端的会话列表目录：{sessions_root()}"}
-    target = target or current_key()
-    tgt = next((f for f in fs if f["key"] == target), None) if target else fs[0]
+        return dict(base, ok=False, error=f"没找到 Claude 桌面端的会话列表目录：{sessions_root()}")
+    target = target or acc.get("key")
+    if not target:
+        return dict(base, ok=False, error=f"认不出{SOURCES[source]}现在登的是哪个号"
+                    + ("（~/.claude.json 里没有登录信息，命令行先 claude 登一下）" if source == "cli" else ""))
+    tgt = next((f for f in fs if f["key"] == target), None)
     if not tgt:
-        return {"ok": False, "error": f"没有这个账号 / 组织文件夹：{target}"}
+        who = f"{SOURCES[source]}的号 {_short(target)}/{_short(target.partition('/')[2])}"
+        return dict(base, ok=False, error=f"{who} 还没有会话列表文件夹——这个号还没在 Claude 桌面端里开过 Claude Code 会话。"
+                    "先用这个号在桌面端开一个 Claude Code 会话，再回来补齐。")
     tdir = Path(tgt["path"])
     have = {f.name for f in tdir.glob("local_*.json")}
     # 在当前账号里删过的（桌面端留 deleted_<会话号> 墓碑）不复活
@@ -117,7 +477,7 @@ def plan(target: str | None = None) -> dict:
             old = best.get(src.name)
             if old is None or d.get("lastActivityAt", 0) > old[1].get("lastActivityAt", 0):
                 best[src.name] = (src, d, f["key"])
-    add, update, skip_missing = [], [], 0
+    add, update, skip_missing, skip_tomb, skip_have = [], [], 0, 0, 0
     for name, (src, d, frm) in best.items():
         item = {"src": str(src), "name": name, "title": d.get("title") or "（无标题）",
                 "cwd": d.get("cwd"), "from": frm, "archived": bool(d.get("isArchived")),
@@ -131,8 +491,10 @@ def plan(target: str | None = None) -> dict:
                 update.append(item)
             continue
         if d.get("cliSessionId") in tomb or name[len("local_"):-len(".json")] in tomb:
+            skip_tomb += 1
             continue
         if d.get("cliSessionId") in have_cli:
+            skip_have += 1
             continue
         if not _transcript_exists(d.get("cliSessionId")):
             skip_missing += 1
@@ -140,12 +502,14 @@ def plan(target: str | None = None) -> dict:
         add.append(item)
     update.sort(key=lambda x: -x["last"])
     add.sort(key=lambda x: -x["last"])
-    return {"ok": True, "target": tgt, "folders": fs, "add": add, "update": update, "skip_missing": skip_missing}
+    return dict(base, ok=True, target=tgt, folders=fs, add=add, update=update, skip_missing=skip_missing,
+                skip_tomb=skip_tomb, skip_have=skip_have, tombstones=len(tomb))
 
 
-def run(target: str | None = None, dry: bool = False, only: list[str] | None = None) -> dict:
-    """only：只补这几个（local_*.json 文件名）；不给就全补。"""
-    p = plan(target)
+def run(target: str | None = None, dry: bool = False, only: list[str] | None = None,
+        source: str = "desktop") -> dict:
+    """only：只补这几个（local_*.json 文件名）；不给就全补。source：补到桌面端（缺省）还是命令行登的那个号。"""
+    p = plan(target, source)
     if p.get("ok") and only is not None:
         keep = set(only)
         p["add"] = [a for a in p["add"] if a["name"] in keep]
@@ -171,7 +535,7 @@ def run(target: str | None = None, dry: bool = False, only: list[str] | None = N
                 new[k] = cur[k]
         dst.write_text(json.dumps(new, ensure_ascii=False), encoding="utf-8")
         updated += 1
-    _write_ledger(bak, tdir, "sync", added=[a["name"] for a in p["add"]], updated=[a["name"] for a in p["update"]])
+    _write_ledger(bak, tdir, "sync", source=source, added=[a["name"] for a in p["add"]], updated=[a["name"] for a in p["update"]])
     return dict(p, done=done, updated=updated, dry=False, backup=str(bak))
 
 
@@ -251,16 +615,47 @@ def restore(backup_id: str) -> dict:
             "trash": str(trash) if removed else None}
 
 
+def _acc_line(name: str, a: dict) -> str:
+    if not a.get("key"):
+        return f"{name}：认不出来"
+    via = {"leveldb": "", "cli": "（认不出来，按命令行的号算）", "newest-folder": "（认不出来，按最近有写入的文件夹算）"}.get(a.get("via"), "")
+    fold = f"已有 {a['count']} 个会话" if a.get("exists") else "还没有文件夹"
+    who = " ".join(x for x in (a.get("name"), a.get("email")) if x)
+    if who and a.get("email_guess"):
+        who += "（推测：以前记下的）"
+    return f"{name}：{a['key']}{'  ' + who if who else ''}  {fold}{via}"
+
+
+def _print_plan(r: dict) -> None:
+    print(f"目标（{SOURCES[r['source']]}当前账号 / 组织）：{r['target']['key']}（已有 {r['target']['count']} 个会话）")
+    print(f"可以补进来 {len(r['add'])} 个；已有但别处更新、要刷新 {len(r['update'])} 个；"
+          f"对话记录已不在、跳过 {r['skip_missing']} 个；在这个号里删过（墓碑）不复活 {r['skip_tomb']} 个；"
+          f"同一会话已在、跳过 {r['skip_have']} 个")
+    for a in r["add"][:40]:
+        t = datetime.fromtimestamp(a["last"]).strftime("%m-%d %H:%M") if a["last"] else "—"
+        print(f"  {t}  {a['title'][:40]}{'（已归档）' if a['archived'] else ''}  ·  {a['cwd']}")
+    if len(r["add"]) > 40:
+        print(f"  … 还有 {len(r['add']) - 40} 个")
+
+
 def main(argv: list[str]) -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     dry = "--dry-run" in argv
     tgt = None
     if "--to" in argv:
         tgt = argv[argv.index("--to") + 1]
+    src = argv[argv.index("--source") + 1] if "--source" in argv else None
+    if src and src not in (*SOURCES, "both"):
+        print(f"✗ --source 只能是 desktop / cli / both，不认识：{src}")
+        return 2
     if "--list" in argv:
+        acc = accounts()
+        print(_acc_line("桌面端当前", acc["desktop"]))
+        print(_acc_line("命令行当前", acc["cli"]))
         for f in folders():
             t = datetime.fromtimestamp(f["latest"]).strftime("%m-%d %H:%M") if f["latest"] else "—"
-            print(f"{f['key']}  会话 {f['count']:>3}  最近 {t}")
+            tag = "、".join(n for n, s in (("桌面端", "desktop"), ("CLI", "cli")) if acc[s].get("key") == f["key"])
+            print(f"{f['key']}  会话 {f['count']:>3}  最近 {t}{'  ← ' + tag + '当前' if tag else ''}")
         return 0
     if "--backups" in argv:
         for b in list_backups():
@@ -275,26 +670,46 @@ def main(argv: list[str]) -> int:
         print(r.get("hint") or json.dumps({k: v for k, v in r.items() if k != "deferred"}, ensure_ascii=False))
         return 0
     only = argv[argv.index("--only") + 1].split(",") if "--only" in argv else None
-    r = run(tgt, True, only)
+    if dry:
+        # 演练缺省两边都看；--to 指定了文件夹就只看一次（来源只影响显示）
+        srcs = ["desktop", "cli"] if (src or "both") == "both" else [src]
+        if tgt:
+            srcs = srcs[:1]
+        seen, bad = {}, 0
+        for s in srcs:
+            r = run(tgt, True, only, s)
+            print(f"===== {SOURCES[s]} =====")
+            print(_acc_line("当前账号", r["account"]))
+            if not r["ok"]:
+                print("✗ " + r["error"])
+                bad += 1
+            elif r["target"]["key"] in seen:
+                print(f"（跟{SOURCES[seen[r['target']['key']]]}是同一个号 / 组织，结果同上）")
+            else:
+                seen[r["target"]["key"]] = s
+                _print_plan(r)
+            print()
+        print("（演练，没写文件；去掉 --dry-run 真正补齐，真补时用 --source desktop 或 --source cli 选一边，缺省桌面端）")
+        return 1 if bad == len(srcs) else 0
+    if src == "both":
+        print("✗ 真正补齐一次只能选一边：--source desktop 或 --source cli")
+        return 2
+    src = src or "desktop"
+    r = run(tgt, True, only, src)
+    print(_acc_line(f"{SOURCES[src]}当前账号", r["account"]))
     if not r["ok"]:
         print("✗ " + r["error"])
         return 1
-    print(f"目标（当前账号 / 组织）：{r['target']['key']}（已有 {r['target']['count']} 个会话）")
-    print(f"可以补进来 {len(r['add'])} 个；已有但别处更新、要刷新 {len(r['update'])} 个；对话记录已不在、跳过 {r['skip_missing']} 个")
-    for a in r["add"][:40]:
-        t = datetime.fromtimestamp(a["last"]).strftime("%m-%d %H:%M") if a["last"] else "—"
-        print(f"  {t}  {a['title'][:40]}{'（已归档）' if a['archived'] else ''}  ·  {a['cwd']}")
-    if len(r["add"]) > 40:
-        print(f"  … 还有 {len(r['add']) - 40} 个")
-    if dry:
-        print("（演练，没写文件；去掉 --dry-run 真正补齐）")
-        return 0
+    _print_plan(r)
     if not (r["add"] or r["update"]):
         return 0
     # 桌面端开着时直接写，会在它退出时被内存里的旧登记盖回去：排到它退出之后
-    r = apps.run_or_defer("claude", "claude-sync", {"target": tgt, "only": only}, "同步 Claude 会话到当前账号")
+    r = apps.run_or_defer("claude", "claude-sync", {"target": tgt or r["target"]["key"], "only": only, "source": src},
+                          f"同步 Claude 会话到{SOURCES[src]}当前账号")
     if r.get("deferred"):
         print(r["hint"])
+    elif not r.get("ok"):
+        print("✗ " + r.get("error", "失败"))
     else:
         print(f"✓ 已补齐 {r['done']} 个、刷新 {r['updated']} 个，原目录备份在 {r['backup']}（撤回：--restore {Path(r['backup']).name}）。"
               "打开 Claude 桌面端就能在列表里看到。")

@@ -3,3 +3,10 @@ __pycache__/
 *.tmp
 tools/bloub/
 tools/bloub-icons.json
+dist/
+build/
+.tmp-shots/
+.venv/
+venv/
+nuitka-crash-report.xml
+.nuitka-cache/

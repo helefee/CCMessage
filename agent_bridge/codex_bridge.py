@@ -337,7 +337,7 @@ def cmd_to_claude(args):
     print(json.dumps(build_claude(find_thread(args.thread), version=args.version), ensure_ascii=False))
 
 
-def main():
+def main(argv=None):
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description="把 Codex 线程交给 Claude Code")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -349,7 +349,7 @@ def main():
     t = sub.add_parser("to-claude")
     t.add_argument("thread")
     t.add_argument("--version", default="2.1.281", help="写进记录的 Claude Code 版本号")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     {"list": cmd_list, "export": cmd_export, "to-claude": cmd_to_claude}[a.cmd](a)
 
 

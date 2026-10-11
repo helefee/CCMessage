@@ -2,14 +2,17 @@
 """命令行入口。
 
     python -m agent_bridge                     起管理服务（网页界面，默认 http://127.0.0.1:8765）
-    python -m agent_bridge serve [--port N] [--no-browser]
+    python -m agent_bridge serve [--port N] [--no-browser] [--host 0.0.0.0]
+                                               --host：另开一个只认配对设备的局域网监听（管理界面始终只在 127.0.0.1）
+    python -m agent_bridge desktop [--port N]  桌面版：在独立窗口里开界面（要 pywebview）；浏览器照样能打开同一个地址
+    python -m agent_bridge pair [--port N]     给正在跑的服务出一个一次性配对链接（手机 / 别的设备扫码或打开）
     python -m agent_bridge install <项目目录>    不开界面，直接把总线装进项目（钩子合并、git 排除、自检）
     python -m agent_bridge uninstall <项目目录> [--purge]
     python -m agent_bridge selftest [<项目目录>] 不给目录就在临时目录里装一份跑完整自检
     python -m agent_bridge doctor              检查这台电脑能不能用（Python、git、Codex、Claude、二维码库）
     python -m agent_bridge export <Codex 线程>  Codex 线程导出成交接文件（给 Claude 接手）
     python -m agent_bridge codex-list          最近的 Codex 线程
-    python -m agent_bridge claude-sync [--dry-run] [--list] [--to 账号/组织]
+    python -m agent_bridge claude-sync [--dry-run] [--list] [--source desktop|cli|both] [--to 账号/组织]
     python -m agent_bridge codex-sync [--dry-run] [--days 14] [--cwd 项目] [--to 账号/组织]   把 Codex 对话同步进 Claude 桌面端列表
                                                切换账号后看不到的 Claude 桌面端会话，补齐到当前账号的列表里
     python -m agent_bridge codex-unify [--dry-run] [--no-account] [--list] [--restore 账本]
@@ -52,7 +55,20 @@ def doctor() -> int:
         ok &= bool(good) or hint.startswith("（可选）")
         print(("✓ " if good else "✗ ") + text + ("" if good or not hint else "  —— " + hint))
     sys.stdout.reconfigure(encoding="utf-8")
-    line(True, f"Python {sys.version.split()[0]}（{sys.executable}）")
+    from . import __version__
+    line(True, f"agent-bridge {__version__}" + ("（Windows 安装版）" if paths.FROZEN else f"，Python {sys.version.split()[0]}（{sys.executable}）"))
+    from . import server
+    hp = server.hook_py_info()
+    kind = {"current": "就是现在这个 Python", "system": "系统装的 Python", "busexe": "安装版自带的 bus.exe，不需要 Python"}
+    line(bool(hp["path"]), f"新装钩子用：{hp['path'] or '没找到'}（{kind.get(hp['kind'], '')}）", server.NO_PY)
+    for r in server.load_registry():
+        try:
+            st = server.project_status(Path(r["root"]))
+        except Exception:
+            continue
+        if st.get("hook_py"):
+            line(not st.get("hook_py_missing"), f"项目 {st['name']} 的钩子用：{'、'.join(st['hook_py'])}",
+                 "这个 Python 已经不在了（桌面版文件夹挪了？）—— 在界面里点「安装 / 升级 / 修复」，或 python -m agent_bridge install <项目>")
     line(shutil.which("git"), "git", "装 git 才能自动写 .git/info/exclude、交接文件里查分支")
     cx = paths.codex_exe()
     line(cx, f"Codex 命令行：{cx or '没找到'}", "装 Codex 桌面端，或设环境变量 CODEX_CLI_PATH")
@@ -96,6 +112,33 @@ def selftest(target: str | None) -> int:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def pair(rest) -> int:
+    """问本机正在跑的服务要一个一次性配对链接（3 分钟内有效、只能用一次），打出来（有 qrcode 库就顺带打个字符二维码）。"""
+    import argparse
+    import urllib.request
+    ap = argparse.ArgumentParser(prog="agent_bridge pair")
+    ap.add_argument("--port", type=int, default=8765)
+    a = ap.parse_args(rest)
+    sys.stdout.reconfigure(encoding="utf-8")
+    req = urllib.request.Request(f"http://127.0.0.1:{a.port}/api/pair/new", data=b"{}", method="POST",
+                                 headers={"X-Msgbus": "1", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            d = json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        print(f"连不上 http://127.0.0.1:{a.port}/ 的服务（先启动它）：{e}")
+        return 1
+    print(f"配对链接（{d.get('expires_in', 180)} 秒内有效、只能用一次）：\n{d['url']}")
+    try:
+        import qrcode
+        q = qrcode.QRCode(border=1)
+        q.add_data(d["url"])
+        q.print_ascii(invert=True)
+    except Exception:
+        pass
+    return 0
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     cmd = argv[0] if argv and not argv[0].startswith("-") else "serve"
@@ -103,6 +146,11 @@ def main(argv=None):
     if cmd == "serve":
         from . import server
         return server.main(rest)
+    if cmd == "desktop":
+        from . import desktop
+        return desktop.main(rest)
+    if cmd == "pair":
+        return pair(rest)
     if cmd == "install":
         from . import server
         if not rest:
@@ -138,9 +186,11 @@ def main(argv=None):
         from . import codex_sync
         return codex_sync.main(rest)
     if cmd in ("export", "codex-list", "to-claude"):
-        from .paths import PKG
-        sub = {"codex-list": "list"}.get(cmd, cmd)
-        return subprocess.call([sys.executable, str(PKG / "codex_bridge.py"), sub, *rest])
+        from . import codex_bridge
+        return codex_bridge.main([{"codex-list": "list"}.get(cmd, cmd), *rest]) or 0
+    if cmd == "fx":                     # 桌面信件动画（服务在后台起它；也可以手动试）
+        from . import fx
+        return fx.main(rest) or 0
     print(__doc__)
     return 2
 

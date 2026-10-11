@@ -157,7 +157,7 @@ def _ops():
     """op 名 → 函数(**args) -> dict。放在函数里导入，免得循环引用。"""
     from . import claude_sync, codex_sync, codex_unify, session_mgr
     return {
-        "claude-sync": lambda **a: claude_sync.run(a.get("target"), only=a.get("only")),
+        "claude-sync": lambda **a: claude_sync.run(a.get("target"), only=a.get("only"), source=a.get("source") or "desktop"),
         "codex-sync": lambda **a: codex_sync.run(a.get("days", 14), a.get("root"), only=a.get("only")),
         "claude-restore": lambda **a: claude_sync.restore(a["backup"]),
         "codex-unify": lambda **a: codex_unify.run(**a),
@@ -186,7 +186,7 @@ def _watcher_alive(kind: str) -> bool:
 def _spawn_watcher(kind: str) -> None:
     if _watcher_alive(kind):
         return
-    args = [sys.executable, "-m", "agent_bridge", "after-quit", kind]
+    args = paths.self_cmd("after-quit", kind)
     cwd = str(paths.PKG.parent)
     if os.name == "nt":
         # 独立进程组 + 脱离父进程的作业对象：桌面端退出时会收拾它起的子进程，等待进程不能跟着被收拾掉

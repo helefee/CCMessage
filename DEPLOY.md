@@ -55,7 +55,9 @@
 
 ## 3. 启动管理服务
 
-    python -m agent_bridge            # Windows 也可以双击 start.cmd；macOS / Linux 用 ./start.sh
+    python -m agent_bridge            # Windows 也可以双击 start.cmd；Linux / macOS 用 ./run.sh（先 ./install.sh）
+
+不想装 Python：用 Windows 安装版 `AgentBridge-Setup-<版本>.exe`（见 README「Windows 安装版」），效果一样，只是开在独立窗口里；它给项目装的钩子用自带的 `bus.exe`。
 
 浏览器会自动打开 http://127.0.0.1:8765/ 。只听本机，别人访问不到。
 
@@ -202,4 +204,5 @@ Codex 对新加的钩子有一道信任闸：没点信任的钩子**不会运行
 ## 13. 平台说明
 
 - **Windows**：全部功能。
+- **Linux**：`./install.sh`（可加 `--service` 装成 systemd 用户服务、`--host 0.0.0.0` 开只认配对设备的局域网监听），详见 README「Linux」。
 - **macOS / Linux**：除信件桌面动画、按窗口位置摆放会话列表外都能用（这两样用了 Win32 接口，其他系统自动跳过；网页信件动画照常有）。Claude 桌面端数据目录按系统自动找，Codex 命令行按 `CODEX_CLI_PATH` → PATH 里的 `codex` → macOS 桌面端自带的 顺序找。
