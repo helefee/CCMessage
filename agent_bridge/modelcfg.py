@@ -4,7 +4,7 @@
 - 只改白名单里的键，其余原样保留：JSON 保持原顺序，TOML 用 tomlkit 保留注释和格式。
 - 每次写之前先备份到 ~/.agent-bridge/backups，写临时文件再原子替换，写完重新读一遍核对；备份一键还原。
 - key 存 Windows 凭据管理器（keystore.py），配置文件里只写取 key 的命令。返回给网页的只有打码后的样子。
-- 供应商切换归 CC Switch：检测到它时页面会标「由 CC Switch 管理」，这里不抢。
+- 供应商的增删改和一键切换在 providers.py；CC Switch 可选，检测到时提示它切换会覆盖这里的值。
 - 迁移明文 key、统一子代理模型、指向代理等都只在用户点按钮时做，先备份。
 """
 from __future__ import annotations

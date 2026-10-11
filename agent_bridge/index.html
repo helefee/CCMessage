@@ -1464,6 +1464,11 @@ body.noanim .trun .trl.shim{animation:none;background:none;color:var(--text)}
 .us .dim{color:var(--faint)}
 .us .miss{background:var(--warn-weak);border:1px solid var(--warn);border-radius:8px;padding:6px 10px;font-size:12.5px}
 #mcBox code{overflow-wrap:anywhere;word-break:break-all}
+.pvsec{margin-bottom:10px}
+.pvt{margin-top:6px;display:block;overflow-x:auto}.pvt tr.on td{background:var(--ok-weak)}
+.pvr{display:inline-flex;gap:4px;font-size:11.5px}.pvr span{border:1px solid var(--line);border-radius:6px;padding:0 5px}.pvr .y{color:var(--ok);border-color:var(--ok)}.pvr .n{color:var(--faint)}
+.pvm{display:inline-block;font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:0 5px;margin:1px 3px 1px 0}
+.tag.ok{color:var(--ok);border-color:var(--ok)}
 #mcBox .miss{margin-bottom:6px}
 .us input.pr{width:70px;padding:2px 5px;text-align:right}
 .us .more{display:flex;justify-content:center;padding:8px}
@@ -3128,11 +3133,13 @@ function openSession(x){
     <button class="spbtn prhb hib" id="chgBtn" title="改动：看这个项目本地的改动（git status / diff），可以发给会话做代码审查">${ic("gitdiff")}<span class="spl">改动</span></button>
     <button class="spbtn prhb hib" id="prsBtn" title="PR：这个项目在 GitHub 上的 PR（用本机 gh 只读查看）">${ic("gitpr")}<span class="spl">PR</span></button>
     ${x.agent==="codex" ? `<button class="spbtn hib" id="toClaude" title="交给 Claude：导出成交接文件，让 Claude 接着做">${ic("handoff")}<span class="tcl"> 交给 Claude</span></button>` : ""}
+    ${(x.agent==="claude" || x.agent==="codex") && isLocal && !isMobile() ? `<button class="spbtn hib" id="pvSess" title="换供应商继续：用 CC Msg 里的某个供应商，在新终端里恢复这个会话（只限命令行，不改配置）">${ic("key")}</button>` : ""}
     <button class="spbtn hib" id="trRefresh" title="刷新：从头重读这个会话的记录">${ic("refresh")}</button>
     <span class="note" tabindex="0" title="${esc(x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : x.agent==="cursor" ? "回复经总线送达 Cursor，标成「用户本人」发的：它下次提交消息、调用工具或一轮结束时收到，闲着叫不醒" : "回复经总线送达 Claude（闲着会被叫醒），标成「用户本人 · 经 agent-bridge 网页」，它会当成你直接说的话；项目要先 ⋯ → 安装 / 升级 / 修复 换上新版总线")}">${ic("info")}</span>`;
   $("#toFixed").innerHTML = `发给 <b class="a-${esc(x.agent)}">${esc(nm)}</b>`;
   $$("#trHead .hib").forEach(b => b.setAttribute("aria-label", (b.title || "").split("\n")[0]));
   if ($("#toClaude")) $("#toClaude").onclick = () => handToClaude(x);
+  if ($("#pvSess")) $("#pvSess").onclick = () => pvSessLaunch(x);
   $("#trRefresh").onclick = e => { spin(e.currentTarget); trOffset = -1; trEntries = []; trResetState(true); pollTranscript(true); };
   if (!same) { trOffset = -1; trEntries = []; trResetState(false); $("#trView").innerHTML = `<div class="empty">正在读会话记录…</div>`; }
   $("#spBtn").onclick = () => spOpenP ? spClose() : spShow();
@@ -4792,7 +4799,7 @@ async function usSources(){
 }
 $("#mUsage").onclick = usOpen;
 // ---------- 0.6.0 模型与 API（agent_bridge/modelcfg.py；只在本机，key 只显示打码） ----------
-const MC = {tab:"claude", scope:"user", d:null, sel:new Set()};
+const MC = {tab:"prov", scope:"user", d:null, p:null, sel:new Set()};
 const CL_FIELDS = [["model","主模型","仅命令行 / 新会话默认；Claude 桌面版用它自己的模型选择"],["ANTHROPIC_DEFAULT_OPUS_MODEL","Opus 映射","opus 别名用哪个模型"],
   ["ANTHROPIC_DEFAULT_SONNET_MODEL","Sonnet 映射","sonnet 别名"],["ANTHROPIC_DEFAULT_HAIKU_MODEL","Haiku 映射","haiku 别名，也用于后台小任务（旧名 ANTHROPIC_SMALL_FAST_MODEL）"],
   ["ANTHROPIC_DEFAULT_FABLE_MODEL","Fable 映射","fable 别名"],["CLAUDE_CODE_SUBAGENT_MODEL","子代理模型","没单独指定模型的子代理 / 队友默认用它"]];
@@ -4804,24 +4811,25 @@ async function mcOpen(){
   $("#dlg").classList.add("wide"); await mcLoad();
 }
 async function mcLoad(){
-  try { MC.d = await api("/api/modelcfg" + (cur ? "?root=" + encodeURIComponent(cur.root) : "")); } catch(e){ $("#mcBox").innerHTML = `<div class="miss">读不到：${esc(e.message)}</div>`; return; }
+  const qs = cur ? "?root=" + encodeURIComponent(cur.root) : "";
+  try { [MC.d, MC.p] = await Promise.all([api("/api/modelcfg" + qs), api("/api/providers" + qs)]); } catch(e){ $("#mcBox").innerHTML = `<div class="miss">读不到：${esc(e.message)}</div>`; return; }
   if (!cur) MC.scope = "user"; mcRender();
 }
 function mcHead(){
   const d = MC.d, cs = d.ccswitch, run = d.running || {};
   let h = "";
-  if (cs.installed) h += `<div class="miss" style="background:var(--accent-weak);border-color:var(--accent)">检测到 <b>CC Switch</b>${cs.current && Object.keys(cs.current).length ? "：当前 " + Object.entries(cs.current).map(([a, n]) => `${esc(a)} → <b>${esc(n)}</b>`).join("，") : ""}。<b>切换供应商（Base URL / 账号）请在 CC Switch 里做</b>，它切换时会改写这些文件；这里管模型映射、子代理、思考强度和 key。</div>`;
+  if (cs.installed) h += `<div class="miss" style="background:var(--accent-weak);border-color:var(--accent)">检测到 <b>CC Switch</b>${cs.current && Object.keys(cs.current).length ? "（当前 " + Object.entries(cs.current).filter(([a]) => a === "claude" || a === "codex").map(([a, n]) => `${esc(a)} → <b>${esc(n)}</b>`).join("，") + "）" : ""}。CC Msg 现在可以自己管供应商，CC Switch 不是必须的；但<b>在 CC Switch 里切换会覆盖 CC Msg 设的值</b>（Codex 的整个 config.toml 都会被它换掉）。可以在「供应商」页把它的供应商导入过来。</div>`;
   const on = [run.claude && "Claude", run.codex && "Codex"].filter(Boolean);
   if (on.length) h += `<div class="miss">${on.join("、")} 正在运行：改动只对<b>之后新开的会话</b>生效；已经开着的会话要重开，Claude 桌面版 / Codex 桌面版要退出后重开。</div>`;
   if (d.plaintext.length) h += `<div class="miss" style="border-color:var(--bad);background:var(--bad-weak)">配置文件里有 <b>${d.plaintext.length}</b> 个明文 key：${d.plaintext.map(p => `${esc(p.tool)} <code>${esc(p.field)}</code>（${esc(p.masked)}）`).join("，")}。可以在「Key」页一键挪进 Windows 凭据管理器（先备份，你点了才做）。</div>`;
   return h;
 }
 function mcRender(){
-  const d = MC.d, tabs = [["claude","Claude"],["codex","Codex"],["agents","子代理"],["proxy","代理"],["keys","Key"],["backups","备份"]];
+  const d = MC.d, tabs = [["prov","供应商"],["claude","Claude"],["codex","Codex"],["agents","子代理"],["proxy","代理"],["keys","Key"],["backups","备份"]];
   $("#mcBox").innerHTML = mcHead() + `<div class="utabs">${tabs.map(([v,t]) => `<button data-mt="${v}" class="${MC.tab===v?"on":""}">${t}</button>`).join("")}</div><div id="mcTab"></div>
     <datalist id="mcModels">${MODEL_SUGG.map(m => `<option value="${m}">`).join("")}</datalist>`;
   $$("#mcBox [data-mt]").forEach(b => b.onclick = () => { MC.tab = b.dataset.mt; mcRender(); });
-  ({claude: mcClaude, codex: mcCodex, agents: mcAgents, proxy: mcProxy, keys: mcKeys, backups: mcBackups})[MC.tab]();
+  ({prov: mcProv, claude: mcClaude, codex: mcCodex, agents: mcAgents, proxy: mcProxy, keys: mcKeys, backups: mcBackups})[MC.tab]();
 }
 const mcScopeSeg = () => cur ? `<span class="seg" id="mcScope"><button data-v="user" class="${MC.scope==="user"?"on":""}">用户级（所有项目）</button><button data-v="project" class="${MC.scope==="project"?"on":""}">当前项目：${esc(cur.name || cur.root)}</button></span>` : "";
 function mcWireScope(){ $$("#mcScope button").forEach(b => b.onclick = () => { MC.scope = b.dataset.v; mcRender(); }); }
@@ -4949,6 +4957,141 @@ function mcBackups(){
   $("#mcTab").innerHTML = `<div class="dim" style="margin:8px 0;font-size:12.5px">每次写之前的原文件。还原时会先把现在的文件也备份一份。</div><table><tr><th class="l">时间</th><th class="l">操作</th><th class="l">文件</th><th></th></tr>${b.map(x => `<tr><td class="l">${new Date(x.at*1000).toLocaleString()}</td><td class="l">${esc(x.label)}</td><td class="l m" title="${esc(x.file)}">${esc(x.file)}</td><td><button data-rb="${esc(x.id)}">还原</button></td></tr>`).join("") || '<tr><td class="l dim" colspan="4">还没有备份</td></tr>'}</table>`;
   $$("#mcTab [data-rb]").forEach(btn => btn.onclick = async () => { const x = b.find(y => y.id === btn.dataset.rb); if (!confirm(`把 ${x.file} 还原成 ${new Date(x.at*1000).toLocaleString()} 的样子？`)) return;
     try { await api("/api/modelcfg/restore", {id: x.id}); toast("已还原"); } catch(e){ toast("没还原：" + e.message); } MC.tab = "backups"; await mcLoad(); });
+}
+// ---------- 供应商（CC Msg 自己管；CC Switch 可选） ----------
+async function pvApi(act, body){
+  const r = await fetch("/api/providers/" + act, {method:"POST", headers:{"Content-Type":"application/json","X-Msgbus":"1"}, body:JSON.stringify(body)});
+  const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error(j.error || r.status); e.status = r.status; e.j = j; throw e; } return j;
+}
+const PV_TOOL = {claude: "Claude Code", codex: "Codex"};
+const pvReach = (tool, lvl) => { const r = MC.p.reach[tool][lvl]; return `<span class="pvr" title="${esc(r.note)}"><span class="${r.cli?"y":"n"}">命令行 ${r.cli?"✓":"✗"}</span><span class="${r.desktop?"y":"n"}">桌面版 ${r.desktop?"✓":"✗"}</span></span>`; };
+const pvModels = (tool, p) => { const m = p.models || {}, ks = Object.keys(m); if (!ks.length && !p.effort) return '<span class="dim">（模型不改）</span>';
+  const lab = {model:"主", opus:"Opus", sonnet:"Sonnet", haiku:"Haiku", fable:"Fable", subagent:"子代理", review_model:"审查"};
+  return ks.map(k => `<span class="pvm">${lab[k]||k} <b>${esc(m[k])}</b></span>`).join("") + (p.effort ? `<span class="pvm">思考 <b>${esc(p.effort)}</b></span>` : ""); };
+function mcProv(){
+  const P = MC.p, cs = MC.d.ccswitch;
+  let h = `<div class="dim" style="margin:8px 0;font-size:12.5px">在这里管供应商（名字、Base URL、key、模型），点「设为全局」一键切换；key 存在凭据管理器，配置文件里只写取 key 的命令。还可以按<b>项目</b>或按<b>会话</b>单独用别的供应商，不动全局配置。${cs.installed ? ` <button class="ghost" id="pvCcs">从 CC Switch 导入…</button>` : ""}</div>`;
+  for (const tool of ["claude", "codex"]) {
+    const rows = P[tool];
+    h += `<div class="ucard pvsec"><div class="ufl"><b>${PV_TOOL[tool]}</b><span class="dim" style="font-size:12px">全局切换：</span>${pvReach(tool, "global")}<span style="flex:1"></span><button data-pvadd="${tool}">＋ 添加供应商</button></div>`;
+    if (P[tool + "_drift"]) h += `<div class="miss" style="margin-top:6px">${PV_TOOL[tool]} 的全局配置已经被别的工具改过${cs.installed ? "（多半是 CC Switch 切换了）" : ""}，和 CC Msg 记的不一致。要用 CC Msg 的，再点一次「设为全局」。</div>`;
+    h += rows.length ? `<table class="pvt"><tr><th class="l">名称</th><th class="l">地址</th><th class="l">key</th><th class="l">模型</th><th></th></tr>` + rows.map(p => `<tr class="${p.live ? "on" : ""}">
+      <td class="l"><b>${esc(p.name)}</b>${p.live ? ' <span class="tag ok">全局在用</span>' : ""}${p.from && p.from.startsWith("ccswitch") ? ' <span class="tag">CC Switch 导入</span>' : ""}${p.projects.length ? ` <span class="tag" title="${esc(p.projects.join("\n"))}">${p.projects.length} 个项目</span>` : ""}</td>
+      <td class="l m">${p.mode === "key" ? esc(p.base_url) : (tool === "claude" ? "官方（claude.ai 登录）" : "官方（ChatGPT 登录）")}${tool === "codex" && p.mode === "key" ? ` <span class="dim">${esc(p.wire_api)}</span>` : ""}</td>
+      <td class="l">${p.mode !== "key" ? '<span class="dim">登录</span>' : p.key_missing ? '<span class="note">缺 key</span>' : esc(p.key_masked)}</td>
+      <td class="l">${pvModels(tool, p)}</td>
+      <td class="r" style="white-space:nowrap">${p.live ? "" : `<button class="primary" data-pvsw="${esc(p.id)}" data-t="${tool}">设为全局</button>`}<button data-pved="${esc(p.id)}" data-t="${tool}">编辑</button>${p.mode === "key" ? `<button data-pvts="${esc(p.id)}" data-t="${tool}">测试</button>` : ""}<button class="ghost" data-pvdel="${esc(p.id)}" data-t="${tool}">删除</button></td></tr>`).join("") + "</table>"
+      : `<div class="dim" style="margin:6px 0">还没有。${cs.installed ? "可以从 CC Switch 导入，或" : ""}点「添加供应商」。</div>`;
+    if (tool === "codex") h += `<div class="ufl" style="margin-top:6px;font-size:12px"><span class="dim">全局切换写进 <code>[model_providers.<input id="pvSlot" value="${esc(P.codex_slot)}" style="width:90px;padding:1px 4px">]</code>；Codex 按这个 id 分对话列表，沿用原来的 id 老对话不会「消失」。</span><button class="ghost" id="pvSlotSave">改</button></div>`;
+    h += `<div id="pvOut-${tool}"></div></div>`;
+  }
+  if (cur) {
+    const pj = P.project || {};
+    h += `<div class="ucard pvsec"><div class="ufl"><b>项目覆盖：${esc(cur.name || cur.root)}</b><span class="dim" style="font-size:12px">只影响这个项目，不动全局</span></div><div class="setlist">` +
+      ["claude", "codex"].map(tool => `<div class="setrow"><div class="sl"><div><b>${PV_TOOL[tool]}</b> ${pvReach(tool, "project")}<div class="sd">${esc(P.reach[tool].project.note)}${tool === "claude" ? "；写 <code>.claude/settings.local.json</code>（已排除出 git）" : "；后台派活按它跑"}</div></div></div>
+        <span style="display:flex;gap:6px"><select data-pvpj="${tool}" style="width:220px"><option value="">（不覆盖，跟全局）</option>${P[tool].map(p => `<option value="${esc(p.id)}" ${pj[tool]===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select><button data-pvpjgo="${tool}">应用</button></span></div>`).join("") + `</div></div>`;
+    h += `<div class="ucard pvsec"><div class="ufl"><b>用指定供应商开会话</b>${pvReach("claude", "session")}<span class="dim" style="font-size:12px">CC Msg 开一个终端窗口跑命令行版；不改任何配置文件</span></div>
+      <div class="ufl" style="margin-top:6px"><select id="pvLt"><option value="claude">Claude Code</option><option value="codex">Codex</option></select><select id="pvLp" style="width:200px"></select><select id="pvLs" style="width:260px"></select><button id="pvLdry">看命令</button><button class="primary" id="pvLgo">在终端打开</button></div>
+      <div id="pvLout" class="dim" style="font-size:12px;margin-top:4px"></div></div>`;
+  }
+  $("#mcTab").innerHTML = h;
+  const back = () => { MC.tab = "prov"; mcOpen(); };
+  $$("#mcTab [data-pvadd]").forEach(b => b.onclick = () => pvEdit(b.dataset.pvadd, null));
+  $$("#mcTab [data-pved]").forEach(b => b.onclick = () => pvEdit(b.dataset.t, P[b.dataset.t].find(p => p.id === b.dataset.pved)));
+  $$("#mcTab [data-pvsw]").forEach(b => b.onclick = () => pvSwitch(b.dataset.t, P[b.dataset.t].find(p => p.id === b.dataset.pvsw)));
+  $$("#mcTab [data-pvts]").forEach(b => b.onclick = async () => { const o = $("#pvOut-" + b.dataset.t); o.innerHTML = '<div class="dim">测试中…</div>';
+    const r = await pvApi("test", {tool: b.dataset.t, id: b.dataset.pvts}).catch(e => ({ok: false, error: e.message})); o.innerHTML = mcTestHtml(r); });
+  $$("#mcTab [data-pvdel]").forEach(b => b.onclick = () => { const p = P[b.dataset.t].find(x => x.id === b.dataset.pvdel);
+    openDlg("删除供应商", `删除 <b>${esc(p.name)}</b>？只删 CC Msg 里的这条记录，已经写进配置文件的不动。${p.key ? `<label style="display:block;margin-top:8px"><input type="checkbox" id="pvDk"> 同时从凭据管理器删掉它的 key（${esc(p.key_masked || "")}）</label>` : ""}`, '<button id="pvNo">取消</button><button class="primary" id="mcGo">删除</button>');
+    $("#pvNo").onclick = back; $("#mcGo").onclick = async () => { try { await pvApi("delete", {tool: b.dataset.t, id: p.id, drop_key: !!($("#pvDk") && $("#pvDk").checked)}); toast("已删除"); } catch(e){ toast("没删：" + e.message); } back(); }; });
+  const ccs = $("#pvCcs"); if (ccs) ccs.onclick = pvCcs;
+  const ss = $("#pvSlotSave"); if (ss) ss.onclick = async () => { try { await pvApi("slot", {slot: $("#pvSlot").value.trim()}); toast("已改"); } catch(e){ toast("没改：" + e.message); } back(); };
+  $$("#mcTab [data-pvpjgo]").forEach(b => b.onclick = () => pvProject(b.dataset.pvpjgo, $(`#mcTab [data-pvpj="${b.dataset.pvpjgo}"]`).value));
+  if (cur) { const fill = () => { const t = $("#pvLt").value;
+      $("#pvLp").innerHTML = `<option value="">（按项目覆盖 / 全局）</option>` + P[t].map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
+      const ss = sessList.filter(s => s.agent === t).slice(0, 30);
+      $("#pvLs").innerHTML = `<option value="">新会话</option>` + ss.map(s => `<option value="${esc(s.sid)}">继续：${esc(s.alias || s.title || s.short || s.sid)}</option>`).join("");
+      $("#pvLout").innerHTML = P.cli[t] ? `命令行：<code>${esc(P.cli[t])}</code>` : `<span class="note">找不到 ${PV_TOOL[t]} 命令行版</span>`; };
+    $("#pvLt").onchange = fill; fill();
+    const go = async dry => { try { const r = await pvApi("launch", {tool: $("#pvLt").value, id: $("#pvLp").value || null, root: cur.root, resume: $("#pvLs").value || null, dry});
+        $("#pvLout").innerHTML = (dry ? "" : "已在新终端里打开。") + `<code style="word-break:break-all">${esc(r.cmd)}</code>`; } catch(e){ $("#pvLout").innerHTML = `<span class="note">${esc(e.message)}</span>`; } };
+    $("#pvLdry").onclick = () => go(true); $("#pvLgo").onclick = () => go(false); }
+}
+function pvEdit(tool, p){
+  const isNew = !p; p = p || {mode: "key", models: {}, wire_api: "responses"};
+  const m = p.models || {}, cl = tool === "claude";
+  const fields = cl ? [["model","主模型","settings 的 model"],["opus","Opus 映射",""],["sonnet","Sonnet 映射",""],["haiku","Haiku 映射","也用于后台小任务"],["fable","Fable 映射",""],["subagent","子代理模型",""]]
+                    : [["model","主模型",""],["review_model","审查模型","/review"],["subagent","子代理模型","[agents]"]];
+  const efs = cl ? ["", "low", "medium", "high", "xhigh"] : ["", "minimal", "low", "medium", "high", "xhigh"];
+  const login = cl ? "login" : "chatgpt";
+  openDlg((isNew ? "添加" : "编辑") + " " + PV_TOOL[tool] + " 供应商", `<div class="us mc pve">
+    <div class="ufl" style="margin-bottom:8px"><span class="dim">预设：</span>${[[login, cl ? "官方登录" : "ChatGPT 登录"],["official","官方 API Key"],["openkey","OpenKey"],["custom","自定义"]].map(([k,t]) => `<button data-pre="${k}">${t}</button>`).join("")}</div>
+    <div class="setlist">
+    <div class="setrow"><div class="sl"><b>名称</b></div><input id="pvN" value="${esc(p.name || "")}" style="width:280px"></div>
+    <div class="setrow"><div class="sl"><b>方式</b></div><select id="pvM" style="width:280px"><option value="key" ${p.mode==="key"?"selected":""}>API key + Base URL</option><option value="${login}" ${p.mode===login?"selected":""}>${cl ? "官方登录（claude.ai 订阅）" : "ChatGPT 登录"}</option></select></div>
+    <div class="setrow pvk"><div class="sl"><div><b>Base URL</b><div class="sd">${cl ? "ANTHROPIC_BASE_URL；空 = https://api.anthropic.com" : "OpenAI 兼容地址，一般以 /v1 结尾"}</div></div></div><input id="pvU" value="${esc(p.base_url || "")}" placeholder="${cl ? "https://api.anthropic.com" : "https://api.openai.com/v1"}" style="width:280px"></div>
+    ${cl ? "" : `<div class="setrow pvk"><div class="sl"><b>wire_api</b></div><select id="pvW" style="width:280px">${["responses","chat"].map(w => `<option ${p.wire_api===w?"selected":""}>${w}</option>`).join("")}</select></div>`}
+    <div class="setrow pvk"><div class="sl"><div><b>API key</b><div class="sd">存进凭据管理器，只写不读${p.key_masked ? "；已存：" + esc(p.key_masked) + "，留空不改" : ""}</div></div></div><input id="pvK" type="password" autocomplete="new-password" placeholder="${p.key_masked ? "（不改）" : "粘贴 key"}" style="width:280px"></div>
+    ${fields.map(([k, l, hint]) => `<div class="setrow"><div class="sl"><div><b>${l}</b>${hint ? `<div class="sd">${hint}</div>` : ""}</div></div><input data-pvf="${k}" list="mcModels" value="${esc(m[k] || "")}" placeholder="（不改）" style="width:280px"></div>`).join("")}
+    <div class="setrow"><div class="sl"><b>思考强度</b></div><select id="pvE" style="width:280px">${efs.map(e => `<option value="${e}" ${(p.effort||"")===e?"selected":""}>${e || "（不改）"}</option>`).join("")}</select></div>
+    </div><datalist id="mcModels">${MODEL_SUGG.map(x => `<option value="${x}">`).join("")}</datalist>
+    ${cl ? `<div class="miss" style="margin-top:8px">用 API key 的 Claude 供应商会<b>按 API 计费</b>，不走 claude.ai 订阅额度。Claude 桌面版不读这些设置。</div>` : ""}</div>`,
+    '<button id="pvNo">取消</button><button class="primary" id="pvSave">保存</button>');
+  $("#dlg").classList.add("wide");
+  const sync = () => $$("#dlgBody .pvk").forEach(r => r.style.display = $("#pvM").value === "key" ? "" : "none"); $("#pvM").onchange = sync; sync();
+  $$("#dlgBody [data-pre]").forEach(b => b.onclick = () => { const k = b.dataset.pre, okb = ((MC.d.codex.user.providers || []).find(x => /openkey/i.test((x.name || "") + (x.base_url || ""))) || {}).base_url;
+    if (k === login) { $("#pvM").value = login; if (!$("#pvN").value) $("#pvN").value = cl ? "Claude 官方登录" : "ChatGPT 登录"; }
+    else { $("#pvM").value = "key"; }
+    if (k === "official") { $("#pvU").value = cl ? "https://api.anthropic.com" : "https://api.openai.com/v1"; if (!$("#pvN").value) $("#pvN").value = cl ? "Anthropic API" : "OpenAI API"; }
+    if (k === "openkey") { $("#pvU").value = okb ? (cl ? okb.replace(/\/v1\/?$/, "") : okb) : "https://"; if (!$("#pvN").value) $("#pvN").value = "OpenKey"; }
+    if (k === "custom") { $("#pvU").value = ""; $("#pvU").focus(); }
+    sync(); });
+  $("#pvNo").onclick = () => { MC.tab = "prov"; mcOpen(); };
+  $("#pvSave").onclick = async () => { const models = {}; $$("#dlgBody [data-pvf]").forEach(i => { if (i.value.trim()) models[i.dataset.pvf] = i.value.trim(); });
+    const prov = {id: p.id, name: $("#pvN").value.trim(), mode: $("#pvM").value, base_url: $("#pvU").value.trim(), wire_api: $("#pvW") ? $("#pvW").value : undefined, models, effort: $("#pvE").value || null, from: p.from};
+    try { const r = await pvApi("save", {tool, provider: prov, secret: $("#pvK").value || null}); $("#pvK").value = ""; toast(`已保存 ${r.name}${r.key_masked ? "（key " + r.key_masked + "）" : ""}`); MC.tab = "prov"; mcOpen(); }
+    catch(e){ toast("没保存：" + e.message); } };
+}
+function pvSwitch(tool, p, drop){
+  const cl = tool === "claude", cs = MC.d.ccswitch, run = MC.d.running || {};
+  const warn = [];
+  if (cl && p.mode === "key") warn.push("Claude Code 会<b>改用这个 key 按 API 计费</b>，不走 claude.ai 订阅额度。");
+  if (cl) warn.push("Claude 桌面版不读这些设置（它走自己的登录 / 第三方推理配置），只影响命令行和 VS Code。");
+  else warn.push("Codex 桌面版也会用它，要退出重开桌面版。");
+  if (cs.installed) warn.push("CC Switch 还装着：在 CC Switch 里切换会<b>覆盖</b>这里的设置" + (cl ? "" : "（它会换掉整个 config.toml）") + "。");
+  if (run[tool]) warn.push("正在运行的会话要重开才生效。");
+  const f = cl ? "~/.claude/settings.json" : "~/.codex/config.toml";
+  const body = cl ? (p.mode === "key" ? `ANTHROPIC_BASE_URL = <b>${esc(p.base_url)}</b>；apiKeyHelper 从凭据管理器取 <b>${esc(p.key || "")}</b>（${esc(p.key_masked || "缺")}）；模型映射按这个供应商设，没填的删掉` : "去掉 Base URL、apiKeyHelper 和模型映射，回到 claude.ai 登录")
+    : (p.mode === "key" ? `model_provider = <b>${esc(MC.p.codex_slot)}</b>，[model_providers.${esc(MC.p.codex_slot)}] 改成 ${esc(p.base_url)}，key 从凭据管理器取 <b>${esc(p.key || "")}</b>` : "model_provider = <b>openai</b>（用 codex login 的 ChatGPT 登录；auth.json 不动）");
+  openDlg("切换全局供应商", `<div>把 ${PV_TOOL[tool]} 切到 <b>${esc(p.name)}</b>：改 <code>${f}</code>（先备份，写完核对）。</div><ul><li>${body}</li>${p.models && Object.keys(p.models).length ? "<li>模型：" + pvModels(tool, p) + "</li>" : ""}</ul>${warn.map(w => `<div class="miss" style="margin-top:6px">${w}</div>`).join("")}${drop ? `<div class="miss" style="margin-top:6px;border-color:var(--bad);background:var(--bad-weak)">${drop.map(x => `<code>${esc(x.field)}</code>（${esc(x.masked)}）`).join("、")} 是明文 key，会从配置里拿掉（备份里还在，不会存进凭据管理器）。</div>` : ""}`,
+    '<button id="pvNo">取消</button><button class="primary" id="mcGo">切换</button>');
+  $("#pvNo").onclick = () => { MC.tab = "prov"; mcOpen(); };
+  $("#mcGo").onclick = async () => { try { const r = await pvApi("switch", {tool, id: p.id, drop_plaintext: !!drop}); toast(r.live ? `已切到 ${p.name}，备份 ${r.backup || "（原来没有文件）"}` : "写了，但核对不一致，请到「备份」页还原"); MC.tab = "prov"; mcOpen(); }
+    catch(e){ if (e.status === 409 && e.j.plaintext) return pvSwitch(tool, p, e.j.plaintext); toast("没切换：" + e.message); MC.tab = "prov"; mcOpen(); } };
+}
+async function pvProject(tool, id, drop){
+  const p = id ? MC.p[tool].find(x => x.id === id) : null;
+  const what = p ? `这个项目的 ${PV_TOOL[tool]} 改用 <b>${esc(p.name)}</b>` : `取消这个项目的 ${PV_TOOL[tool]} 覆盖（只删 CC Msg 写的几项）`;
+  const note = tool === "claude" ? "写 <code>.claude/settings.local.json</code>：Base URL、取 key 的命令、模型映射；同时把用户级的明文 key 在这个项目里置空（不然它会压过这里的 key）。命令行 / VS Code 生效，交互模式要先信任这个目录；桌面版不认。"
+    : "Codex 不允许项目配置改供应商（官方限制），所以 CC Msg 只记下来：从 CC Msg 开的命令行会话和后台派活按它启动。模型 / 思考强度写进 <code>.codex/config.toml</code>（桌面版也认，项目要受信任）。";
+  openDlg("项目覆盖", `<div>${what}？</div><div class="miss" style="margin-top:6px">${note}</div>${drop ? `<div class="miss" style="margin-top:6px">${drop.map(x => `<code>${esc(x.field)}</code>（${esc(x.masked)}）`).join("、")} 是明文 key，会从项目配置里拿掉（备份里还在）。</div>` : ""}`, '<button id="pvNo">取消</button><button class="primary" id="mcGo">应用</button>');
+  $("#pvNo").onclick = () => { MC.tab = "prov"; mcOpen(); };
+  $("#mcGo").onclick = async () => { try { await pvApi("project", {tool, id: id || null, root: cur.root, drop_plaintext: !!drop}); toast("已应用"); MC.tab = "prov"; mcOpen(); }
+    catch(e){ if (e.status === 409 && e.j.plaintext) return pvProject(tool, id, e.j.plaintext); toast("没应用：" + e.message); MC.tab = "prov"; mcOpen(); } };
+}
+async function pvCcs(){
+  let items; try { items = (await pvApi("ccs-preview", {})).items; } catch(e){ return toast("读不了 CC Switch：" + e.message); }
+  openDlg("从 CC Switch 导入供应商", `<div class="dim" style="margin-bottom:8px">只读打开 CC Switch 的数据库，不改它。导入的 key 存进凭据管理器；之后切换在 CC Msg 里做。</div>
+    <table><tr><th></th><th class="l">工具</th><th class="l">名称</th><th class="l">地址</th><th class="l">key</th><th class="l">模型</th></tr>${items.map(x => `<tr><td>${x.imported ? '<span class="dim">已导入</span>' : `<input type="checkbox" data-ci="${esc(x.ccs_id)}" checked>`}</td><td class="l">${PV_TOOL[x.tool]}</td><td class="l"><b>${esc(x.name)}</b>${x.current ? ' <span class="tag">CC Switch 当前</span>' : ""}</td>
+      <td class="l m">${x.mode === "key" ? esc(x.base_url || "官方") : "官方登录"}</td><td class="l">${esc(x.key_masked || "—")}</td><td class="l">${pvModels(x.tool, x)}</td></tr>`).join("") || '<tr><td colspan="6" class="dim">没有可导入的</td></tr>'}</table>`,
+    '<button id="pvNo">取消</button><button class="primary" id="mcGo">导入选中</button>');
+  $("#dlg").classList.add("wide");
+  $("#pvNo").onclick = () => { MC.tab = "prov"; mcOpen(); };
+  $("#mcGo").onclick = async () => { const ids = $$("#dlgBody [data-ci]").filter(c => c.checked).map(c => c.dataset.ci); if (!ids.length) return toast("没选");
+    try { const r = await pvApi("ccs-import", {ids}); toast(`导入 ${r.imported.length} 个${r.skipped.length ? "，跳过 " + r.skipped.length + " 个" : ""}`); } catch(e){ toast("没导入：" + e.message); } MC.tab = "prov"; mcOpen(); };
+}
+function pvSessLaunch(x){
+  MC.tab = "prov"; mcOpen().then(() => { const t = $("#pvLt"); if (!t) return; t.value = x.agent; t.onchange(); $("#pvLs").value = x.sid; $("#pvLt").scrollIntoView({block: "center"}); });
 }
 $("#mModel").onclick = mcOpen;
 </script>

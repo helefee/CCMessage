@@ -1630,6 +1630,13 @@ class Handler(BaseHTTPRequestHandler):
                 from . import modelcfg
                 root = str(proj_root(q["root"])) if q.get("root") else None
                 self._json(modelcfg.overview(root))
+            elif u.path == "/api/providers":
+                # 供应商：只给本机（返回里只有打码后的 key）
+                if not self._local():
+                    return self._err("供应商只能在电脑上看", 403)
+                from . import providers
+                root = str(proj_root(q["root"])) if q.get("root") else None
+                self._json(providers.overview(root))
             elif u.path.startswith("/api/usage/"):
                 # 用量统计：只给本机（局域网 8766 本来就不在 PHONE_GET 里，这里再挡一道）
                 if not self._local():
@@ -1866,6 +1873,40 @@ class Handler(BaseHTTPRequestHandler):
                                                         body.get("model"), bool(body.get("use_settings_key"))))
                 else:
                     self._err("not found", 404)
+            elif path.startswith("/api/providers/"):
+                if not self._local():
+                    return self._err("供应商只能在电脑上改", 403)
+                from . import providers
+                act = path.rsplit("/", 1)[1]
+                tool = body.get("tool") or "claude"
+                root = str(proj_root(body["root"])) if body.get("root") else None
+                try:
+                    if act == "save":
+                        self._json(providers.upsert(tool, body.get("provider") or {}, body.get("secret") or None))
+                    elif act == "delete":
+                        self._json(providers.delete(tool, str(body["id"]), bool(body.get("drop_key"))))
+                    elif act == "switch":
+                        self._json(providers.apply_global(tool, str(body["id"]), bool(body.get("drop_plaintext"))))
+                    elif act == "project":
+                        if not root:
+                            raise ValueError("要先选一个项目")
+                        self._json(providers.apply_project(tool, root, body.get("id") or None, bool(body.get("drop_plaintext"))))
+                    elif act == "slot":
+                        self._json(providers.set_slot(str(body["slot"])))
+                    elif act == "launch":
+                        if not root:
+                            raise ValueError("要先选一个项目")
+                        self._json(providers.launch(tool, body.get("id") or None, root, body.get("resume") or None, bool(body.get("dry"))))
+                    elif act == "ccs-preview":
+                        self._json({"items": providers.ccswitch_preview()})
+                    elif act == "ccs-import":
+                        self._json(providers.ccswitch_import([str(x) for x in body.get("ids") or []]))
+                    elif act == "test":
+                        self._json(providers.test(tool, str(body["id"])))
+                    else:
+                        self._err("not found", 404)
+                except providers.PlaintextError as e:
+                    self._json({"error": str(e), "plaintext": e.items}, 409)
             elif path.startswith("/api/usage/"):
                 if not self._local():
                     return self._err("用量统计只能在电脑上用", 403)
