@@ -59,6 +59,21 @@ jobs:
       - name: Build (Nuitka app + bus.exe, smoke test, Inno Setup installer, zip)
         shell: cmd
         run: build_desktop.cmd -Zip
+      - name: Isolated "CC Msg TEST" installer (branch / PR builds only, for manual tray tests; never released)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        shell: pwsh
+        run: |
+          $v = ([regex]'__version__\s*=\s*"([^"]+)"').Match((Get-Content agent_bridge\__init__.py -Raw)).Groups[1].Value
+          New-Item -ItemType Directory -Force dist\test | Out-Null
+          & $env:ISCC /Q "/DTestBuild=1" "/DAppVersion=$v" "/DSourceDir=$PWD\dist\CCMsg" "/DOutputDir=$PWD\dist\test" installer\CCMsg.iss
+          if ($LASTEXITCODE) { throw "ISCC TEST failed" }
+          Get-ChildItem dist\test
+      - uses: actions/upload-artifact@v4.6.2
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        with:
+          name: CCMsg-TEST-Setup
+          path: dist/test/CCMsg-TEST-Setup-*.exe
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4.6.2
         with:
           name: CCMsg-Setup
