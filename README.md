@@ -28,7 +28,7 @@
 
     git clone https://github.com/helefee/CCMessage.git
     cd CCMessage
-    python -m agent_bridge            # 或双击 start.cmd（Windows）/ ./start.sh
+    python -m agent_bridge            # 或双击 start.cmd（Windows）/ ./run.sh（Linux / macOS）
 
 浏览器打开 http://127.0.0.1:8765/ 。右上角 ⋯ →「添加项目」选项目目录 →「一键安装」。
 
@@ -61,6 +61,41 @@
 代价是以后挪动 / 删除桌面版文件夹，钩子就跑不起来了 —— 界面会显示「总线可修复 / 钩子的 Python 不在了」，点「升级 / 修复」就会改成现在能用的：
 Claude 钩子直接改；Codex 钩子平时一字不动，只有它写的 Python 已经不在了（反正跑不起来）才改，改完要在 Codex 的 `/hooks` 里重新信任。
 `python -m agent_bridge doctor` 会列出每个项目的钩子用的是哪个 Python。
+
+### Linux
+
+管理界面、手机端、会话记录、交接、Claude Code 命令行（`~/.claude`）和 Codex（`~/.codex`）都能用；
+桌面信件动画（Win32）、「同步 Claude 会话到当前账号」（Claude 桌面端，Linux 上没有）会自动隐藏。
+
+    git clone https://github.com/helefee/CCMessage.git && cd CCMessage
+    ./install.sh                     # 建 .venv、装 qrcode、跑 doctor（要 Python 3.11+；Debian / Ubuntu 先 sudo apt install python3-venv）
+    ./run.sh                         # 打开 http://127.0.0.1:8765/
+    ./run.sh install ~/code/myproj   # 不开界面也能把总线装进项目
+
+做成开机 / 登录后自动跑的 systemd 用户服务：
+
+    ./install.sh --service                     # ~/.config/systemd/user/agent-bridge.service，已 enable --now
+    systemctl --user status agent-bridge       # 看状态；日志 journalctl --user -u agent-bridge -f
+    sudo loginctl enable-linger $USER          # 想不登录也一直跑
+    ./install.sh --uninstall-service           # 删掉服务（.venv 和数据不动）
+
+**在服务器上跑、从别的机器访问**：管理界面永远只听 127.0.0.1，不会开到局域网。
+要从别的设备用，开一个只认配对设备的监听，跟手机端是同一套设备令牌：
+
+    ./run.sh --no-browser --host 0.0.0.0       # 局域网监听在 端口+1（8766），可用 --lan-port 改
+    ./install.sh --service --host 0.0.0.0      # 服务也一样
+    ./run.sh pair                              # 出一个一次性配对链接 + 终端二维码（3 分钟、只能用一次）
+
+没配对的请求一律 401；配对过的设备也只能看、发消息，安装 / 卸载 / 配对 / 设置只能在本机做。
+真要远程管理，用 SSH 端口转发：`ssh -L 8765:127.0.0.1:8765 服务器`，再在自己电脑上开 http://127.0.0.1:8765/ 。
+
+钩子用 `.venv` 背后的系统 python3（`/usr/bin/python3`），删 / 重建 `.venv` 不影响钩子。
+
+可选的桌面窗口模式（GTK WebKit）：
+
+    sudo apt install python3-gi gir1.2-webkit2-4.1              # Fedora：python3-gobject webkit2gtk4.1
+    rm -rf .venv && python3 -m venv --system-site-packages .venv && ./install.sh --desktop
+    ./run.sh desktop
 
 **装进项目会做什么**（改前都备份到项目的 `.msgbus/bak/`）：
 
