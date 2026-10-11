@@ -383,23 +383,25 @@ Cursor（3.x）会读项目 `.claude/settings.json` 里的 Claude 钩子（设�
 
 ⋯ 菜单 →「模型与 API…」，或设置页最上面那一行（只在电脑上；局域网 / 手机端访问一律 403，手机上也不显示入口）。
 
-- **供应商（不依赖 CC Switch）**：「供应商」页（第一个页签）里添加 / 编辑 / 删除 Claude Code 和 Codex 的供应商：名字、Base URL、key、模型映射、思考强度，Codex 还有 wire_api；点「设为全局」一键切换。装了 CC Switch 也能用，可以把它的供应商**只读导入**过来（key 进凭据管理器）；但在 CC Switch 里切换会覆盖 CC Msg 设的值（Codex 的整个 config.toml 都会被它换掉），页面会提示「被别的工具改过」。
-- **Claude**：主模型（只对命令行 / 新会话有效，Claude 桌面版用自己的选择）、Opus / Sonnet / Haiku / Fable 别名映射、子代理模型、思考强度（`effortLevel`）。可选「用户级」或「当前项目」（项目级写 `<项目>/.claude/settings.local.json`，只放模型和思考强度）。
-- **Codex**：`model`、`review_model`、`model_reasoning_effort`、`[agents]` 子代理模型和思考强度；项目级写 `<项目>/.codex/config.toml`。
-- **预设**：官方登录 / 官方 API Key / OpenKey / 自定义——只是帮你填表，点「保存」才写。
-- **key**：存在 Windows 凭据管理器（`CCMsg/key/<名字>`）。Claude 通过 `apiKeyHelper`、Codex 通过 `[model_providers.x.auth]` 运行 `CCMsg.exe key get <名字>` 取 key，配置文件里不留明文。页面和接口只显示打码后的样子（`sk-...abcd`），永远不返回完整 key。注意：设了 `apiKeyHelper` 后 Claude 会改用 API key 计费，不再走订阅。
-- **怎么写的**：只改 CC Msg 管的这几项，其它键、注释、顺序原样保留（TOML 用 tomlkit）；每次写之前先备份到 `~/.agent-bridge/backups`，原子写入，写完再读回来核对；「备份」页一键还原。
-- **测试连接**：用当前地址和 key 发一个最小请求，显示 HTTP 状态（不会显示 key）。保存前会列出要改的项、哪些会话要重开、计费 / 桌面版提示。
-- **一键迁移明文 key / 统一子代理模型**：是按钮，**不会自动执行**；点了才做，做之前先备份。统一子代理模型会跳过 opencodex 生成的 `ocx-*` 代理。
-- **代理（opencodex / magpie）**：检测到就列出路由，`ocx-*` 代理显示它真正用的模型，可一键把 Claude / Codex 指向代理。
+打开就是**供应商列表**，Claude Code 和 Codex 各一段：每行是名称、Base URL、key 的后 4 位。**点一行就切到它**（圆点标出在用的那个），每行有个小「测试」按钮；「＋ 添加供应商」带预设（官方登录 / 官方 API Key / OpenKey / 自定义）。
+
+- **不依赖 CC Switch**：CC Msg 自己管供应商（添加 / 编辑 / 删除 / 一键切换）。装了 CC Switch 也能用，可以把它的供应商**只读导入**过来（key 进凭据管理器）；但在 CC Switch 里切换会覆盖 CC Msg 设的值（Codex 的整个 config.toml 都会被它换掉）。
+- **编辑供应商**：只有名称、Base URL、key、模型四项；Opus / Sonnet / Haiku / Fable 映射、子代理模型、思考强度、Codex 的 wire_api 和审查模型都收在默认折起的「高级」里。
+- **提示只有一行**：检测到 CC Switch、要重开会话、有明文 key、配置被别的工具改过——有才显示，合成一行小字，点开看详情。
+- **⋯ 菜单（对话框右上角）**：备份 / 恢复、代理（opencodex / magpie：检测、显示路由、一键指过去）、迁移明文 key、从 CC Switch 导入、Key 列表、子代理定义（统一 `.claude/agents/*.md` 的模型，跳过 `ocx-*`）、直接改 Claude / Codex 配置文件、Codex 对话列表 id。
+- **项目级**：在左栏项目文件夹那一行右键（或悬停时的 ⋯）→「供应商与模型…」：这个项目用哪个供应商、项目的模型和思考强度、用指定供应商开会话。会话标题栏的钥匙按钮也能改这个项目默认用哪个。
+- **key**：存在 Windows 凭据管理器（`CCMsg/key/<名字>`）。Claude 通过 `apiKeyHelper`、Codex 通过 `[model_providers.x.auth]` 运行 `CCMsg.exe key get <名字>` 取 key，配置文件里不留明文。页面和接口只显示打码后的样子，永远不返回完整 key。注意：Claude 用 API key 会按 API 计费，不再走订阅；从订阅登录切到 key 的供应商时会先问一句。
+- **怎么写的**：只改 CC Msg 管的这几项，其它键、注释、顺序原样保留（TOML 用 tomlkit）；每次写之前先备份到 `~/.agent-bridge/backups`，原子写入，写完再读回来核对；⋯ →「备份 / 恢复」一键还原。
+- **明文 key**：切换时如果配置里有明文 key，会先列出来（打码）要你确认；一键迁移是按钮，**不会自动执行**。
+- 「仅命令行」「命令行和桌面版都生效」这类小字提示每处设置对谁生效，鼠标放上去看原因。
 
 ### 按项目、按会话用不同的供应商
 
 | 层级 | Claude Code | Codex |
 |---|---|---|
-| 全局（「设为全局」） | 改 `~/.claude/settings.json`：命令行、VS Code 认；**桌面版不认**（它走自己的登录 / 第三方推理配置） | 改 `~/.codex/config.toml`：命令行和桌面版都认（桌面版要重开） |
-| 项目（「项目覆盖」） | 写 `<项目>/.claude/settings.local.json`（自动排除出 git）：命令行、VS Code 认，交互模式要先信任这个目录；桌面版不认 | **Codex 不许项目配置改供应商**（官方限制）：只对 CC Msg 开的命令行会话和后台派活生效；模型 / 思考强度写进 `.codex/config.toml`，桌面版也认 |
-| 会话（「用指定供应商开会话」、会话标题栏的钥匙按钮） | CC Msg 开一个终端跑 `claude --settings <文件> [--resume <会话>]`，只限命令行 | CC Msg 开一个终端跑 `codex -c … [resume <会话>]`，只限命令行；老对话的归属不变 |
+| 全局（列表里点一行） | 改 `~/.claude/settings.json`：命令行、VS Code 认；**桌面版不认**（它走自己的登录 / 第三方推理配置） | 改 `~/.codex/config.toml`：命令行和桌面版都认（桌面版要重开） |
+| 项目（项目右键 →「供应商与模型」） | 写 `<项目>/.claude/settings.local.json`（自动排除出 git）：命令行、VS Code 认，交互模式要先信任这个目录；桌面版不认 | **Codex 不许项目配置改供应商**（官方限制）：只对 CC Msg 开的命令行会话和后台派活生效；模型 / 思考强度写进 `.codex/config.toml`，桌面版也认 |
+| 会话（项目菜单里「用指定供应商开会话」、会话标题栏的钥匙按钮） | CC Msg 开一个终端跑 `claude --settings <文件> [--resume <会话>]`，只限命令行 | CC Msg 开一个终端跑 `codex -c … [resume <会话>]`，只限命令行；老对话的归属不变 |
 
 - 项目 / 会话层会把用户级的明文 key（`ANTHROPIC_AUTH_TOKEN` 等）置空，因为它会压过 `apiKeyHelper`（实测）。
 - 切换时如果配置里有明文 key，会先列出来（打码）要你确认；拿掉的明文只留在备份里，**不会**自动存进凭据管理器。
