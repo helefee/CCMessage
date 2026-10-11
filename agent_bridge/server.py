@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -40,6 +41,8 @@ TOOL = paths.PKG                      # 程序本体（包目录）
 DATA = paths.HOME                     # 每个用户自己的数据：~/.agent-bridge
 BUS_SRC = TOOL / "bus.py"
 INDEX = TOOL / "index.html"
+FONTS = TOOL / "fonts"          # 界面字体（Inter / JetBrains Mono，OFL，只裁了拉丁字符）
+_FONT_NAME = re.compile(r"^[a-z0-9-]{1,40}\.woff2$")
 AVATARS = TOOL / "bloub-icons.json"      # 会话头像数据（由 tools/gen_bloub_icons.ts 从 bloub 导出）
 REGISTRY = DATA / "projects.json"
 PY = Path(sys.executable).as_posix()
@@ -154,11 +157,27 @@ def add_hooks(cfg: dict, cmd: str, agent: str) -> list[str]:
             entry = {"hooks": [{
                 "type": "command", "command": f"{cmd} --rewake --max-secs {REWAKE_TIMEOUT - 60}",
                 "asyncRewake": True, "timeout": REWAKE_TIMEOUT,
-                "rewakeMessage": "📨 msgbus：",
-                "rewakeSummary": "msgbus：收到别的会话发来的消息"}]}
+                "rewakeMessage": REWAKE_MESSAGE, "rewakeSummary": REWAKE_SUMMARY}]}
         hooks.setdefault(ev, []).append(entry)
         added.append(ev)
     return added
+
+
+# Stop 钩子叫醒时 Claude 会把 rewakeSummary 当成通知标题。旧版写的是「收到别的会话发来的消息」，
+# 可网页里用户本人的回复也走这条路，标题不能一口咬定是「别的会话」
+REWAKE_MESSAGE = "📨 msgbus："
+REWAKE_SUMMARY = "msgbus：收到新消息"
+
+
+def stale_rewake(cfg: dict) -> list[dict]:
+    """我们挂的 Claude Stop 钩子里提示语还是旧版的那些（只认自己的，别人的钩子不碰）。"""
+    out = []
+    for g in (cfg.get("hooks") or {}).get("Stop") or []:
+        for h in g.get("hooks") or []:
+            if is_ours(h.get("command", ""), "claude") and h.get("asyncRewake") and \
+                    (h.get("rewakeSummary") != REWAKE_SUMMARY or h.get("rewakeMessage") != REWAKE_MESSAGE):
+                out.append(h)
+    return out
 
 
 def remove_hooks(cfg: dict, agent: str) -> int:
@@ -213,6 +232,11 @@ def project_status(root: Path) -> dict:
         if got:
             claude_where.append(f.name)
         ev_claude |= got
+        try:
+            if got and stale_rewake(read_json(f, {})):
+                st["claude_stale"] = True
+        except ValueError:
+            pass
     try:
         ev_codex = events_with_ours(read_json(root / ".codex" / "hooks.json", {}), "codex")
     except ValueError as e:
@@ -224,7 +248,8 @@ def project_status(root: Path) -> dict:
         "claude_files": claude_where,
         "codex_hooks": sorted(ev_codex),
         "codex_trusted": sorted(ev for ev, ok in trust.items() if ok),
-        "bus_outdated": bool(bus_rel) and md5_file(root / bus_rel / "bus.py") != md5_file(BUS_SRC),
+        "bus_outdated": bool(bus_rel) and (md5_file(root / bus_rel / "bus.py") != md5_file(BUS_SRC)
+                                           or bool(st.get("claude_stale"))),
     })
     st["installed"] = bool(bus_rel) and len(ev_claude) == len(CLAUDE_EVENTS) and len(ev_codex) == len(EVENTS)
     st["claude_total"], st["codex_total"] = len(CLAUDE_EVENTS), len(EVENTS)
@@ -287,6 +312,16 @@ def install(root: Path) -> dict:
         log.append(f"Claude 钩子加到 .claude/{target.name}：{', '.join(added)}" + (f"（原件备份 {Path(b).name}）" if b else ""))
     else:
         log.append(f"Claude 钩子已齐（.claude/{target.name}）")
+    # 旧版 Stop 钩子的提示语顺手改新（只动 rewakeSummary / rewakeMessage 两个字段，命令不变）
+    for f in claude_files(root):
+        cfg = read_json(f, {})
+        old = stale_rewake(cfg)
+        if old:
+            for h in old:
+                h["rewakeMessage"], h["rewakeSummary"] = REWAKE_MESSAGE, REWAKE_SUMMARY
+            b = backup(f, bak)
+            write_json(f, cfg)
+            log.append(f"更新 .claude/{f.name} 里 Stop 钩子的叫醒提示语" + (f"（原件备份 {Path(b).name}）" if b else ""))
 
     # Codex：只补缺的，已有的一字不动（改了命令 Codex 会要求重新信任）
     cx = root / ".codex" / "hooks.json"
@@ -315,7 +350,8 @@ def install(root: Path) -> dict:
     st = project_status(root)
     if len(st["codex_trusted"]) < 3:
         log.append("⚠ 还差一步：在 Codex 里打开这个项目，进钩子管理（/hooks）把 3 个 msgbus 钩子设为信任。")
-    log.append("正在跑的 Claude 会话一般不用重开就能接上；如果没接上，重开一次会话。")
+    log.append("正在跑的 Claude 会话一般不用重开就能接上；如果没接上，重开一次会话。"
+               "（已经闲着在后台待命的 Claude 会话用的还是旧版 bus.py，要等它下一轮干完才换上新版）")
     return {"log": log, "status": st, "selftest": selftest(root)}
 
 
@@ -353,7 +389,7 @@ def run_bus(root: Path, args: list[str], stdin: str | None = None, cwd: Path | N
     if not bus_rel:
         raise ValueError("这个项目还没装总线")
     env = dict(os.environ, PYTHONUTF8="1")
-    for k in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"):
+    for k in ("CLAUDE_CODE_SESSION_ID", "CLAUDECODE", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CURSOR_AGENT", "MSGBUS_AS"):
         env.pop(k, None)
     return subprocess.run([sys.executable, str(root / bus_rel / "bus.py")] + args,
                           input=(stdin or "").encode("utf-8"), capture_output=True,
@@ -400,7 +436,7 @@ def selftest(root: Path) -> dict:
         ok &= good
         # 待命：模拟 Claude 闲下来（Stop 钩子后台跑），再发一条，看它是否以退出码 2 结束并带出内容
         env = dict(os.environ, PYTHONUTF8="1")
-        for k in ("CLAUDE_CODE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID"):
+        for k in ("CLAUDE_CODE_SESSION_ID", "CLAUDECODE", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CURSOR_AGENT", "MSGBUS_AS"):
             env.pop(k, None)
         lp = subprocess.Popen([sys.executable, str(bus_dir / "bus.py"), "hook", "claude", "--rewake", "--max-secs", "20"],
                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(root), env=env)
@@ -748,12 +784,36 @@ def transcript(root: Path, agent: str, sid: str, since: int) -> dict:
     return transcripts.read(agent, sid, since, rec.get("transcript"))
 
 
+def subtask_info(root: Path, agent: str, sid: str, ids: str) -> dict:
+    """主记录里各个子任务的实时情况（子代理记录里数出来的工具次数、最后活动、交回的报告）。只有 Claude 有。"""
+    if agent != "claude":
+        return {"items": {}}
+    rec = session_rec(root, agent, sid)
+    return {"items": transcripts.subtask_info(sid, [x for x in ids.split(",") if x], rec.get("transcript"))}
+
+
+def subtask_list(root: Path, agent: str, sid: str) -> dict:
+    """整个会话的子任务总表（整份主记录扫一遍，增量缓存）。只有 Claude 有。"""
+    if agent != "claude":
+        return {"items": [], "total": 0}
+    rec = session_rec(root, agent, sid)
+    return transcripts.subtask_list(sid, rec.get("transcript"))
+
+
+def subtask_transcript(root: Path, agent: str, sid: str, aid: str, since: int) -> dict:
+    if agent != "claude":
+        return {"entries": [], "offset": 0, "missing": True}
+    rec = session_rec(root, agent, sid)
+    return transcripts.read_subtask(sid, aid, since, rec.get("transcript"))
+
+
 codex_exe = paths.codex_exe
 
 
 def reply(root: Path, agent: str, sid: str, text: str, kind: str, who: str) -> dict:
     """在会话视图里回复 / 派活。
-    Codex 的「回复」用 codex queue 交成一条真正的用户输入；Claude 没有外部注入用户输入的口子，走总线（钩子送达、闲着会被叫醒）。
+    Codex 的「回复」用 codex queue 交成一条真正的用户输入；Claude 没有外部注入用户输入的口子，走总线（钩子送达、闲着会被叫醒），
+    发件人是 user:ui / user:phone，总线送达时标成【用户本人 · 经 agent-bridge 网页】，让 Claude 当成用户直接说的话。
     派活两边都走总线 task（有任务号、done 回报）。"""
     rec = session_rec(root, agent, sid)
     short = sid[-6:] if agent == "codex" else sid[:6]
@@ -827,7 +887,8 @@ LAN = {"srv": None, "ip": None, "port": None}
 PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
 PHONE_GET = {"/", "/bloub-icons.json", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
-             "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout"}
+             "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout",
+             "/api/transcript/subtasks", "/api/transcript/subtask", "/api/transcript/subtask-list"}
 PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role", "/api/codex/resume"}
 
 
@@ -844,12 +905,13 @@ def sm_get(path: str, q: dict) -> dict:
     if path == "/api/jobs":
         return {"jobs": apps.pending(), "apps": apps.status()}
     if path == "/api/sm/sync":
-        cp = claude_sync.plan()
+        cp = claude_sync.plan(source="desktop")
         xp = codex_unify.plan()
         return {"apps": apps.status(),
                 "claude": {"ok": cp.get("ok"), "error": cp.get("error"), "target": cp.get("target"),
                            "add": len(cp.get("add", [])), "update": len(cp.get("update", [])),
                            "add_archived": sum(1 for a in cp.get("add", []) if a["archived"]),
+                           "source": "desktop", "accounts": claude_sync.accounts(),
                            "backups": claude_sync.list_backups()[:15]},
                 "codex": {"provider": xp["provider"], "account": xp["account"], "by_provider": xp["by_provider"],
                           "by_account": xp["by_account"], "threads": len(xp["threads"]), "files": len(xp["files"]),
@@ -1080,7 +1142,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._err("没有配对，或设备令牌已失效 / 被电脑端移除", 401)
             return False
         allowed = PHONE_GET if method == "GET" else PHONE_POST
-        if path not in allowed:
+        if path not in allowed and not (method == "GET" and path.startswith("/fonts/")):
             self._err("手机端不能做这个操作（只能在电脑上做）", 403)
             return False
         self.device = dev
@@ -1104,7 +1166,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"local": self._local(), "device": d and {"id": d["id"], "name": d["name"]}})
             elif u.path == "/api/claude-sync":
                 from . import claude_sync
-                self._json(claude_sync.plan())
+                src = q.get("source") or "desktop"
+                if src not in claude_sync.SOURCES:
+                    raise ValueError("source 只能是 desktop / cli")
+                self._json(dict(claude_sync.plan(source=src), accounts=claude_sync.accounts()))
             elif u.path == "/api/codex-sync":
                 from . import codex_sync
                 self._json(codex_sync.plan(float(q.get("days", 14)), q.get("root") or None))
@@ -1114,6 +1179,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(window_layout())
             elif u.path == "/api/transcript":
                 self._json(transcript(norm_root(q["root"]), q["agent"], q["sid"], int(q.get("since", -1))))
+            elif u.path == "/api/transcript/subtasks":
+                self._json(subtask_info(norm_root(q["root"]), q["agent"], q["sid"], q.get("ids", "")))
+            elif u.path == "/api/transcript/subtask-list":
+                self._json(subtask_list(norm_root(q["root"]), q["agent"], q["sid"]))
+            elif u.path == "/api/transcript/subtask":
+                self._json(subtask_transcript(norm_root(q["root"]), q["agent"], q["sid"], q.get("aid", ""),
+                                              int(q.get("since", -1))))
             elif u.path == "/api/lan":
                 self._json({"running": bool(LAN["srv"]), "ip": LAN["ip"], "port": LAN["port"],
                             "devices": devices_public()})
@@ -1127,6 +1199,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "max-age=86400")
+                self.end_headers()
+                self.wfile.write(body)
+            elif u.path.startswith("/fonts/"):
+                name = u.path[len("/fonts/"):]
+                f = FONTS / name
+                if not _FONT_NAME.match(name) or not f.is_file():
+                    return self._err("没有这个字体文件", 404)
+                body = f.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "font/woff2")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "max-age=2592000")
                 self.end_headers()
                 self.wfile.write(body)
             elif u.path == "/":
@@ -1206,8 +1290,14 @@ class Handler(BaseHTTPRequestHandler):
                                  "phone" if getattr(self, "device", None) else "ui"))
             elif path == "/api/claude-sync":
                 # 桌面端开着时直接写会在它退出时被盖回去：排到退出之后做
-                from . import apps
-                self._json(apps.run_or_defer("claude", "claude-sync", {"only": body.get("only")}, "同步 Claude 会话到当前账号"))
+                from . import apps, claude_sync
+                src = body.get("source") or "desktop"
+                if src not in claude_sync.SOURCES:
+                    raise ValueError("source 只能是 desktop / cli")
+                # 目标号现在就定下来：排队等桌面端退出时不用再认一遍
+                self._json(apps.run_or_defer("claude", "claude-sync",
+                                             {"target": claude_sync.current_key(src), "only": body.get("only"), "source": src},
+                                             f"同步 Claude 会话到{claude_sync.SOURCES[src]}当前账号"))
             elif path == "/api/codex-sync":
                 from . import apps
                 self._json(apps.run_or_defer("claude", "codex-sync", {"days": float(body.get("days") or 14),
