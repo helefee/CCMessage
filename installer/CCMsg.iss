@@ -17,36 +17,52 @@
 #ifndef OutputDir
   #define OutputDir "..\dist"
 #endif
+; /DTestBuild=1 builds an isolated "CC Msg TEST" (own AppId, folder, mutex, tray, autostart value) for tests
+#ifdef TestBuild
+  #define MyAppId "{{0D5A1C2B-7E31-4F7A-9C00-7E57AB13C0DE}"
+  #define MyName "CC Msg TEST"
+  #define MyDir "AgentBridgeTEST"
+  #define MyMutex "Local\AgentBridgeDesktop-TEST"
+  #define MyRun "CC Msg TEST"
+  #define MyOut "CCMsg-TEST-Setup-"
+#else
+  #define MyAppId "{{6F3C1B2A-8E4D-4C7A-9B1E-2A5D7C9E0F13}"
+  #define MyName "CC Msg"
+  #define MyDir "AgentBridge"
+  #define MyMutex "Local\AgentBridgeDesktop"
+  #define MyRun "CC Msg"
+  #define MyOut "CCMsg-Setup-"
+#endif
 
 [Setup]
-AppId={{6F3C1B2A-8E4D-4C7A-9B1E-2A5D7C9E0F13}
-AppName=CC Msg
+AppId={#MyAppId}
+AppName={#MyName}
 AppVersion={#AppVersion}
-AppVerName=CC Msg {#AppVersion}
+AppVerName={#MyName} {#AppVersion}
 AppPublisher=CCMessage
 AppPublisherURL=https://github.com/helefee/CCMessage
 AppSupportURL=https://github.com/helefee/CCMessage/issues
 AppUpdatesURL=https://github.com/helefee/CCMessage/releases
 VersionInfoVersion={#AppVersion}
-DefaultDirName={userpf}\AgentBridge
-DefaultGroupName=CC Msg
+DefaultDirName={userpf}\{#MyDir}
+DefaultGroupName={#MyName}
 DisableProgramGroupPage=yes
 DisableDirPage=auto
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
-OutputBaseFilename=CCMsg-Setup-{#AppVersion}
+OutputBaseFilename={#MyOut}{#AppVersion}
 SetupIconFile=..\agent_bridge\icon.ico
 UninstallDisplayIcon={app}\CCMsg.exe
-UninstallDisplayName=CC Msg {#AppVersion}
+UninstallDisplayName={#MyName} {#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
 CloseApplicationsFilter=CCMsg.exe,AgentBridge.exe
 RestartApplications=no
-SetupMutex=AgentBridgeSetupMutex
+SetupMutex=AgentBridgeSetupMutex{#MyDir}
 ShowLanguageDialog=no
 LanguageDetectionMethod=none
 
@@ -90,7 +106,7 @@ var
   i: Integer;
 begin
   i := 0;
-  while CheckForMutexes('Local\AgentBridgeDesktop') and (i < 80) do
+  while CheckForMutexes('{#MyMutex}') and (i < 80) do
   begin
     Sleep(250);
     i := i + 1;
@@ -125,12 +141,39 @@ begin
   RemoveDir(Dir);
 end;
 
+{ 0.4.2+: CC Msg may be hidden in the tray (closing the window only hides it). Ask the running one to quit:
+  CCMsg.exe --quit posts a quit message to its tray window and waits for its mutex to go away.
+  (an older CCMsg.exe ignores --quit with a usage error; it has no tray, Restart Manager closes it) }
+procedure QuitRunningApp;
+var
+  rc: Integer;
+begin
+  if CheckForMutexes('{#MyMutex}') and FileExists(ExpandConstant('{app}\CCMsg.exe')) then
+    Exec(ExpandConstant('{app}\CCMsg.exe'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, rc);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssInstall then
   begin
+    QuitRunningApp;
     WaitForApp;
     if DirExists(ExpandConstant('{app}')) then
       ClearDir(ExpandConstant('{app}'));
+  end;
+#ifdef TestBuild
+  if CurStep = ssPostInstall then
+    SaveStringToFile(ExpandConstant('{app}\instance.txt'), 'TEST', False);
+#endif
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    QuitRunningApp;
+    WaitForApp;
+    { autostart entry written by the app (tray menu / settings): remove it with the app }
+    RegDeleteValue(HKEY_CURRENT_USER, 'Software\Microsoft\Windows\CurrentVersion\Run', '{#MyRun}');
   end;
 end;

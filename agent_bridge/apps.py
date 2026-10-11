@@ -278,3 +278,99 @@ def _brief(r) -> str:
     keys = ("done", "updated", "restored", "removed", "moved", "threads", "files", "error")
     s = "，".join(f"{k}={r[k]}" for k in keys if k in r and not isinstance(r[k], (list, dict)))
     return s or ("ok" if r.get("ok", True) else "失败")
+
+
+# ---------- 启动检查：Claude / Codex 在不在跑（侧栏缺省开不开、托盘提示用） ----------
+# 便宜的查法：Windows 用进程快照（只看进程名，再对几个候选取 exe 路径）；Linux 读 /proc；macOS 用一次 ps。
+# 测试：AGENT_BRIDGE_FAKE_APPS 指向一个 JSON 文件 {"claude": true, "codex": false}，每次现读。
+_ST = {"t": 0.0, "v": None}
+
+
+def _win_names() -> list[tuple[int, str, str]]:
+    """[(pid, 进程名小写, exe 路径小写)]，只给可能相关的进程取路径。"""
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.windll.kernel32
+
+    class PE(ctypes.Structure):
+        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD), ("th32ProcessID", wintypes.DWORD),
+                    ("th32DefaultHeapID", ctypes.c_size_t), ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
+                    ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", ctypes.c_long), ("dwFlags", wintypes.DWORD),
+                    ("szExeFile", ctypes.c_wchar * 260)]
+    k32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    k32.OpenProcess.restype = wintypes.HANDLE
+    snap = k32.CreateToolhelp32Snapshot(2, 0)            # TH32CS_SNAPPROCESS
+    out = []
+    if not snap or snap == wintypes.HANDLE(-1).value:
+        return out
+    try:
+        e = PE()
+        e.dwSize = ctypes.sizeof(PE)
+        ok = k32.Process32FirstW(snap, ctypes.byref(e))
+        while ok:
+            n = e.szExeFile.lower()
+            if n in ("claude.exe", "chatgpt.exe", "codex.exe"):
+                path = ""
+                h = k32.OpenProcess(0x1000, False, e.th32ProcessID)       # PROCESS_QUERY_LIMITED_INFORMATION
+                if h:
+                    buf = ctypes.create_unicode_buffer(1024)
+                    size = wintypes.DWORD(1024)
+                    if k32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(size)):
+                        path = buf.value.lower()
+                    k32.CloseHandle(h)
+                out.append((e.th32ProcessID, n, path))
+            ok = k32.Process32NextW(snap, ctypes.byref(e))
+    finally:
+        k32.CloseHandle(snap)
+    return out
+
+
+def _detect() -> dict:
+    fake = os.environ.get("AGENT_BRIDGE_FAKE_APPS")
+    if fake:
+        try:
+            d = json.loads(Path(fake).read_text(encoding="utf-8"))
+            return {"claude": bool(d.get("claude")), "codex": bool(d.get("codex")), "fake": True}
+        except Exception:
+            return {"claude": False, "codex": False, "fake": True}
+    cl = cx = False
+    if os.name == "nt":
+        for _pid, n, path in _win_names():
+            if n == "claude.exe":                 # 桌面端（Claude_… / AnthropicClaude）或 Claude Code 命令行（claude-code / .local\bin）
+                cl = True
+            elif n == "chatgpt.exe" and "openai.codex" in path:      # Codex 桌面端（OpenAI.Codex 包里的 ChatGPT.exe）
+                cx = True
+            elif n == "codex.exe":                # Codex 命令行 / 桌面端的 app-server
+                cx = True
+        return {"claude": cl, "codex": cx}
+    if sys.platform.startswith("linux"):
+        for d in Path("/proc").iterdir():
+            if not d.name.isdigit():
+                continue
+            try:
+                cmd = (d / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "replace").lower()
+            except OSError:
+                continue
+            first = cmd.split(" ", 1)[0]
+            name = first.rsplit("/", 1)[-1]
+            if name == "claude" or "claude-code" in cmd or "/claude.app/" in cmd:
+                cl = True
+            if name == "codex" or "codex app-server" in cmd or "codex.app/" in cmd:
+                cx = True
+        return {"claude": cl, "codex": cx}
+    ps = _procs()
+    cl = any(_is_app("claude", p) or p["name"] == "claude" or "claude-code" in p["cmd"] for p in ps)
+    cx = any(_is_app("codex", p) or p["name"] == "codex" for p in ps)
+    return {"claude": cl, "codex": cx}
+
+
+def run_status(max_age: float = 10) -> dict:
+    """{"claude": bool, "codex": bool, "ts": …}；10 秒内重复问用缓存。"""
+    now = time.time()
+    if _ST["v"] is None or now - _ST["t"] > max_age or os.environ.get("AGENT_BRIDGE_FAKE_APPS"):
+        try:
+            v = _detect()
+        except Exception as e:
+            v = {"claude": False, "codex": False, "error": str(e)}
+        _ST.update(t=now, v=dict(v, ts=now))
+    return dict(_ST["v"])

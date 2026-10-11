@@ -822,7 +822,7 @@ def sessions(root: Path) -> list[dict]:
             x["role_manual"] = True
     return [{k: v for k, v in x.items() if k in ("agent", "sid", "short", "name", "title", "alias", "age", "originator",
                                                   "listening", "owner_name", "managed", "role", "role_note",
-                                                  "role_manual", "role_set", "ignore", "links")}
+                                                  "role_manual", "role_set", "ignore", "links", "busy")}
             for x in rows if x.get("agent") != "user"]
 
 
@@ -881,7 +881,7 @@ SETTINGS = DATA / "settings.json"
 
 
 def load_settings() -> dict:
-    s = {"fx": True, "update_auto": True}
+    s = {"fx": True, "update_auto": True, "tray_close": True, "start_min": False, "notify": True}
     try:
         s.update(json.loads(SETTINGS.read_text(encoding="utf-8")))
     except Exception:
@@ -987,6 +987,141 @@ class FxWatcher:
 
 
 FX_WATCHER = FxWatcher()
+
+
+# ---------- 托盘：会话概况、给你的消息 / 任务完成的通知（桌面版的托盘图标轮询 /api/tray） ----------
+
+class TrayFeed:
+    """盯着各项目信箱：发给「用户」的消息 / 任务、你派出去的任务交回结果，记成通知事件（带递增序号，托盘按序号取新的）。
+    未读 = 发给用户的消息里比「看过」时间新的；托盘打开窗口时标成看过。会话概况 15 秒算一次（每个项目要跑一次 who）。"""
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.offsets: dict[str, int] = {}
+        self.user_tasks: dict[str, set] = {}      # 信箱 → 用户派出去的任务编号
+        self.events: list[dict] = []
+        self.seq = 0
+        self.inbox: list[dict] = []               # 最近发给用户的消息（新的在后）
+        self.sess = {"t": 0.0, "v": None}
+        self.started = False
+
+    def _add(self, ev: dict):
+        self.seq += 1
+        ev["seq"] = self.seq
+        self.events = (self.events + [ev])[-60:]
+
+    def _scan(self):
+        for r in load_registry():
+            root = Path(r["root"])
+            bus_rel = find_bus_dir(root) if root.is_dir() else None
+            if not bus_rel:
+                continue
+            p = root / bus_rel / "messages.jsonl"
+            try:
+                size = p.stat().st_size
+            except FileNotFoundError:
+                continue
+            key = str(p)
+            first = key not in self.offsets or size < self.offsets[key]
+            start = 0 if first else self.offsets[key]
+            if not first and size == start:
+                continue
+            with open(p, "rb") as f:
+                f.seek(start)
+                chunk = f.read(size - start)
+            end = chunk.rfind(b"\n") + 1
+            self.offsets[key] = start + end
+            tasks = self.user_tasks.setdefault(key, set())
+            for line in chunk[:end].splitlines():
+                try:
+                    m = json.loads(line)
+                except Exception:
+                    continue
+                fr = m.get("from") or {}
+                if str(fr.get("sid", "")).startswith("selftest-"):
+                    continue
+                kind, fa = m.get("kind", "msg"), fr.get("agent")
+                if fa == "user" and kind == "task":
+                    tasks.add(m.get("id"))
+                to = str(m.get("to", "")).lower()
+                to_user = to == "user" or to.startswith("user:") or any(str(k).startswith("user-") for k in (m.get("to_keys") or []))
+                who = str(fr.get("name") or fa or "").rsplit(" [", 1)[0]
+                body = str(m.get("body") or "").strip()
+                where = {"root": str(root), "agent": fa, "sid": fr.get("sid")} if fa in ("claude", "codex", "cursor") else {"root": str(root)}
+                if to_user and fa != "user":
+                    rec = {"id": m.get("id"), "ts": m.get("ts", 0), "who": who, "agent": fa, "kind": kind, "body": body[:300],
+                           "project": root.name, "open": where}
+                    self.inbox = (self.inbox + [rec])[-30:]
+                    if not first:
+                        self._add({"kind": "task" if kind == "task" else "msg",
+                                   "title": f"{who} {'给你派了任务' if kind == 'task' else '给你发了消息'}（{root.name}）",
+                                   "text": body[:200], "open": where})
+                elif kind == "result" and fa != "user" and m.get("reply_to") in tasks and not first:
+                    self._add({"kind": "result", "title": f"任务完成：{who}（{root.name}）", "text": body[:200], "open": where})
+
+    def _update_note(self):
+        try:
+            from . import update
+            st = update.status()
+            if st.get("newer") and st.get("latest"):
+                s = load_settings()
+                if s.get("tray_update_noted") != st["latest"]:
+                    s["tray_update_noted"] = st["latest"]
+                    save_settings(s)
+                    self._add({"kind": "update", "title": f"CC Msg 有新版本 {st['latest']}",
+                               "text": "点这里打开设置里的「检查更新」安装（装完会自动重开）", "open": {"settings": True}})
+        except Exception:
+            pass
+
+    def _sessions(self) -> dict:
+        now = time.time()
+        if self.sess["v"] is not None and now - self.sess["t"] < 15:
+            return self.sess["v"]
+        rows, act, stand = [], 0, 0
+        for r in load_registry():
+            root = Path(r["root"])
+            if not root.is_dir() or not find_bus_dir(root):
+                continue
+            try:
+                lst = sessions(root)
+            except Exception:
+                continue
+            for x in lst:
+                if x.get("managed") or x.get("ignore"):
+                    continue
+                st = "active" if x.get("busy") else "stand" if x.get("listening") else "active" if (x.get("age") or 1e9) < 180 else "idle"
+                act += st == "active"
+                stand += st == "stand"
+                rows.append({"agent": x.get("agent"), "sid": x.get("sid"), "short": x.get("short"), "state": st,
+                             "name": x.get("alias") or x.get("title") or "未命名", "age": x.get("age"),
+                             "project": root.name, "root": str(root)})
+        rows.sort(key=lambda x: x.get("age") if x.get("age") is not None else 1e12)
+        v = {"active": act, "stand": stand, "sessions": rows[:12]}
+        self.sess.update(t=now, v=v)
+        return v
+
+    def get(self, since: int) -> dict:
+        with self.lock:
+            try:
+                self._scan()
+            except Exception:
+                pass
+            self._update_note()
+            seen = float(load_settings().get("tray_seen") or 0)
+            unread = [m for m in self.inbox if m["ts"] > seen]
+            evs = [e for e in self.events if e["seq"] > since] if since >= 0 else []
+            from . import apps
+            s = load_settings()
+            return dict(self._sessions(), seq=self.seq, events=evs, unread=len(unread), inbox=self.inbox[-6:][::-1],
+                        apps=apps.run_status(), settings={k: s.get(k) for k in ("tray_close", "start_min", "notify")})
+
+    def seen(self):
+        s = load_settings()
+        s["tray_seen"] = time.time()
+        save_settings(s)
+
+
+TRAY_FEED = TrayFeed()
 
 
 # ---------- 会话记录 + 直接回复 ----------
@@ -1103,7 +1238,7 @@ _dev_lock = threading.Lock()
 LAN = {"srv": None, "ip": None, "port": None, "bind": None, "bind_port": None}
 PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
-PHONE_GET = {"/", "/bloub-icons.json", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions", "/api/links",
+PHONE_GET = {"/", "/bloub-icons.json", "/api/ping", "/api/apps/status", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions", "/api/links",
              "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout",
              "/api/transcript/subtasks", "/api/transcript/subtask", "/api/transcript/subtask-list",
              "/api/gh/ref", "/api/gh/pr", "/api/gh/diff", "/api/gh/prs", "/api/git/changes",
@@ -1480,7 +1615,18 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/sessions":
                 self._json(sessions(norm_root(q["root"])))
             elif u.path == "/api/settings":
-                self._json(load_settings())
+                s = load_settings()
+                if sys.platform == "win32":
+                    from . import tray
+                    s["autostart"] = tray.autostart_get()
+                self._json(s)
+            elif u.path == "/api/apps/status":
+                from . import apps
+                self._json(apps.run_status())
+            elif u.path == "/api/tray":
+                if not self._local():
+                    raise PermissionError("只在本机")
+                self._json(TRAY_FEED.get(int(q.get("since", -1))))
             elif u.path == "/api/update":
                 from . import update
                 self._json(update.status())
@@ -1657,8 +1803,19 @@ class Handler(BaseHTTPRequestHandler):
                     s["fx"] = bool(body["fx"])
                 if "update_auto" in body:
                     s["update_auto"] = bool(body["update_auto"])
+                for k in ("tray_close", "start_min", "notify", "tray_hint_shown"):
+                    if k in body:
+                        s[k] = bool(body[k])
                 save_settings(s)
+                if sys.platform == "win32":
+                    from . import tray
+                    if "autostart" in body:
+                        tray.autostart_set(bool(body["autostart"]), PORT["n"])
+                    s["autostart"] = tray.autostart_get()
                 self._json(s)
+            elif path == "/api/tray/seen":
+                TRAY_FEED.seen()
+                self._json({"ok": True})
             elif path == "/api/update/check":
                 from . import update
                 self._json(update.check(force=True))
