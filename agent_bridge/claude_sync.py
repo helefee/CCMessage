@@ -10,7 +10,8 @@
 - 写之前把目标文件夹整个备份到 ~/.agent-bridge/claude-sync-bak/<时间>/。
 
 注意：桌面端和命令行（Claude Code CLI）是两套登录，可以登的不是同一个号：
-- 桌面端：从它自己的 Local Storage（<Claude 数据目录>/Local Storage/leveldb）里找最近一条带账号 / 组织的记录；
+- 桌面端：从它自己的 Local Storage（<Claude 数据目录>/Local Storage/leveldb）里找最近一条带账号 / 组织的记录
+  （表文件里 snappy 压过的块先解开再找；每次都重新看文件，切号后刷新就能认出来）；
 - 命令行：~/.claude.json 的 oauthAccount。
 桌面端的邮箱 / 名字从它的 IndexedDB（claude.ai 页面缓存的账号信息）里读，读不到就借命令行的（同一个号时）或以前记下的（推测）。
 所以有两个「当前账号」，source='desktop' / 'cli' 分别对应，缺省按桌面端算（会话列表本来就是给桌面端看的）。
@@ -87,9 +88,128 @@ _TS_RE = re.compile(rb'Timestamp"\s*:\s*"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+
 _CUT_RE = re.compile(rb'"eventName"|"(?:accountUuid|account_uuid)"')
 
 
+# ---------- 读 Chromium 的 LevelDB（只读，不加锁） ----------
+# *.log 是没压缩的写入日志，直接扫字节；*.ldb 是整理过的表文件，数据块大多用 snappy 压过，
+# 压过的块里「accountUuid」这类字段名会被拆碎，硬扫字节就认不出来（桌面端整理一次 Local Storage 后就认不出当前账号了），
+# 所以按表格式把每个数据块解开再扫。值可能是 UTF-16 存的，统一去掉 \x00 再按 ASCII 找。
+# 按（文件、修改时间、大小）缓存，文件一变就重新读。
+
+_LDB_CACHE: dict = {}
+
+
+def _varint(b: bytes, i: int) -> tuple[int, int]:
+    n = shift = 0
+    while True:
+        x = b[i]
+        i += 1
+        n |= (x & 0x7F) << shift
+        if not x & 0x80:
+            return n, i
+        shift += 7
+
+
+def _unsnappy(b: bytes) -> bytes:
+    n, i = _varint(b, 0)
+    out = bytearray()
+    L = len(b)
+    while i < L:
+        tag = b[i]
+        i += 1
+        t = tag & 3
+        if t == 0:                                  # 原样的一段
+            ln = tag >> 2
+            if ln >= 60:
+                k = ln - 59
+                ln = int.from_bytes(b[i:i + k], "little")
+                i += k
+            ln += 1
+            out += b[i:i + ln]
+            i += ln
+            continue
+        if t == 1:
+            ln = ((tag >> 2) & 7) + 4
+            off = ((tag >> 5) << 8) | b[i]
+            i += 1
+        elif t == 2:
+            ln = (tag >> 2) + 1
+            off = int.from_bytes(b[i:i + 2], "little")
+            i += 2
+        else:
+            ln = (tag >> 2) + 1
+            off = int.from_bytes(b[i:i + 4], "little")
+            i += 4
+        if off <= 0 or off > len(out):
+            raise ValueError("bad snappy offset")
+        st = len(out) - off
+        if off >= ln:
+            out += out[st:st + ln]
+        else:                                       # 重叠复制
+            for k in range(ln):
+                out.append(out[st + k])
+    if len(out) != n:
+        raise ValueError("bad snappy length")
+    return bytes(out)
+
+
+def _ldb_blocks(b: bytes) -> list[bytes]:
+    """LevelDB 表文件 → 解开的各个数据块（解不开的块跳过）。"""
+    if len(b) < 48 or b[-8:] != bytes.fromhex("57fb808b247547db"):
+        return [b]
+    foot = b[-48:]
+    _, i = _varint(foot, 0)
+    _, i = _varint(foot, i)                         # metaindex
+    ioff, i = _varint(foot, i)
+    isz, i = _varint(foot, i)
+
+    def block(off: int, sz: int) -> bytes:
+        raw, typ = b[off:off + sz], b[off + sz]
+        return _unsnappy(raw) if typ == 1 else raw
+
+    idx = block(ioff, isz)
+    nres = int.from_bytes(idx[-4:], "little")
+    end = len(idx) - 4 - 4 * nres
+    out, i = [], 0
+    while i < end:
+        _, i = _varint(idx, i)                      # shared
+        nk, i = _varint(idx, i)
+        nv, i = _varint(idx, i)
+        i += nk
+        v = idx[i:i + nv]
+        i += nv
+        off, j = _varint(v, 0)
+        sz, _ = _varint(v, j)
+        try:
+            out.append(block(off, sz))
+        except Exception:
+            continue
+    return out
+
+
+def _ldb_text(f: Path) -> list[bytes]:
+    """一个 .log / .ldb 文件里能扫的字节（去掉 \x00）；读不了返回 []。"""
+    try:
+        st = f.stat()
+    except Exception:
+        return []
+    key = (str(f), st.st_mtime_ns, st.st_size)
+    hit = _LDB_CACHE.get(str(f))
+    if hit and hit[0] == key:
+        return hit[1]
+    try:
+        b = f.read_bytes()
+    except Exception:              # 桌面端开着时有的文件锁着
+        return []
+    try:
+        parts = _ldb_blocks(b) if f.suffix == ".ldb" else [b]
+    except Exception:
+        parts = [b]
+    parts = [p.replace(b"\x00", b"") for p in parts]
+    _LDB_CACHE[str(f)] = (key, parts)
+    return parts
+
+
 def _leveldb_pairs() -> list[tuple[str, float, str, str]]:
-    """桌面端 Local Storage 里所有（时间戳, 文件修改时间, 账号, 组织）。
-    按字节硬扫 *.log / *.ldb：被 snappy 压过的块大多对不上，对不上的就跳过。"""
+    """桌面端 Local Storage 里所有（时间戳, 文件修改时间, 账号, 组织）。"""
     d = claude_app_dir() / "Local Storage" / "leveldb"
     out = []
     try:
@@ -98,27 +218,28 @@ def _leveldb_pairs() -> list[tuple[str, float, str, str]]:
         return out
     for f in files:
         try:
-            b, mt = f.read_bytes(), f.stat().st_mtime
+            mt = f.stat().st_mtime
         except Exception:
             continue
-        for m in _ACC_RE.finditer(b):
-            # 组织号在账号号前后 300 字节内找，碰到下一条事件 / 下一个账号字段就停，免得串到别的事件上
-            after = b[m.end():m.end() + 300]
-            c = _CUT_RE.search(after)
-            after = after[:c.start()] if c else after
-            before = b[max(0, m.start() - 300):m.start()]
-            cuts = list(_CUT_RE.finditer(before))
-            if cuts and cuts[-1].group(0) != b'"eventName"':
-                before = before[cuts[-1].end():]
-            og = _ORG_RE.search(after) or (list(_ORG_RE.finditer(before)) or [None])[-1]
-            if not og:
-                continue
-            # 时间戳：同一条事件里，在账号字段前面（eventName 之后）
-            ev = before
-            k = ev.rfind(b'"eventName"')
-            ev = ev[k:] if k >= 0 else ev
-            ts = (list(_TS_RE.finditer(ev)) or [None])[-1]
-            out.append((ts.group(1).decode() if ts else "", mt, m.group(1).decode(), og.group(1).decode()))
+        for b in _ldb_text(f):
+            for m in _ACC_RE.finditer(b):
+                # 组织号在账号号前后 300 字节内找，碰到下一条事件 / 下一个账号字段就停，免得串到别的事件上
+                after = b[m.end():m.end() + 300]
+                c = _CUT_RE.search(after)
+                after = after[:c.start()] if c else after
+                before = b[max(0, m.start() - 300):m.start()]
+                cuts = list(_CUT_RE.finditer(before))
+                if cuts and cuts[-1].group(0) != b'"eventName"':
+                    before = before[cuts[-1].end():]
+                og = _ORG_RE.search(after) or (list(_ORG_RE.finditer(before)) or [None])[-1]
+                if not og:
+                    continue
+                # 时间戳：同一条事件里，在账号字段前面（eventName 之后）
+                ev = before
+                k = ev.rfind(b'"eventName"')
+                ev = ev[k:] if k >= 0 else ev
+                ts = (list(_TS_RE.finditer(ev)) or [None])[-1]
+                out.append((ts.group(1).decode() if ts else "", mt, m.group(1).decode(), og.group(1).decode()))
     return out
 
 
@@ -190,18 +311,23 @@ def _idb_profile(acct: str) -> dict | None:
         try:
             if f.stat().st_size > 50_000_000:
                 continue
-            b, mt = f.read_bytes(), f.stat().st_mtime
+            mt = f.stat().st_mtime
+            # 表文件按块解开（V8 序列化里本来就有 \x00，不能去掉，所以这里自己解）；读不了就算了
+            bs = [f.read_bytes()]
+            if f.suffix == ".ldb":
+                bs = _ldb_blocks(bs[0])
         except Exception:          # 桌面端开着时有的文件锁着，读不了就算了
             continue
-        i = b.find(needle)
-        while i >= 0:
-            j = i + len(needle)
-            email = _field(b, j, b"email_address", 40)
-            if email and _EMAIL_OK.fullmatch(email):
-                name = _field(b, j, b"full_name") or _field(b, j, b"display_name")
-                if not best or mt > best[0]:
-                    best = (mt, email, name)
-            i = b.find(needle, j)
+        for b in bs:
+            i = b.find(needle)
+            while i >= 0:
+                j = i + len(needle)
+                email = _field(b, j, b"email_address", 40)
+                if email and _EMAIL_OK.fullmatch(email):
+                    name = _field(b, j, b"full_name") or _field(b, j, b"display_name")
+                    if not best or mt > best[0]:
+                        best = (mt, email, name)
+                i = b.find(needle, j)
     return {"email": best[1], "name": best[2]} if best else None
 
 
