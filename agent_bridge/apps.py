@@ -186,7 +186,7 @@ def _watcher_alive(kind: str) -> bool:
 def _spawn_watcher(kind: str) -> None:
     if _watcher_alive(kind):
         return
-    args = [sys.executable, "-m", "agent_bridge", "after-quit", kind]
+    args = paths.self_cmd("after-quit", kind)
     cwd = str(paths.PKG.parent)
     if os.name == "nt":
         # 独立进程组 + 脱离父进程的作业对象：桌面端退出时会收拾它起的子进程，等待进程不能跟着被收拾掉

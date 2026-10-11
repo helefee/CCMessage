@@ -151,6 +151,13 @@ class Api:
         webbrowser.open(self._url.rstrip("/") + (path or "/"))
         return True
 
+    def open_url(self, url: str):
+        """只开 GitHub 上的发布页（更新说明里的链接），别的不开。"""
+        if isinstance(url, str) and url.startswith("https://github.com/"):
+            webbrowser.open(url)
+            return True
+        return False
+
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="agent_bridge desktop")
@@ -198,6 +205,8 @@ def main(argv=None) -> int:
     win = webview.create_window(TITLE, url, js_api=Api(url), width=st.get("width", 1360), height=st.get("height", 880),
                                 x=st.get("x"), y=st.get("y"), min_size=(720, 480), text_select=True)
     win.events.closing += lambda: _save_state(win)
+    from . import update
+    update.QUIT = win.destroy           # 装更新前：关窗口 → 服务跟着退 → 安装程序接手
     if os.name == "nt":
         win.events.shown += lambda: threading.Thread(target=_win_icon, daemon=True).start()
     storage = paths.HOME / "webview"

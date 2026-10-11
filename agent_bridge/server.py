@@ -45,72 +45,29 @@ FONTS = TOOL / "fonts"          # 界面字体（Inter / JetBrains Mono，OFL，
 _FONT_NAME = re.compile(r"^[a-z0-9-]{1,40}\.woff2$")
 AVATARS = TOOL / "bloub-icons.json"      # 会话头像数据（由 tools/gen_bloub_icons.ts 从 bloub 导出）
 REGISTRY = DATA / "projects.json"
-# 钩子命令里写的 Python：项目里的 Claude / Codex 钩子每轮都用它跑 bus.py。
-# 优先用系统里装的 Python（桌面版文件夹挪走 / 删掉也不影响钩子）；系统里没有 Python 时才用桌面版自带的
-# runtime\python.exe（有控制台的那个，不是 pythonw，钩子要读它的输出），这时文件夹挪了要点一次「安装 / 升级 / 修复」。
+# 钩子命令里跑总线的程序：
+# - 源码版：系统 Python + 项目里的 <总线目录>/bus.py（在 venv 里跑时用 venv 背后的系统 Python，删 / 重建 venv 不影响钩子）；
+# - Windows 安装版：程序目录里的 bus\bus.exe --dir <总线目录>（不需要装 Python；项目里只放数据）。
 _HOOK_PY: dict = {}
 
 
 def bundled() -> bool:
-    """是不是桌面版自带的嵌入式 Python 在跑（runtime 目录里有 pythonXY._pth）。"""
-    exe = Path(sys.executable)
-    return bool(os.environ.get("AGENT_BRIDGE_BUNDLED")) or \
-        (exe.parent / f"python{sys.version_info[0]}{sys.version_info[1]}._pth").exists()
-
-
-def _py_ok(p: str) -> bool:
-    try:
-        r = subprocess.run([p, "-c", "import sys; print(sys.version_info >= (3, 9))"], capture_output=True,
-                           timeout=15, creationflags=0x08000000 if os.name == "nt" else 0)
-        return r.stdout.decode(errors="replace").strip() == "True"
-    except Exception:
-        return False
-
-
-def _system_py(mine: str) -> str | None:
-    """找系统里装的 Python（跳过 WindowsApps 里那个应用商店占位的，和桌面版自带的）。
-    AGENT_BRIDGE_HIDE_SYSTEM_PY=1：假装没有（测试「没装 Python 的电脑」用）。"""
-    if os.environ.get("AGENT_BRIDGE_HIDE_SYSTEM_PY"):
-        return None
-    cands = []
-    nw = 0x08000000 if os.name == "nt" else 0
-    if os.name == "nt":
-        if shutil.which("py"):
-            try:
-                r = subprocess.run(["py", "-3", "-c", "import sys; print(sys.executable)"], capture_output=True,
-                                   timeout=15, creationflags=nw)
-                cands.append(r.stdout.decode(errors="replace").strip())
-            except Exception:
-                pass
-        try:
-            r = subprocess.run(["where", "python"], capture_output=True, timeout=15, creationflags=nw)
-            cands += r.stdout.decode(errors="replace").splitlines()
-        except Exception:
-            pass
-    else:
-        cands += [shutil.which("python3") or "", shutil.which("python") or ""]
-    for c in cands:
-        c = c.strip()
-        if not c or not Path(c).exists() or "\\windowsapps\\" in c.lower() or Path(c).name.lower() == "pythonw.exe":
-            continue
-        if str(Path(c).resolve()).lower().startswith(mine):
-            continue
-        if _py_ok(c):
-            return Path(c).as_posix()
-    return None
+    """是不是 Windows 安装版（Nuitka 编译的 AgentBridge.exe）在跑。"""
+    return paths.FROZEN
 
 
 def hook_py_info() -> dict:
-    """{"path": 钩子用的 Python（正斜杠）或 None, "kind": "current" / "system" / "bundled"}"""
+    """{"path": 钩子用的程序（正斜杠）或 None, "kind": "busexe" / "system" / "current"}"""
     if "v" in _HOOK_PY:
         return _HOOK_PY["v"]
-    exe = Path(sys.executable)
-    if exe.name.lower() == "pythonw.exe" and (exe.parent / "python.exe").exists():
-        exe = exe.parent / "python.exe"
-    if not bundled():
+    if paths.FROZEN:
+        v = {"path": paths.BUS_EXE.as_posix() if paths.BUS_EXE and paths.BUS_EXE.exists() else None, "kind": "busexe"}
+    else:
+        exe = Path(sys.executable)
+        if exe.name.lower() == "pythonw.exe" and (exe.parent / "python.exe").exists():
+            exe = exe.parent / "python.exe"
         base = getattr(sys, "_base_executable", None)
         if sys.prefix != sys.base_prefix and base and Path(base).exists():
-            # 在 venv 里跑（Linux install.sh 就是）：钩子用 venv 背后的系统 Python，删 / 重建 venv 不影响钩子
             b = Path(base)
             if b.name.lower() == "pythonw.exe" and (b.parent / "python.exe").exists():
                 b = b.parent / "python.exe"
@@ -120,14 +77,6 @@ def hook_py_info() -> dict:
             v = {"path": b.as_posix(), "kind": "system"}
         else:
             v = {"path": exe.as_posix(), "kind": "current"}
-    else:
-        sp = _system_py(str(exe.parent.resolve()).lower())
-        if sp:
-            v = {"path": sp, "kind": "system"}
-        elif exe.exists() and exe.name.lower() != "pythonw.exe":
-            v = {"path": exe.resolve().as_posix(), "kind": "bundled"}
-        else:
-            v = {"path": None, "kind": None}
     _HOOK_PY["v"] = v
     return v
 
@@ -136,7 +85,7 @@ def hook_py() -> str | None:
     return hook_py_info()["path"]
 
 
-NO_PY = "找不到能给钩子用的 Python（3.9 或更新）：先装 Python（python.org 下载，安装时勾上 Add python.exe to PATH），再点安装。"
+NO_PY = "程序目录里找不到 bus\\bus.exe：安装不完整，重新运行一次安装程序。"
 
 CODEX_HOME = paths.CODEX_HOME
 CLAUDE_HOME = paths.CLAUDE_HOME
@@ -150,7 +99,7 @@ _reg_lock = threading.Lock()
 
 
 def hook_interp(cmd: str) -> str:
-    """钩子命令开头那个解释器（"C:/x/python.exe" ... 或 python ...）。"""
+    """钩子命令开头那个程序（"C:/x/python.exe" ... / "C:/x/bus.exe" ... 或 python ...）。"""
     cmd = cmd.strip()
     if cmd.startswith('"'):
         return cmd[1:].split('"', 1)[0]
@@ -158,7 +107,7 @@ def hook_interp(cmd: str) -> str:
 
 
 def interp_missing(cmd: str) -> bool:
-    """解释器写的是完整路径、而那个文件已经不在了（比如桌面版文件夹挪走了）。裸的 python / python3 不算。"""
+    """程序写的是完整路径、而那个文件已经不在了（比如程序挪走 / 卸载了）。裸的 python / python3 不算。"""
     p = hook_interp(cmd)
     return ("/" in p or "\\" in p) and not Path(p).exists()
 
@@ -171,18 +120,23 @@ def _hooks_of(cfg: dict, agent: str):
                     yield h
 
 
-def fix_interp(cfg: dict, agent: str, new: str) -> int:
-    """把解释器已经不在了的那些钩子换成 new（只换命令开头的解释器，后面一字不动）。"""
+def _hook_head(cmd: str, agent: str) -> str:
+    return cmd.split(f" hook {agent}", 1)[0].strip()
+
+
+def rewrite_hooks(cfg: dict, agent: str, want: str, force: bool) -> int:
+    """把我们的钩子换成 want（「… hook claude」那一段），hook <agent> 后面的参数（--rewake 等）原样保留。
+    force=False 时只换程序已经不在了的；force=True 时凡是和 want 不一样的都换（安装版把 python + bus.py 换成 bus.exe）。"""
     n = 0
+    head = _hook_head(want, agent)
     for h in _hooks_of(cfg, agent):
         c = h.get("command", "")
-        if interp_missing(c):
-            old = hook_interp(c)
-            rest = c.strip()[len(old) + 2:] if c.strip().startswith('"') else c.strip()[len(old):]
-            h["command"] = f'"{new}"' + rest
+        if _hook_head(c, agent) == head:
+            continue
+        if force or interp_missing(c):
+            h["command"] = want + c.split(f" hook {agent}", 1)[1]
             n += 1
     return n
-
 
 
 # ---------- 小工具 ----------
@@ -242,7 +196,8 @@ def save_registry(rows: list[dict]) -> None:
 def find_bus_dir(root: Path) -> str | None:
     """已装的总线在哪：.msgbus/；早期版本装在 .temp/msgbus/ 的也认（别挪，挪了 Codex 钩子要重新信任）。"""
     for rel in (".msgbus", ".temp/msgbus"):
-        if (root / rel / "bus.py").exists():
+        # 源码版装的有 bus.py；安装版装的只有数据（sessions/ 等），程序是 bus.exe
+        if (root / rel / "bus.py").exists() or (root / rel / "sessions").is_dir():
             return rel
     return None
 
@@ -250,15 +205,19 @@ def find_bus_dir(root: Path) -> str | None:
 # ---------- 钩子配置 ----------
 
 def claude_cmd(bus_rel: str) -> str:
+    if paths.FROZEN:
+        return f'"{hook_py()}" --dir "$CLAUDE_PROJECT_DIR/{bus_rel}" hook claude'
     return f'"{hook_py() or "python"}" "$CLAUDE_PROJECT_DIR/{bus_rel}/bus.py" hook claude'
 
 
 def codex_cmd(root: Path, bus_rel: str) -> str:
+    if paths.FROZEN:
+        return f'"{hook_py()}" --dir "{root.as_posix()}/{bus_rel}" hook codex'
     return f'"{hook_py() or "python"}" "{root.as_posix()}/{bus_rel}/bus.py" hook codex'
 
 
 def is_ours(cmd: str, agent: str) -> bool:
-    return "bus.py" in cmd and f"hook {agent}" in cmd and "msgbus" in cmd
+    return ("bus.py" in cmd or "bus.exe" in cmd) and f"hook {agent}" in cmd and "msgbus" in cmd
 
 
 def events_with_ours(cfg: dict, agent: str) -> set[str]:
@@ -392,12 +351,19 @@ def project_status(root: Path) -> dict:
         "claude_files": claude_where,
         "codex_hooks": sorted(ev_codex),
         "codex_trusted": sorted(ev for ev, ok in trust.items() if ok),
-        "bus_outdated": bool(bus_rel) and (md5_file(root / bus_rel / "bus.py") != md5_file(BUS_SRC)
-                                           or bool(st.get("claude_stale")) or missing),
+        "bus_outdated": bool(bus_rel) and (bus_differs(root, bus_rel, interps) or bool(st.get("claude_stale")) or missing),
     })
     st["installed"] = bool(bus_rel) and len(ev_claude) == len(CLAUDE_EVENTS) and len(ev_codex) == len(EVENTS)
     st["claude_total"], st["codex_total"] = len(CLAUDE_EVENTS), len(EVENTS)
     return st
+
+
+def bus_differs(root: Path, bus_rel: str, interps: set) -> bool:
+    """总线要不要升级：源码版比 bus.py 的内容；安装版看钩子是不是都用着现在这个 bus.exe。"""
+    if paths.FROZEN:
+        want = hook_py()
+        return bool(interps) and any(i != want for i in interps)
+    return md5_file(root / bus_rel / "bus.py") != md5_file(BUS_SRC)
 
 
 # ---------- 安装 / 卸载 / 自检 ----------
@@ -442,7 +408,12 @@ def install(root: Path) -> dict:
     bus_dir = root / bus_rel
     bak = bus_dir / "bak"
     bus_dir.mkdir(parents=True, exist_ok=True)
-    if md5_file(bus_dir / "bus.py") != md5_file(BUS_SRC):
+    if paths.FROZEN:
+        # 安装版：程序是 bus\bus.exe，项目里只放数据；以前源码版放进来的 bus.py 留着不动（老会话可能还在用它，数据是同一份）
+        (bus_dir / "sessions").mkdir(exist_ok=True)
+        log.append(f"总线程序：{hp['path']}（项目的 {bus_rel}/ 里只放消息和在线记录）"
+                   + ("；原来的 bus.py 留着没动" if (bus_dir / "bus.py").exists() else ""))
+    elif md5_file(bus_dir / "bus.py") != md5_file(BUS_SRC):
         b = backup(bus_dir / "bus.py", bak)
         shutil.copy2(BUS_SRC, bus_dir / "bus.py")
         log.append(f"写入 {bus_rel}/bus.py" + (f"（旧版备份 {Path(b).name}）" if b else ""))
@@ -460,14 +431,14 @@ def install(root: Path) -> dict:
         log.append(f"Claude 钩子加到 .claude/{target.name}：{', '.join(added)}" + (f"（原件备份 {Path(b).name}）" if b else ""))
     else:
         log.append(f"Claude 钩子已齐（.claude/{target.name}）")
-    # 钩子里写的 Python 已经不在了（多半是桌面版文件夹挪了 / 删了）：换成现在这个
+    # 安装版：Claude 钩子都换成 bus.exe（python + bus.py 的老钩子也换）；源码版：只换程序已经不在了的
     for f in claude_files(root):
         cfg = read_json(f, {})
-        n = fix_interp(cfg, "claude", hp["path"])
+        n = rewrite_hooks(cfg, "claude", claude_cmd(bus_rel), force=paths.FROZEN)
         if n:
             b = backup(f, bak)
             write_json(f, cfg)
-            log.append(f"修好 .claude/{f.name} 里 {n} 个钩子的 Python 路径 → {hp['path']}" + (f"（原件备份 {Path(b).name}）" if b else ""))
+            log.append(f"改 .claude/{f.name} 里 {n} 个钩子 → {hp['path']}" + (f"（原件备份 {Path(b).name}）" if b else ""))
     # 旧版 Stop 钩子的提示语顺手改新（只动 rewakeSummary / rewakeMessage 两个字段，命令不变）
     for f in claude_files(root):
         cfg = read_json(f, {})
@@ -479,17 +450,17 @@ def install(root: Path) -> dict:
             write_json(f, cfg)
             log.append(f"更新 .claude/{f.name} 里 Stop 钩子的叫醒提示语" + (f"（原件备份 {Path(b).name}）" if b else ""))
 
-    # Codex：只补缺的，已有的一字不动（改了命令 Codex 会要求重新信任）；
-    # 唯一例外：钩子里的 Python 已经不在了（反正已经跑不起来），换成现在这个，Codex 会要求重新信任
+    # Codex：改了命令 Codex 会要求重新信任，所以源码版只补缺的、程序已经不在了的才换；
+    # 安装版：用户点了「安装 / 升级 / 修复」才走到这里，换成 bus.exe，并提醒重新信任
     cx = root / ".codex" / "hooks.json"
     existed = cx.exists()
     cfg = read_json(cx, {})
-    n = fix_interp(cfg, "codex", hp["path"])
+    n = rewrite_hooks(cfg, "codex", codex_cmd(root, bus_rel), force=paths.FROZEN)
     if n:
         b = backup(cx, bak)
         write_json(cx, cfg)
-        log.append(f"修好 .codex/hooks.json 里 {n} 个钩子的 Python 路径 → {hp['path']}（原来那个已经不在了）；"
-                   "Codex 可能会要求在 /hooks 里重新信任" + (f"（原件备份 {Path(b).name}）" if b else ""))
+        log.append(f"改 .codex/hooks.json 里 {n} 个钩子 → {hp['path']}；"
+                   "⚠ Codex 会要求在 /hooks 里重新信任这几个钩子" + (f"（原件备份 {Path(b).name}）" if b else ""))
     added = add_hooks(cfg, codex_cmd(root, bus_rel), "codex")
     if added:
         b = backup(cx, bak)
@@ -511,9 +482,9 @@ def install(root: Path) -> dict:
             rows.append({"root": str(root)})
             save_registry(rows)
     st = project_status(root)
-    if hp["kind"] == "bundled":
-        log.append(f"ℹ 这台电脑上没找到系统装的 Python，钩子用的是桌面版自带的：{hp['path']}。"
-                   "以后挪动 / 删除桌面版文件夹，钩子就跑不起来了，挪完回来点一次「安装 / 升级 / 修复」；装了系统 Python 更稳。")
+    if hp["kind"] == "busexe":
+        log.append("ℹ 钩子用的是安装目录里的 bus.exe，不需要装 Python；卸载程序或换安装目录后钩子就跑不起来了，"
+                   "重新安装后回来点一次「安装 / 升级 / 修复」。")
     if len(st["codex_trusted"]) < 3:
         log.append("⚠ 还差一步：在 Codex 里打开这个项目，进钩子管理（/hooks）把 3 个 msgbus 钩子设为信任。")
     log.append("正在跑的 Claude 会话一般不用重开就能接上；如果没接上，重开一次会话。"
@@ -557,9 +528,22 @@ def run_bus(root: Path, args: list[str], stdin: str | None = None, cwd: Path | N
     env = dict(os.environ, PYTHONUTF8="1")
     for k in ("CLAUDE_CODE_SESSION_ID", "CLAUDECODE", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CURSOR_AGENT", "MSGBUS_AS"):
         env.pop(k, None)
-    return subprocess.run([sys.executable, str(root / bus_rel / "bus.py")] + args,
+    return subprocess.run(bus_argv(root, bus_rel) + args,
                           input=(stdin or "").encode("utf-8"), capture_output=True,
-                          cwd=str(cwd or root), env=env, timeout=timeout)
+                          cwd=str(cwd or root), env=env, timeout=timeout, creationflags=NO_WINDOW)
+
+
+NO_WINDOW = 0x08000000 if os.name == "nt" else 0     # bus.exe 是控制台程序：从窗口程序里起它别闪黑框
+
+
+def bus_argv(root: Path, bus_rel: str) -> list[str]:
+    """跑这个项目的总线：安装版 bus.exe --dir；源码版优先项目里的 bus.py，没有（安装版装的项目）就用包里的 + --dir。"""
+    d = root / bus_rel
+    if paths.FROZEN:
+        return [str(paths.BUS_EXE), "--dir", str(d)]
+    if (d / "bus.py").exists():
+        return [sys.executable, str(d / "bus.py")]
+    return [sys.executable, str(BUS_SRC), "--dir", str(d)]
 
 
 def selftest(root: Path) -> dict:
@@ -604,8 +588,9 @@ def selftest(root: Path) -> dict:
         env = dict(os.environ, PYTHONUTF8="1")
         for k in ("CLAUDE_CODE_SESSION_ID", "CLAUDECODE", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CURSOR_AGENT", "MSGBUS_AS"):
             env.pop(k, None)
-        lp = subprocess.Popen([sys.executable, str(bus_dir / "bus.py"), "hook", "claude", "--rewake", "--max-secs", "20"],
-                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(root), env=env)
+        lp = subprocess.Popen(bus_argv(root, bus_rel) + ["hook", "claude", "--rewake", "--max-secs", "20"],
+                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=str(root), env=env,
+                              creationflags=NO_WINDOW)
         lp.stdin.write(json.dumps({"session_id": a, "cwd": str(root), "hook_event_name": "Stop"}).encode())
         lp.stdin.close()
         lp.stdin = None     # 已经关了：别让 communicate 再去 flush（Linux / macOS 上会报 flush of closed file）
@@ -827,11 +812,10 @@ def suggest_projects() -> list[str]:
 # ---------- 信件动画 ----------
 
 SETTINGS = DATA / "settings.json"
-FX = TOOL / "fx.py"
 
 
 def load_settings() -> dict:
-    s = {"fx": True}
+    s = {"fx": True, "update_auto": True}
     try:
         s.update(json.loads(SETTINGS.read_text(encoding="utf-8")))
     except Exception:
@@ -888,8 +872,8 @@ class FxWatcher:
                     self.cv.wait()
                 args = self.queue.pop(0)
             try:
-                subprocess.run([sys.executable, str(FX)] + args, timeout=20,
-                               env=dict(os.environ, PYTHONUTF8="1"), capture_output=True)
+                subprocess.run(paths.self_cmd("fx", *args), timeout=20, cwd=str(TOOL.parent),
+                               env=dict(os.environ, PYTHONUTF8="1"), capture_output=True, creationflags=NO_WINDOW)
             except Exception:
                 pass
 
@@ -1424,6 +1408,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(sessions(norm_root(q["root"])))
             elif u.path == "/api/settings":
                 self._json(load_settings())
+            elif u.path == "/api/update":
+                from . import update
+                self._json(update.status())
             elif u.path == "/api/codex":
                 r = run_bus(norm_root(q["root"]), ["codex-status", "--json"])
                 self._json(json.loads(r.stdout.decode("utf-8") or "{}"))
@@ -1448,8 +1435,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/export":
                 root = norm_root(body["root"])
                 out_dir = root / (find_bus_dir(root) or ".msgbus") / "exports"
-                r = subprocess.run([sys.executable, str(TOOL / "codex_bridge.py"), "export", body["sid"], "--out", str(out_dir)],
-                                   capture_output=True, timeout=120, env=dict(os.environ, PYTHONUTF8="1"))
+                r = subprocess.run(paths.self_cmd("export", body["sid"], "--out", str(out_dir)), cwd=str(TOOL.parent),
+                                   capture_output=True, timeout=120, env=dict(os.environ, PYTHONUTF8="1"),
+                                   creationflags=NO_WINDOW)
                 out = r.stdout.decode("utf-8", "replace").strip()
                 if r.returncode != 0:
                     raise ValueError((out + r.stderr.decode("utf-8", "replace")).strip()[-400:])
@@ -1519,8 +1507,19 @@ class Handler(BaseHTTPRequestHandler):
                 s = load_settings()
                 if "fx" in body:
                     s["fx"] = bool(body["fx"])
+                if "update_auto" in body:
+                    s["update_auto"] = bool(body["update_auto"])
                 save_settings(s)
                 self._json(s)
+            elif path == "/api/update/check":
+                from . import update
+                self._json(update.check(force=True))
+            elif path == "/api/update/download":
+                from . import update
+                self._json(update.download())
+            elif path == "/api/update/apply":
+                from . import update
+                self._json(update.apply(["--port", str(PORT["n"])] if PORT["n"] != 8765 else None))
             elif path == "/api/fx/test":
                 FX_WATCHER.play(body.get("dir") or "c2x", body.get("kind") or "task", "试放")
                 self._json({"ok": True})
@@ -1556,6 +1555,8 @@ def start(port: int = 8765, host: str | None = None, lan_port: int | None = None
         return None
     threading.Thread(target=srv.serve_forever, daemon=True, name="http").start()
     FX_WATCHER.start()      # Claude↔Codex 有消息时放信件动画（只在 Windows 上；设置里可关）
+    from . import update    # 后台查一次新版本（6 小时最多一次；设置里可关；断网没关系）
+    update.auto_check_later(lambda: load_settings().get("update_auto", True))
     if host and host not in ("127.0.0.1", "localhost", "::1"):
         LAN["bind"] = host
         LAN["bind_port"] = lan_port or (port + 1 if host in ("0.0.0.0", "::") else port)

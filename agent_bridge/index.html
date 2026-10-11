@@ -311,6 +311,17 @@ code{font-family:var(--mono);font-size:12px;background:var(--line2);padding:1px 
 #dlgTitle{display:inline-flex;align-items:center;gap:8px}
 .toast{align-items:center;gap:8px}
 .toast[style*="block"]{display:flex!important}
+/* 有新版本：右下角一张小卡片，不挡操作 */
+#updBar{position:fixed;right:16px;bottom:44px;width:340px;max-width:calc(100vw - 32px);background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;z-index:35;font-size:13px;display:none}
+#updBar.show{display:block}
+#updBar .uh{display:flex;align-items:center;gap:8px;font-weight:600}
+#updBar .uh .x{margin-left:auto;border:0;background:transparent;cursor:pointer;color:var(--muted);padding:2px}
+#updBar details{margin:6px 0 2px;color:var(--muted)}
+#updBar pre,.updnotes{white-space:pre-wrap;font:12.5px/1.5 var(--sans,inherit);max-height:180px;overflow:auto;margin:6px 0 0;color:var(--text)}
+#updBar .ub{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.updprog{height:6px;border-radius:3px;background:var(--line2);overflow:hidden;margin-top:8px}
+.updprog i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
 .mnav{display:none}
 
 /* ---------- 风格：照 Open WebUI —— 纯中性灰、大圆角、淡边框；你说的话是右侧圆角气泡，AI 的回复不套框；底部圆角输入浮层 ---------- */
@@ -1090,6 +1101,7 @@ body.lg-bottom .sfoot{display:flex;position:sticky;bottom:0;margin-top:auto;z-in
 </div>
 
 <div class="toast" id="toast"></div>
+<div id="updBar" class="admin"></div>
 <div class="dlg" id="dlg"><div class="box">
   <div class="hd"><span id="dlgTitle"></span><button class="ghost" onclick="closeDlg()"><i data-ic="x"></i></button></div>
   <div class="bd" id="dlgBody"></div>
@@ -1231,7 +1243,11 @@ function renderSettings(){
     <div class="setrow"><div class="sl">${ic("activity")}<div><b>状态说明位置</b><div class="sd">待命 / 活跃 / 空闲 和各有几个会话</div></div></div>${segHtml("legSeg", LEGEND_POS, legendPos())}</div>
     <div class="setrow"><div class="sl">${ic("sparkles")}<div><b>网页信件动画</b><div class="sd">新消息时网页里飞一封信（只影响这台设备）</div></div></div>${segHtml("webFxSeg", [["1", "开"], ["0", "关"]], webFx ? "1" : "0")}</div>
     <div class="setrow admin needfx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">Windows 桌面上窗口之间飞（电脑上全局）</div></div></div>${segHtml("fxSeg", [["1", "开"], ["0", "关"]], fxOn ? "1" : "0")}</div>
-    <div class="setrow admin onlynofx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">只有 Windows 上有；这台电脑上不放（网页信件动画照常）</div></div></div></div>`;
+    <div class="setrow admin onlynofx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">只有 Windows 上有；这台电脑上不放（网页信件动画照常）</div></div></div></div>
+    <div class="setrow admin"><div class="sl">${ic("download")}<div><b>版本 ${esc(upd.current || "")}</b><div class="sd" id="updLine">${updLine()}</div></div></div><button id="updCheck">检查更新</button></div>
+    <div class="setrow admin"><div class="sl">${ic("refresh")}<div><b>自动检查更新</b><div class="sd">启动后在后台查 GitHub 上的新版本（最多 6 小时一次）</div></div></div>${segHtml("updSeg", [["1", "开"], ["0", "关"]], updAuto ? "1" : "0")}</div>`;
+  $("#updCheck").onclick = () => checkUpdate(true);
+  $$("#updSeg button").forEach(b => b.onclick = async () => { try { updAuto = (await api("/api/settings", {update_auto: b.dataset.v === "1"})).update_auto; } catch(e){ toast("❌ " + e.message); } renderSettings(); });
   $$("#themeSeg button").forEach(b => b.onclick = () => setTheme(b.dataset.v));
   $$("#legSeg button").forEach(b => b.onclick = () => { store.set("msgbus.legend", b.dataset.v); applyLegendPos(); renderSettings(); });
   $$("#webFxSeg button").forEach(b => b.onclick = () => setWebFx(b.dataset.v === "1"));
@@ -1240,7 +1256,7 @@ function renderSettings(){
 function openSettings(){
   $("#menu").classList.remove("open");
   openDlg("设置", `<div class="setlist" id="setBody"></div>`, '<button onclick="closeDlg()">完成</button>');
-  setOpen = true; renderSettings();
+  setOpen = true; renderSettings(); loadUpdate();
 }
 function renderTop(){
   const p = cur; if (!p) { $("#pills").innerHTML=""; $("#instBtn").style.display="none"; return; }
@@ -1350,7 +1366,78 @@ $("#themeBtn").onclick = () => { const i = THEMES.findIndex(x => x[0] === themeM
 sysDark.addEventListener("change", renderThemeUi);       // 跟随系统时 CSS 自己会换，这里只更新按钮上的说明
 renderThemeUi();
 let fxOn = true;
-async function loadFx(){ try { fxOn = (await api("/api/settings")).fx; } catch(e) {} if (typeof renderSettings === "function") renderSettings(); }
+async function loadFx(){ try { const st = await api("/api/settings"); fxOn = st.fx; updAuto = st.update_auto !== false; } catch(e) {} if (typeof renderSettings === "function") renderSettings(); }
+// ---------- 检查更新（GitHub Releases）：安装版能一键更新；源码版只提示 git pull ----------
+let upd = {}, updAuto = true, updPoll = null;
+function fmtAgo(ts){ if (!ts) return "还没查过"; const m = Math.round((Date.now()/1000 - ts)/60); return m < 1 ? "刚刚查过" : m < 60 ? `${m} 分钟前查过` : `${Math.round(m/60)} 小时前查过`; }
+function updLine(){
+  if (!upd.current) return "";
+  if (upd.newer) return `有新版本 <b>${esc(upd.latest)}</b>（${fmtAgo(upd.checked)}）` + (upd.mode === "installer" ? "" : " · 源码版：在程序目录 git pull 后重启");
+  if (upd.error) return `${esc(upd.error)}（${fmtAgo(upd.checked)}）`;
+  return `已是最新（${fmtAgo(upd.checked)}）`;
+}
+function openUrl(u){ try { if (window.pywebview && pywebview.api.open_url) return pywebview.api.open_url(u); } catch(e) {} window.open(u, "_blank"); }
+function renderUpd(){
+  const el = $("#updBar"); if (!el) return;
+  const d = upd.download || {};
+  const busy = ["downloading", "verifying", "ready", "installing"].includes(d.state);
+  const show = isLocal && upd.newer && (busy || store.get("msgbus.updSkip") !== upd.latest);
+  el.classList.toggle("show", !!show);
+  if (!show) return;
+  const pct = d.total ? Math.min(100, Math.round(d.done * 100 / d.total)) : 0;
+  let body = "", btns = "";
+  if (d.state === "downloading" || d.state === "verifying") {
+    body = `<div style="color:var(--muted);margin-top:6px">${d.state === "verifying" ? "校验中…" : `下载中 ${pct}%（${(d.done/1048576).toFixed(1)} / ${(d.total/1048576).toFixed(1)} MB）`}</div><div class="updprog"><i style="width:${pct}%"></i></div>`;
+  } else if (d.state === "ready") {
+    body = `<div style="color:var(--muted);margin-top:6px">已下好并校验通过。安装时程序会关掉，装完自动重新打开（会话之间照常互发消息）。</div>`;
+    btns = `<button class="primary" id="updGo">安装并重启</button>`;
+  } else if (d.state === "installing") {
+    body = `<div style="color:var(--muted);margin-top:6px">正在安装，程序马上会关掉、装完自动重开…</div>`;
+  } else {
+    if (d.state === "error") body += `<div style="color:var(--bad);margin-top:6px">${esc(d.error || "下载失败")}</div>`;
+    btns = upd.mode === "installer" && upd.has_setup ? `<button class="primary" id="updNow">立即更新</button>`
+         : upd.mode === "installer" ? `<span style="color:var(--muted)">这个版本没有安装包</span>`
+         : `<span style="color:var(--muted)">源码版：在程序目录 <code>git pull</code> 后重启</span>`;
+    btns = (upd.page ? `<button id="updPage">发布页</button>` : "") + btns;
+  }
+  el.innerHTML = `<div class="uh">${ic("download")}<span>新版本 ${esc(upd.latest)} 可用</span><span style="color:var(--muted);font-weight:400">（当前 ${esc(upd.current)}）</span>
+      ${busy ? "" : `<button class="x" id="updX" title="这个版本先不提醒">${ic("x")}</button>`}</div>
+    ${upd.notes ? `<details><summary>更新说明</summary><pre>${esc(upd.notes)}</pre></details>` : ""}${body}<div class="ub">${btns}</div>`;
+  const on = (id, f) => { const b = $("#" + id); if (b) b.onclick = f; };
+  on("updX", () => { store.set("msgbus.updSkip", upd.latest); renderUpd(); });
+  on("updPage", () => openUrl(upd.page));
+  on("updNow", async () => { try { updGoAfter = true; upd = await api("/api/update/download", {}); renderUpd(); pollUpd(); } catch(e) { updGoAfter = false; toast("❌ " + e.message); } });
+  on("updGo", applyUpd);
+}
+// 「立即更新」一路走完：下好、校验过就直接装（下载中刷新了页面的话，就停在「安装并重启」等你点）
+let updGoAfter = false;
+async function applyUpd(){
+  updGoAfter = false;
+  try { await api("/api/update/apply", {}); upd.download.state = "installing"; renderUpd(); } catch(e) { toast("❌ " + e.message); }
+}
+function pollUpd(){
+  clearInterval(updPoll);
+  updPoll = setInterval(async () => {
+    try { upd = await api("/api/update"); } catch(e) { return; }
+    renderUpd();
+    const st = (upd.download || {}).state;
+    if (!["downloading", "verifying"].includes(st)) { clearInterval(updPoll); if (st === "ready" && updGoAfter) applyUpd(); }
+  }, 500);
+}
+async function loadUpdate(){
+  if (!isLocal) return;
+  try { upd = await api("/api/update"); } catch(e) { return; }
+  renderUpd(); if (setOpen) renderSettings();
+}
+async function checkUpdate(manual){
+  const b = $("#updCheck"); if (b) { b.disabled = true; b.textContent = "检查中…"; }
+  try { upd = await api("/api/update/check", {}); } catch(e) { toast("❌ " + e.message); }
+  if (manual && upd.current) {
+    if (upd.newer) store.set("msgbus.updSkip", "");
+    toast(upd.newer ? `有新版本 ${upd.latest}` : upd.error ? "⚠ " + upd.error : `已是最新版本 ${upd.current}`);
+  }
+  renderUpd(); renderSettings();
+}
 // 桌面版窗口（pywebview）里：⋯ 多一个「在浏览器中打开」（同一个地址，浏览器里照样能用）
 function markInApp(){ if (window.pywebview && window.pywebview.api && window.pywebview.api.open_browser) document.body.classList.add("inapp"); }
 window.addEventListener("pywebviewready", markInApp); markInApp();
@@ -2678,6 +2765,7 @@ function startPolling(){
 }
 (async () => {
   await loadMe();
+  loadUpdate(); setTimeout(loadUpdate, 20000); setInterval(loadUpdate, 30 * 60 * 1000);   // 启动后服务会在后台查一次
   await loadProjects();
   const last = store.get("msgbus.cur");
   const pick = projects.find(p => p.root === last) || projects[0];

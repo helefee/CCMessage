@@ -8,3 +8,5 @@ build/
 .tmp-shots/
 .venv/
 venv/
+nuitka-crash-report.xml
+.nuitka-cache/

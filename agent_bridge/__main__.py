@@ -55,11 +55,12 @@ def doctor() -> int:
         ok &= bool(good) or hint.startswith("（可选）")
         print(("✓ " if good else "✗ ") + text + ("" if good or not hint else "  —— " + hint))
     sys.stdout.reconfigure(encoding="utf-8")
-    line(True, f"Python {sys.version.split()[0]}（{sys.executable}）")
+    from . import __version__
+    line(True, f"agent-bridge {__version__}" + ("（Windows 安装版）" if paths.FROZEN else f"，Python {sys.version.split()[0]}（{sys.executable}）"))
     from . import server
     hp = server.hook_py_info()
-    kind = {"current": "就是现在这个", "system": "系统装的", "bundled": "桌面版自带的（系统里没找到 Python；挪动桌面版文件夹后要点一次修复）"}
-    line(bool(hp["path"]), f"新装钩子用的 Python：{hp['path'] or '没找到'}（{kind.get(hp['kind'], '')}）", server.NO_PY)
+    kind = {"current": "就是现在这个 Python", "system": "系统装的 Python", "busexe": "安装版自带的 bus.exe，不需要 Python"}
+    line(bool(hp["path"]), f"新装钩子用：{hp['path'] or '没找到'}（{kind.get(hp['kind'], '')}）", server.NO_PY)
     for r in server.load_registry():
         try:
             st = server.project_status(Path(r["root"]))
@@ -185,9 +186,11 @@ def main(argv=None):
         from . import codex_sync
         return codex_sync.main(rest)
     if cmd in ("export", "codex-list", "to-claude"):
-        from .paths import PKG
-        sub = {"codex-list": "list"}.get(cmd, cmd)
-        return subprocess.call([sys.executable, str(PKG / "codex_bridge.py"), sub, *rest])
+        from . import codex_bridge
+        return codex_bridge.main([{"codex-list": "list"}.get(cmd, cmd), *rest]) or 0
+    if cmd == "fx":                     # 桌面信件动画（服务在后台起它；也可以手动试）
+        from . import fx
+        return fx.main(rest) or 0
     print(__doc__)
     return 2
 

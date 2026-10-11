@@ -37,30 +37,41 @@
     python -m agent_bridge install <项目目录>      # 装进项目 + 自检
     python -m agent_bridge selftest                # 在临时目录里装一份跑完整自检（不碰任何真实项目）
 
-### Windows 桌面版（独立窗口，不用开浏览器）
+### Windows 安装版（独立窗口，不用装 Python）
 
-不想自己装 Python 的话，用打包好的文件夹版（GitHub Actions 每次构建都有 `AgentBridge-windows-x64.zip`，打 `v*` 标签时在 Release 里）：
-解压到任意目录，双击 `AgentBridge.exe`。
+下载 `AgentBridge-Setup-<版本>.exe`（Release 里有；GitHub Actions 每次构建的 Artifacts 里也有），双击装就行：
 
-- 里面是官方的 Windows 嵌入式 Python 3.11 + pywebview（用系统自带的 WebView2 / Edge 内核）+ 本仓源码，不是 PyInstaller 那种单文件，杀软误报少、改源码也方便；
+- 装到 `%LOCALAPPDATA%\Programs\AgentBridge`，**只装给当前用户、不要管理员**；开始菜单里有「会话消息总线」，桌面图标可选；
+  控制面板 / 设置 →「应用」里能卸载；再装新版本直接覆盖升级（正在跑的会先自动关掉）；
+- 里面是 Nuitka 编译好的程序（`AgentBridge.exe`）+ 一个单独编译的总线程序 `bus\bus.exe`，**没有 .py 源码，电脑上不用装 Python**；
+  窗口用系统自带的 WebView2（Edge 内核）；
 - 窗口标题「会话消息总线」，大小、位置会记住；只开一个，再双击就把已有的窗口提到前面；
 - 本机 8765 上已经有服务在跑（比如 start.cmd 开的）就直接连上它，关窗口不影响它；没有就在窗口进程里起服务，**关窗口 = 退出服务**；
 - 浏览器照样能打开同一个地址 http://127.0.0.1:8765/ ，⋯ 菜单里多一个「在浏览器中打开」；手机端照旧；
+- 命令行也能用：`AgentBridge.exe --port 8799 --no-browser`、`AgentBridge.exe doctor`、`AgentBridge.exe selftest`、`AgentBridge.exe install <项目目录>`（它是窗口程序，PowerShell 不等它、也接不到输出，在 PowerShell 里前面加 `cmd /c`）；
 - 出错日志：`~/.agent-bridge/desktop.log`。
 
-自己构建（要一个 64 位的系统 Python 3.11 和网络）：
+**钩子用 bus.exe**：用安装版给项目「安装 / 升级 / 修复」总线时，Claude 和 Codex 的钩子都改成
+`"%LOCALAPPDATA%/Programs/AgentBridge/bus/bus.exe" --dir <项目里的总线目录> hook claude|codex`，每轮启动很快、不依赖 Python。
+项目里的总线目录（`.msgbus` 或 `.temp/msgbus`）照旧放消息、收件箱、在线记录，格式不变；原来的 `bus.py` 留着没动（源码方式还能用）。
+Codex 的钩子改了之后要在 Codex 的 `/hooks` 里重新信任一次；平时（不点安装 / 升级 / 修复）Codex 钩子一字不动，只有跑不起来了（比如写的 Python 已经不在）才改。
+卸载安装版后用了 bus.exe 的项目钩子就跑不起来了 —— 再装回来，或者用源码方式的「升级 / 修复」改回 Python。
+`AgentBridge.exe doctor`（源码方式 `python -m agent_bridge doctor`）会列出每个项目的钩子用的是什么。
 
-    build_desktop.cmd            # 输出 dist\AgentBridge\（约 36 MB，zip 约 17 MB），最后用自带的 Python 跑一遍总线自检
-    build_desktop.cmd -Zip       # 另外打成 dist\AgentBridge-windows-x64.zip
+**检查更新**：设置（齿轮）里有「版本 x.y.z · 检查更新」和「自动检查更新」（默认开，启动后、之后最多每 6 小时查一次 GitHub Releases 最新版）。
+有新版本时右下角出一张小卡片（带更新说明），点「立即更新」：下载安装包（有进度）→ 对一遍 Release 里的 `.sha256` → 关掉服务 → 静默装新版（当前用户、不弹 UAC）→ 自动重新打开。
+没网 / GitHub 连不上只是提示一下，不影响使用。源码方式和 Linux 只提示有新版本，用 `git pull` 更新。
+（仓库是公开的，查更新不用登录；万一以后改成私有仓库，未登录的查询会失败 —— 界面会说明，可以设环境变量 `AGENT_BRIDGE_GITHUB_TOKEN` 给一个只读 token，程序里不内置任何密钥。）
 
-源码方式也能开窗口：`pip install pywebview` 后 `python -m agent_bridge desktop`。
+自己构建（要一个 64 位的系统 Python 3.11、网络、[Inno Setup](https://jrsoftware.org/isdl.php) 6.5+ 或 7；没有 Visual Studio 时 Nuitka 会自己下 MinGW64）：
 
-**钩子用哪个 Python**：项目里的 Claude / Codex 钩子每轮都要用 Python 跑 `bus.py`。
-桌面版装钩子时优先写系统里装的 Python（`py -3` / PATH 里的 python，跳过应用商店那个占位的），这样桌面版文件夹挪走、删掉都不影响钩子；
-**电脑上没装 Python 也能用**：这时钩子写的是桌面版自带的 `runtime\python.exe` 的完整路径（有控制台的那个，钩子要读它的输出）。
-代价是以后挪动 / 删除桌面版文件夹，钩子就跑不起来了 —— 界面会显示「总线可修复 / 钩子的 Python 不在了」，点「升级 / 修复」就会改成现在能用的：
-Claude 钩子直接改；Codex 钩子平时一字不动，只有它写的 Python 已经不在了（反正跑不起来）才改，改完要在 Codex 的 `/hooks` 里重新信任。
-`python -m agent_bridge doctor` 会列出每个项目的钩子用的是哪个 Python。
+    build_desktop.cmd            # dist\AgentBridge\（编译好的文件夹）+ dist\AgentBridge-Setup-<版本>.exe（+ .sha256），中间跑 bus.exe 测速和总线自检
+    build_desktop.cmd -Zip       # 另外打成 dist\AgentBridge-<版本>-windows-x64.zip（免安装，解压就能用）
+    build_desktop.cmd -NoInstaller -NoTest
+
+版本号只在 `agent_bridge/__init__.py` 的 `__version__` 里改；打 `v<版本>` 标签时 Actions 会核对两者一致，把安装包、`.sha256` 和 Linux 包挂到 Release 上。
+
+源码方式也能开窗口：`pip install pywebview` 后 `python -m agent_bridge desktop`；源码方式（start.cmd）的钩子照旧用 Python 跑项目里的 `bus.py`。
 
 ### Linux
 

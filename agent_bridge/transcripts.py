@@ -231,7 +231,7 @@ def _bus_cmds(cmd) -> list[dict]:
     if isinstance(cmd, list):
         cmd = " ".join(map(str, cmd))
     cmd = str(cmd or "")
-    if "bus.py" not in cmd or not re.search(r"bus\.py[\"']?\s+(--as\s+\S+\s+)?(send|task|notice|done)\b", cmd):
+    if not re.search(r"bus\.(py|exe)[\"']?\s+(--dir\s+\S+\s+)?(--as\s+\S+\s+)?(send|task|notice|done)\b", cmd):
         return []
     import shlex
     first_line = cmd.split("\n", 1)[0] if "<<" in cmd else cmd
@@ -243,14 +243,14 @@ def _bus_cmds(cmd) -> list[dict]:
         return []
     out = []
     for i, t in enumerate(toks):
-        if not t.rstrip("\"'").endswith("bus.py"):
+        if not t.rstrip("\"'").endswith(("bus.py", "bus.exe")):
             continue
         j, args = i + 1, []
         while j < len(toks) and not re.fullmatch(r"[;&|<>()]+", toks[j]):
             args.append(toks[j]); j += 1
         if args and args[-1].isdigit() and j < len(toks) and toks[j][:1] in "<>":
             args.pop()                          # 2>&1 里的 2
-        while args[:1] == ["--as"]:
+        while args[:1] in (["--as"], ["--dir"]):
             args = args[2:]
         if not args or args[0] not in _BUS_SUBS:
             continue
