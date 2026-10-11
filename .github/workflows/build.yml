@@ -61,15 +61,15 @@ jobs:
         run: build_desktop.cmd -Zip
       - uses: actions/upload-artifact@v4.6.2
         with:
-          name: AgentBridge-Setup
+          name: CCMsg-Setup
           path: |
-            dist/AgentBridge-Setup-*.exe
-            dist/AgentBridge-Setup-*.exe.sha256
+            dist/CCMsg-Setup-*.exe
+            dist/CCMsg-Setup-*.exe.sha256
           if-no-files-found: error
       - uses: actions/upload-artifact@v4.6.2
         with:
-          name: AgentBridge-windows-x64
-          path: dist/AgentBridge-*-windows-x64.zip
+          name: CCMsg-windows-x64
+          path: dist/CCMsg-*-windows-x64.zip
           if-no-files-found: error
 
   linux:
@@ -96,7 +96,7 @@ jobs:
           cd "$RUNNER_TEMP/agent-bridge"
           sh run.sh --no-browser --port 8799 --host 0.0.0.0 > "$RUNNER_TEMP/server.log" 2>&1 &
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8799/api/ping && break; sleep 1; done
-          curl -fsS http://127.0.0.1:8799/ | grep -q "会话消息总线"
+          curl -fsS http://127.0.0.1:8799/ | grep -q "<title>CC Msg</title>"
           curl -fsS http://127.0.0.1:8799/api/me | grep -q '"local": true'
           curl -fsS http://127.0.0.1:8799/api/projects
           IP=$(hostname -I | awk '{print $1}')
@@ -126,9 +126,21 @@ jobs:
         with:
           path: out
           merge-multiple: true
+      - name: compat copy for 0.2.x updaters (they only look for AgentBridge-Setup-*.exe)
+        run: |
+          set -eux
+          cd out
+          for f in CCMsg-Setup-*.exe; do
+            v="${f#CCMsg-Setup-}"; v="${v%.exe}"
+            cp "$f" "AgentBridge-Setup-$v.exe"
+            echo "$(sha256sum "AgentBridge-Setup-$v.exe" | cut -d' ' -f1)  AgentBridge-Setup-$v.exe" > "AgentBridge-Setup-$v.exe.sha256"
+          done
+          ls -l
       - uses: softprops/action-gh-release@v2.3.2
         with:
           files: |
+            out/CCMsg-Setup-*.exe
+            out/CCMsg-Setup-*.exe.sha256
             out/AgentBridge-Setup-*.exe
             out/AgentBridge-Setup-*.exe.sha256
             out/agent-bridge-linux.tar.gz

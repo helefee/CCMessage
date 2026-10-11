@@ -52,7 +52,7 @@ _HOOK_PY: dict = {}
 
 
 def bundled() -> bool:
-    """是不是 Windows 安装版（Nuitka 编译的 AgentBridge.exe）在跑。"""
+    """是不是 Windows 安装版（Nuitka 编译的 CCMsg.exe）在跑。"""
     return paths.FROZEN
 
 
@@ -1039,8 +1039,9 @@ PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
 PHONE_GET = {"/", "/bloub-icons.json", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
              "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout",
-             "/api/transcript/subtasks", "/api/transcript/subtask", "/api/transcript/subtask-list"}
-PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role", "/api/codex/resume"}
+             "/api/transcript/subtasks", "/api/transcript/subtask", "/api/transcript/subtask-list",
+             "/api/gh/ref", "/api/gh/pr", "/api/gh/diff", "/api/gh/prs", "/api/git/changes"}
+PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role", "/api/codex/resume", "/api/review"}
 
 
 # ---------- 会话管理器 / 同步与还原（只认电脑本机） ----------
@@ -1224,7 +1225,7 @@ def revoke(dev_id: str | None) -> int:
 
 
 PAGE = """<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>会话消息总线</title><body style="font:16px/1.6 system-ui,sans-serif;max-width:420px;margin:60px auto;padding:0 16px;text-align:center;color:#1c2127">
+<title>CC Msg</title><body style="font:16px/1.6 system-ui,sans-serif;max-width:420px;margin:60px auto;padding:0 16px;text-align:center;color:#1c2127">
 <div style="font-size:42px">📨</div><h2>{title}</h2><p style="color:#6a737d">{body}</p></body>"""
 
 
@@ -1292,7 +1293,7 @@ class Handler(BaseHTTPRequestHandler):
         dev = device_of(self._cookie_tok())
         if not dev:
             if path == "/":
-                self._html(PAGE.format(title="还没配对", body="在电脑上打开会话消息总线，⋯ 菜单 →「手机端」，用手机扫二维码。"), 401)
+                self._html(PAGE.format(title="还没配对", body="在电脑上打开 CC Msg，⋯ 菜单 →「手机端」，用手机扫二维码。"), 401)
             else:
                 self._err("没有配对，或设备令牌已失效 / 被电脑端移除", 401)
             return False
@@ -1414,6 +1415,21 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/codex":
                 r = run_bus(norm_root(q["root"]), ["codex-status", "--json"])
                 self._json(json.loads(r.stdout.decode("utf-8") or "{}"))
+            elif u.path == "/api/gh/ref":
+                from . import gh
+                self._json(gh.ref_info(q.get("ref", ""), fresh=q.get("fresh") == "1"))
+            elif u.path == "/api/gh/pr":
+                from . import gh
+                self._json(gh.pr_detail(q.get("ref", "")))
+            elif u.path == "/api/gh/diff":
+                from . import gh
+                self._json(gh.pr_diff(q.get("ref", "")))
+            elif u.path == "/api/gh/prs":
+                from . import gh
+                self._json(gh.pr_list(norm_root(q["root"]), q.get("state") or "all"))
+            elif u.path == "/api/git/changes":
+                from . import gh
+                self._json(gh.local_changes(norm_root(q["root"]), q.get("base") or "HEAD"))
             elif u.path == "/api/tasks":
                 r = run_bus(norm_root(q["root"]), ["tasks", "--json"])
                 rows = json.loads(r.stdout.decode("utf-8") or "[]")
@@ -1453,6 +1469,23 @@ class Handler(BaseHTTPRequestHandler):
                 if r.returncode != 0:
                     raise ValueError(out or "设置失败")
                 self._json({"ok": True, "output": out})
+            elif path == "/api/review":
+                # 代码审查：把「请审查 PR / 本地改动」作为用户本人的一句话发给选中的会话（只发消息，不碰 git / GitHub）
+                from . import gh
+                if body.get("agent") not in ("claude", "codex", "cursor") or not body.get("sid"):
+                    raise ValueError("先选一个会话")
+                root = norm_root(body["root"])
+                ref = (body.get("ref") or "").strip()
+                if ref and not gh.parse_ref(ref):
+                    raise ValueError("PR 引用不对")
+                local = None if ref else gh.local_changes(norm_root(body.get("src") or body["root"]), body.get("base") or "HEAD")
+                if local is not None and not local.get("ok"):
+                    raise ValueError(local.get("error") or "读不到本地改动")
+                if local is not None and not local.get("files") and not local.get("diff"):
+                    raise ValueError("没有改动可审查")
+                text = gh.review_prompt(ref or None, local, body.get("note") or "")
+                r = reply(root, body["agent"], body["sid"], text, "msg", "phone" if getattr(self, "device", None) else "ui")
+                self._json(dict(r, text=text) if isinstance(r, dict) else {"ok": True, "result": r, "text": text})
             elif path == "/api/reply":
                 text = (body.get("text") or "").strip()
                 if not text:
@@ -1576,7 +1609,7 @@ def start(port: int = 8765, host: str | None = None, lan_port: int | None = None
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="agent_bridge", description="agent-bridge：Claude ↔ Codex 会话消息总线管理界面")
+    ap = argparse.ArgumentParser(prog="agent_bridge", description="CC Msg（agent-bridge）：Claude ↔ Codex 会话消息总线管理界面")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--host", default=None,
                     help="另外在这个地址上开一个只认配对设备的监听（如 0.0.0.0）；管理界面始终只在 127.0.0.1")

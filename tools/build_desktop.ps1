@@ -1,9 +1,9 @@
-# Build the Windows installer version of AgentBridge (CCMessage):
-#   dist\AgentBridge\AgentBridge.exe       Nuitka standalone (onedir), windows GUI, attaches to a console when run from one
-#   dist\AgentBridge\bus\bus.exe           Nuitka standalone console exe of agent_bridge\bus.py (project hooks run this)
-#   dist\AgentBridge-Setup-<ver>.exe       Inno Setup installer (+ .sha256), per-user, no admin
-#   dist\AgentBridge-<ver>-windows-x64.zip the onedir as a zip (-Zip)
-# No .py sources end up in dist\AgentBridge; Python is not needed on the target machine.
+# Build the Windows installer version of CC Msg (agent-bridge, repo CCMessage):
+#   dist\CCMsg\CCMsg.exe                   Nuitka standalone (onedir), windows GUI, attaches to a console when run from one
+#   dist\CCMsg\bus\bus.exe                 Nuitka standalone console exe of agent_bridge\bus.py (project hooks run this)
+#   dist\CCMsg-Setup-<ver>.exe             Inno Setup installer (+ .sha256), per-user, no admin
+#   dist\CCMsg-<ver>-windows-x64.zip       the onedir as a zip (-Zip)
+# No .py sources end up in dist\CCMsg; Python is not needed on the target machine.
 # Usage:  build_desktop.cmd [-Zip] [-NoTest] [-NoInstaller]
 # Needs:  a 64-bit system Python 3.11 (only to build), internet on first run (pip, Nuitka's MinGW64 if there is no MSVC),
 #         Inno Setup 6.5+ or 7 (ISCC.exe on PATH, in Program Files, or set $env:ISCC).
@@ -17,7 +17,7 @@ $ProgressPreference = "SilentlyContinue"
 $root = Split-Path -Parent $PSScriptRoot
 $build = Join-Path $root "build"
 $distRoot = Join-Path $root "dist"
-$out = Join-Path $distRoot "AgentBridge"
+$out = Join-Path $distRoot "CCMsg"
 New-Item -ItemType Directory -Force $build, $distRoot | Out-Null
 function Step($t) { Write-Host "==> $t" -ForegroundColor Cyan }
 function Check($what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (exit $LASTEXITCODE)" } }
@@ -28,7 +28,7 @@ function Native { $eap = $ErrorActionPreference; $ErrorActionPreference = "Conti
 $ver = ([regex]'__version__\s*=\s*"([^"]+)"').Match((Get-Content (Join-Path $root "agent_bridge\__init__.py") -Raw)).Groups[1].Value
 if (-not $ver) { throw "no __version__ in agent_bridge\__init__.py" }
 $numVer = ([regex]'^\d+(\.\d+){0,3}').Match($ver).Value
-Write-Host "AgentBridge $ver"
+Write-Host "CC Msg $ver"
 
 # 1. build venv from a system Python 3.11 x64
 Step "build venv"
@@ -56,31 +56,31 @@ $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer
 $hasMsvc = (Test-Path $vswhere) -and (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)
 if ($hasMsvc) { $cc = @("--msvc=latest"); Write-Host "    compiler: MSVC" } else { $cc = @("--mingw64"); Write-Host "    compiler: MinGW64 (Nuitka downloads it)" }
 $common = @("--standalone", "--assume-yes-for-downloads", "--remove-output", "--python-flag=no_docstrings",
-            "--company-name=CCMessage", "--product-name=AgentBridge", "--file-version=$numVer", "--product-version=$numVer",
+            "--company-name=CCMessage", "--product-name=CC Msg", "--file-version=$numVer", "--product-version=$numVer",
             "--copyright=MIT", "--windows-icon-from-ico=agent_bridge\icon.ico") + $cc
 Push-Location $root
 try {
     $env:PYTHONPATH = $root
-    # 3. AgentBridge.exe (GUI + all subcommands; bus.py is NOT part of it)
-    Step "nuitka AgentBridge.exe"
-    Native $vpy -m nuitka @common "--output-dir=build\nuitka-app" "--output-filename=AgentBridge.exe" `
-        "--windows-console-mode=attach" "--file-description=AgentBridge" `
+    # 3. CCMsg.exe (GUI + all subcommands; bus.py is NOT part of it)
+    Step "nuitka CCMsg.exe"
+    Native $vpy -m nuitka @common "--output-dir=build\nuitka-app" "--output-filename=CCMsg.exe" `
+        "--windows-console-mode=attach" "--file-description=CC Msg" `
         "--include-package=agent_bridge" "--nofollow-import-to=agent_bridge.bus" "--include-package-data=agent_bridge" `
         "--enable-plugin=tk-inter" `
-        "tools\nuitka\AgentBridge.py"
-    Check "nuitka AgentBridge"
+        "tools\nuitka\CCMsg.py"
+    Check "nuitka CCMsg"
     # 4. bus.exe (console, stdlib only, small and fast to start: project hooks run it every turn)
     Step "nuitka bus.exe"
     Native $vpy -m nuitka @common "--output-dir=build\nuitka-bus" "--output-filename=bus.exe" `
-        "--windows-console-mode=force" "--file-description=AgentBridge message bus" "--python-flag=no_site" `
+        "--windows-console-mode=force" "--file-description=CC Msg message bus" "--python-flag=no_site" `
         "agent_bridge\bus.py"
     Check "nuitka bus"
 } finally { Pop-Location; Remove-Item Env:PYTHONPATH -ErrorAction SilentlyContinue }
 
-# 5. assemble dist\AgentBridge
+# 5. assemble dist\CCMsg
 Step "assemble $out"
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
-Copy-Item -Recurse (Join-Path $build "nuitka-app\AgentBridge.dist") $out
+Copy-Item -Recurse (Join-Path $build "nuitka-app\CCMsg.dist") $out
 Copy-Item -Recurse (Join-Path $build "nuitka-bus\bus.dist") (Join-Path $out "bus")
 foreach ($f in @("LICENSE", "README.md")) { Copy-Item (Join-Path $root $f) $out }
 if (Test-Path (Join-Path $root "licenses")) { Copy-Item -Recurse (Join-Path $root "licenses") (Join-Path $out "licenses") }
@@ -107,7 +107,7 @@ if (-not $NoTest) {
     $oldPath = $env:PATH
     $env:PATH = (($env:PATH -split ';') | Where-Object { $_ -and -not (Test-Path (Join-Path $_ "python.exe")) -and -not (Test-Path (Join-Path $_ "py.exe")) }) -join ';'
     try {
-        $p = Start-Process (Join-Path $out "AgentBridge.exe") -ArgumentList "selftest" -NoNewWindow -Wait -PassThru `
+        $p = Start-Process (Join-Path $out "CCMsg.exe") -ArgumentList "selftest" -NoNewWindow -Wait -PassThru `
             -RedirectStandardOutput (Join-Path $build "selftest.out") -RedirectStandardError (Join-Path $build "selftest.err")
         Get-Content (Join-Path $build "selftest.out") -Encoding UTF8 | Select-Object -Last 12 | ForEach-Object { Write-Host "    $_" }
         if ($p.ExitCode -ne 0) { Get-Content (Join-Path $build "selftest.err") | Write-Host; throw "selftest failed ($($p.ExitCode))" }
@@ -123,17 +123,17 @@ if (-not $NoInstaller) {
         if (-not $iscc -and (Test-Path "$d\ISCC.exe")) { $iscc = "$d\ISCC.exe" }
     }
     if (-not $iscc) { throw "ISCC.exe (Inno Setup 6.5+) not found; install it or set `$env:ISCC" }
-    Native $iscc /Q "/DAppVersion=$ver" "/DSourceDir=$out" "/DOutputDir=$distRoot" (Join-Path $root "installer\AgentBridge.iss")
+    Native $iscc /Q "/DAppVersion=$ver" "/DSourceDir=$out" "/DOutputDir=$distRoot" (Join-Path $root "installer\CCMsg.iss")
     Check "ISCC"
-    $setup = Join-Path $distRoot "AgentBridge-Setup-$ver.exe"
+    $setup = Join-Path $distRoot "CCMsg-Setup-$ver.exe"
     $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
-    [IO.File]::WriteAllText("$setup.sha256", "$hash  AgentBridge-Setup-$ver.exe`n", (New-Object Text.UTF8Encoding $false))
+    [IO.File]::WriteAllText("$setup.sha256", "$hash  CCMsg-Setup-$ver.exe`n", (New-Object Text.UTF8Encoding $false))
     Write-Host ("    {0} ({1:N1} MB)  sha256 {2}" -f $setup, ((Get-Item $setup).Length / 1MB), $hash) -ForegroundColor Green
 }
 if ($Zip) {
-    $z = Join-Path $distRoot "AgentBridge-$ver-windows-x64.zip"
+    $z = Join-Path $distRoot "CCMsg-$ver-windows-x64.zip"
     if (Test-Path $z) { Remove-Item -Force $z }
     Step "zip -> $z"
     Compress-Archive -Path $out -DestinationPath $z -CompressionLevel Optimal
 }
-Write-Host "done: $out\AgentBridge.exe" -ForegroundColor Green
+Write-Host "done: $out\CCMsg.exe" -ForegroundColor Green

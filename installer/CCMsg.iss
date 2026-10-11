@@ -1,6 +1,8 @@
-; AgentBridge (CCMessage) Windows installer - Inno Setup 6.5+
-; Build: tools\build_desktop.ps1 calls  ISCC /DAppVersion=x.y.z /DSourceDir=<dist\AgentBridge> /DOutputDir=<dist> installer\AgentBridge.iss
+; CC Msg (agent-bridge, repo CCMessage) Windows installer - Inno Setup 6.5+
+; Build: tools\build_desktop.ps1 calls  ISCC /DAppVersion=x.y.z /DSourceDir=<dist\CCMsg> /DOutputDir=<dist> installer\CCMsg.iss
 ; - per-user install to %LOCALAPPDATA%\Programs\AgentBridge, no admin / UAC
+;   (the folder keeps its old name on purpose: project hooks already point at .../AgentBridge/bus/bus.exe)
+; - 0.3.0 renamed AgentBridge -> CC Msg (CCMsg.exe); upgrading removes the old shortcuts and AgentBridge.exe
 ; - same AppId => upgrades in place; uninstaller registered under the current user
 ; - files that are still in use (bus.exe hooks waiting in the background, after-quit helpers) are renamed
 ;   out of the way instead of blocking the upgrade; the leftovers are removed on the next upgrade / uninstall
@@ -10,7 +12,7 @@
   #define AppVersion "0.0.0"
 #endif
 #ifndef SourceDir
-  #define SourceDir "..\dist\AgentBridge"
+  #define SourceDir "..\dist\CCMsg"
 #endif
 #ifndef OutputDir
   #define OutputDir "..\dist"
@@ -18,53 +20,60 @@
 
 [Setup]
 AppId={{6F3C1B2A-8E4D-4C7A-9B1E-2A5D7C9E0F13}
-AppName=AgentBridge
+AppName=CC Msg
 AppVersion={#AppVersion}
-AppVerName=AgentBridge {#AppVersion}
+AppVerName=CC Msg {#AppVersion}
 AppPublisher=CCMessage
 AppPublisherURL=https://github.com/helefee/CCMessage
 AppSupportURL=https://github.com/helefee/CCMessage/issues
 AppUpdatesURL=https://github.com/helefee/CCMessage/releases
 VersionInfoVersion={#AppVersion}
 DefaultDirName={userpf}\AgentBridge
-DefaultGroupName=AgentBridge
+DefaultGroupName=CC Msg
 DisableProgramGroupPage=yes
 DisableDirPage=auto
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
-OutputBaseFilename=AgentBridge-Setup-{#AppVersion}
+OutputBaseFilename=CCMsg-Setup-{#AppVersion}
 SetupIconFile=..\agent_bridge\icon.ico
-UninstallDisplayIcon={app}\AgentBridge.exe
-UninstallDisplayName=AgentBridge {#AppVersion}
+UninstallDisplayIcon={app}\CCMsg.exe
+UninstallDisplayName=CC Msg {#AppVersion}
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 CloseApplications=yes
-CloseApplicationsFilter=AgentBridge.exe
+CloseApplicationsFilter=CCMsg.exe,AgentBridge.exe
 RestartApplications=no
 SetupMutex=AgentBridgeSetupMutex
 ShowLanguageDialog=no
 LanguageDetectionMethod=none
 
 [Languages]
-Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl,AgentBridge.zh.isl"
+Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl,CCMsg.zh.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopIcon}"; Flags: unchecked
+
+[InstallDelete]
+; 0.2.x and earlier: the old Chinese-named shortcuts (OldAppTitle) pointing at AgentBridge.exe
+Type: files; Name: "{autoprograms}\{cm:OldAppTitle}.lnk"
+Type: files; Name: "{autoprograms}\{cm:OldUninstall}.lnk"
+Type: files; Name: "{autodesktop}\{cm:OldAppTitle}.lnk"
+Type: files; Name: "{app}\AgentBridge.exe"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{cm:AppTitle}"; Filename: "{app}\AgentBridge.exe"; WorkingDir: "{app}"
+Name: "{autoprograms}\{cm:AppTitle}"; Filename: "{app}\CCMsg.exe"; WorkingDir: "{app}"
 Name: "{autoprograms}\{cm:Uninstall}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{cm:AppTitle}"; Filename: "{app}\AgentBridge.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\{cm:AppTitle}"; Filename: "{app}\CCMsg.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\AgentBridge.exe"; Description: "{cm:LaunchNow}"; Flags: nowait postinstall skipifsilent
-Filename: "{app}\AgentBridge.exe"; Parameters: "{param:RELAUNCHARGS}"; Flags: nowait; Check: ShouldRelaunch
+Filename: "{app}\CCMsg.exe"; Description: "{cm:LaunchNow}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\CCMsg.exe"; Parameters: "{param:RELAUNCHARGS}"; Flags: nowait; Check: ShouldRelaunch
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
@@ -75,7 +84,7 @@ begin
   Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
 end;
 
-{ wait up to ~20 s for a running AgentBridge window (it holds this mutex) to quit by itself }
+{ wait up to ~20 s for a running CC Msg / AgentBridge window (it holds this mutex) to quit by itself }
 procedure WaitForApp;
 var
   i: Integer;

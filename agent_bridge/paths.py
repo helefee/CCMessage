@@ -9,7 +9,7 @@ from pathlib import Path
 
 PKG = Path(__file__).resolve().parent
 
-# Windows 安装版：Nuitka 编译成 AgentBridge.exe（程序目录里没有 .py 源码），总线是同目录 bus\bus.exe
+# Windows 安装版：Nuitka 编译成 CCMsg.exe（0.2.x 叫 AgentBridge.exe，程序目录里没有 .py 源码），总线是同目录 bus\bus.exe
 FROZEN = "__compiled__" in globals()
 
 def _exe_path() -> str:
@@ -26,13 +26,13 @@ def _exe_path() -> str:
     return os.path.abspath(p)
 
 
-EXE = _exe_path() if FROZEN else sys.executable      # 安装版：AgentBridge.exe 的完整路径
+EXE = _exe_path() if FROZEN else sys.executable      # 安装版：CCMsg.exe 的完整路径
 APP_DIR = Path(EXE).parent if FROZEN else None
 BUS_EXE = (APP_DIR / "bus" / "bus.exe") if FROZEN else None
 
 
 def self_cmd(*args: str) -> list[str]:
-    """再起一个自己跑子命令：安装版是 AgentBridge.exe <子命令>，源码版是 python -m agent_bridge <子命令>。"""
+    """再起一个自己跑子命令：安装版是 CCMsg.exe <子命令>，源码版是 python -m agent_bridge <子命令>。"""
     if FROZEN:
         return [EXE, *args]
     return [sys.executable, "-m", "agent_bridge", *args]

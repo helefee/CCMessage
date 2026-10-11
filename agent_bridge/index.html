@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script>/* 主题：先按记下的值设好，免得先白后黑闪一下；没记 / 记的是 system = 跟随系统 */
 try { var t = localStorage.getItem("msgbus.theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}</script>
-<title>会话消息总线</title>
+<title>CC Msg</title>
 <link rel="icon" href="/icon.png">
 <style>
 :root{
@@ -1013,12 +1013,115 @@ body.lg-bottom .sfoot{display:flex;position:sticky;bottom:0;margin-top:auto;z-in
 .setrow .seg{flex:none}
 .setrow .seg button{font-size:12.5px;padding:4px 12px}
 @media (max-width:860px){.setbtn{font-size:19px;padding:4px 8px}.setbtn .ic{width:20px;height:20px}}
+/* ---------- GitHub PR 小标签 / 预览卡片 / PR 面板 / diff 查看器 ---------- */
+:root{--pr-open:#1a7f37;--pr-merged:#8250df;--pr-closed:#cf222e;--pr-draft:#6e7781;--pr-add:#1a7f37;--pr-del:#cf222e;
+  --df-add:#e6ffec;--df-addn:#ccffd8;--df-del:#ffebe9;--df-deln:#ffd7d5;--df-hunk:#ddf4ff;--hl-k:#cf222e;--hl-s:#0a3069;--hl-c:#6e7781;--hl-n:#0550ae}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--pr-open:#3fb950;--pr-merged:#a371f7;--pr-closed:#f85149;--pr-draft:#8b949e;--pr-add:#3fb950;--pr-del:#f85149;
+  --df-add:rgba(46,160,67,.15);--df-addn:rgba(46,160,67,.3);--df-del:rgba(248,81,73,.15);--df-deln:rgba(248,81,73,.3);--df-hunk:rgba(56,139,253,.15);--hl-k:#ff7b72;--hl-s:#a5d6ff;--hl-c:#8b949e;--hl-n:#79c0ff}}
+:root[data-theme="dark"]{--pr-open:#3fb950;--pr-merged:#a371f7;--pr-closed:#f85149;--pr-draft:#8b949e;--pr-add:#3fb950;--pr-del:#f85149;
+  --df-add:rgba(46,160,67,.15);--df-addn:rgba(46,160,67,.3);--df-del:rgba(248,81,73,.15);--df-deln:rgba(248,81,73,.3);--df-hunk:rgba(56,139,253,.15);--hl-k:#ff7b72;--hl-s:#a5d6ff;--hl-c:#8b949e;--hl-n:#79c0ff}
+a.prchip{display:inline-flex;align-items:center;gap:3px;padding:0 7px 0 5px;margin:0 1px;border-radius:999px;background:var(--hover);color:var(--text);
+  font:500 .86em/1.6 var(--mono,ui-monospace,Consolas,monospace);text-decoration:none;vertical-align:baseline;cursor:pointer;border:1px solid var(--line);white-space:nowrap}
+a.prchip:hover{background:var(--hover2)}
+a.prchip .ic{width:12px;height:12px;color:var(--muted)}
+a.prchip.open .ic,a.prchip.is-open .ic{color:var(--pr-open)}a.prchip.merged .ic{color:var(--pr-merged)}a.prchip.closed .ic,a.prchip.is-closed .ic{color:var(--pr-closed)}a.prchip.draft .ic{color:var(--pr-draft)}
+.prcards{display:flex;flex-direction:column;gap:6px;margin:8px 0 2px;max-width:480px}
+.bub.u .prcards{margin-left:auto}
+.prcard{border:1px solid var(--line);border-radius:12px;padding:10px 12px 9px;background:var(--panel2);cursor:pointer;font:13px/1.45 var(--sans,inherit);color:var(--text);text-align:left;
+  transition:border-color .12s,box-shadow .12s;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.prcard:hover{border-color:var(--muted);box-shadow:0 3px 12px rgba(0,0,0,.1)}
+.prc1{display:flex;align-items:center;gap:8px;min-width:0}
+.prst{display:inline-flex;align-items:center;gap:4px;padding:1px 8px 1px 6px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;background:var(--pr-draft);flex:none;line-height:18px}
+.prst .ic{width:12px;height:12px}
+.prst.open,.prst.is-open{background:var(--pr-open)}.prst.merged{background:var(--pr-merged)}.prst.closed,.prst.is-closed{background:var(--pr-closed)}.prst.draft{background:var(--pr-draft)}
+.prst.ld{background:var(--hover2);color:var(--muted);font-weight:400}.prst.ld .spinr{width:9px;height:9px}
+.prrepo{color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.prtm{color:var(--faint);font-size:12px;margin-left:auto;white-space:nowrap;flex:none}
+.prtt{font-weight:600;font-size:14px;margin:6px 0 7px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word}
+.prtt.big{font-size:17px;-webkit-line-clamp:4;margin-top:2px}
+.prc3{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);min-width:0}
+.prav{width:18px;height:18px;border-radius:50%;background:var(--hover2);flex:none}
+.prau{color:var(--text);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pradd{color:var(--pr-add);font-weight:600;font-variant-numeric:tabular-nums}.prdel{color:var(--pr-del);font-weight:600;font-variant-numeric:tabular-nums}
+.prfn{color:var(--muted)}
+/* Codex 视图：更紧、方一点、等宽字的元信息 */
+.center.cx .prcard{border-radius:7px;box-shadow:none;padding:8px 10px;background:transparent}
+.center.cx .prcard .prrepo,.center.cx .prcard .prtm,.center.cx .prc3{font-family:var(--mono,ui-monospace,Consolas,monospace);font-size:11.5px}
+.center.cx .prcard .prtt{font-size:13.5px;margin:4px 0 5px}
+.center.cx .prst{border-radius:5px}
+/* PR 面板 */
+.spanel.prpanel{width:min(820px,96vw);z-index:29}
+.prpanel .sph #prTitle{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.prpanel .sph #prSub{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);white-space:nowrap}
+.prpanel .sph #prSub .ic{width:13px;height:13px}
+#prActs{display:flex;gap:4px;flex:none}
+.prbtn{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--text);font-size:12.5px;cursor:pointer}
+.prbtn:hover{background:var(--hover)}.prbtn .ic{width:14px;height:14px}.prbtn.ic1{padding:0;width:30px;justify-content:center}
+.prtabs{display:flex;gap:2px;align-items:center;padding:6px 10px 0;border-bottom:1px solid var(--line2);flex:none;overflow-x:auto}
+.prtabs>button{border:0;background:transparent;color:var(--muted);padding:6px 11px 8px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;border-radius:0;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.prtabs>button .ic{width:13px;height:13px}
+.prtabs>button.on{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.prtabs>button i{font-style:normal;background:var(--hover2);border-radius:999px;padding:0 6px;font-size:11px;margin-left:2px}
+.prbase{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);padding:0 6px 6px 2px}
+.prbase select{font-size:12.5px;padding:3px 6px;border-radius:7px}
+.prov{padding:4px 2px}
+.prmeta{font-size:12.5px;color:var(--muted);margin:4px 0}
+.prmeta code{font-size:11.5px;background:var(--hover);padding:1px 5px;border-radius:5px}
+.prlbl{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:999px;padding:0 7px;color:var(--muted)}
+.prchecks{display:flex;flex-direction:column;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+.prck{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12.5px;border-top:1px solid var(--line2)}
+.prck:first-child{border-top:0}.prck[data-open]{cursor:pointer}.prck[data-open]:hover{background:var(--hover)}
+.prck .ic{width:14px;height:14px;flex:none}.prck.ok .ic{color:var(--pr-open)}.prck.bad .ic{color:var(--pr-closed)}.prck.skip .ic{color:var(--faint)}
+.prdesc{border:1px solid var(--line2);border-radius:10px;padding:8px 14px;background:var(--panel2);font-size:13.5px;overflow:auto}
+.prhint{color:var(--faint);font-size:12.5px;margin-top:4px}
+.prerr{display:flex;gap:10px;padding:14px;border:1px solid var(--line);border-radius:10px;margin:8px 2px;font-size:13px;line-height:1.6}
+.prerr>.ic{color:var(--warn,#b7791f);width:18px;height:18px;flex:none;margin-top:2px}
+.prlist{display:flex;flex-direction:column;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+.prcm{display:flex;align-items:baseline;gap:9px;padding:6px 10px;font-size:13px;border-top:1px solid var(--line2);min-width:0}
+.prcm:first-child{border-top:0}.prcm code{color:var(--accent);font-size:12px;flex:none}
+.prcmh{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prcm .prtm{margin-left:0}
+.prcmt{border:1px solid var(--line2);border-radius:10px;padding:8px 12px;margin:0 0 8px;font-size:13.5px}
+.prcmth{display:flex;align-items:center;gap:8px;font-size:12.5px}.prrs{font-size:11px;padding:0 7px;border-radius:999px;background:var(--hover2)}
+.prrs.ok{background:var(--pr-open);color:#fff}.prrs.bad{background:var(--pr-closed);color:#fff}
+.prrow{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;margin:2px 0}
+.prrow:hover{background:var(--hover)}.prrow .prst{margin-top:2px}.prrow .prtt{margin:0 0 2px;font-size:13.5px;-webkit-line-clamp:1}
+/* diff */
+.dfsum{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin:2px 2px 8px;flex-wrap:wrap}
+.dfall{margin-left:auto}
+details.dff{border:1px solid var(--line);border-radius:9px;margin:0 0 8px;overflow:hidden;background:var(--panel)}
+details.dff>summary{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:12.5px;cursor:pointer;list-style:none;background:var(--panel2);position:sticky;top:-10px;z-index:1}
+details.dff>summary::-webkit-details-marker{display:none}
+details.dff>summary .tgc .ic{width:13px;height:13px;transition:transform .12s;color:var(--faint)}
+details.dff[open]>summary .tgc .ic{transform:rotate(90deg)}
+details.dff[open]>summary{border-bottom:1px solid var(--line2)}
+.dfp{font-family:var(--mono,ui-monospace,Consolas,monospace);font-size:12px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:left}
+.dftag{font-size:10.5px;padding:0 6px;border-radius:999px;background:var(--hover2);color:var(--muted)}.dftag.add{color:var(--pr-add)}.dftag.del{color:var(--pr-del)}
+.dft{overflow-x:auto;font:12px/1.55 var(--mono,ui-monospace,Consolas,monospace)}
+.dl{display:flex;min-width:max-content}
+.dl .ln{flex:none;width:44px;padding:0 6px;text-align:right;color:var(--faint);user-select:none;border-right:1px solid var(--line2);font-variant-numeric:tabular-nums}
+.dl .dc{white-space:pre;padding:0 12px 0 4px;flex:1}.dl .dc b{display:inline-block;width:14px;color:var(--faint);font-weight:400;user-select:none}
+.dl.ad{background:var(--df-add)}.dl.ad .ln{background:var(--df-addn)}.dl.ad .dc b{color:var(--pr-add)}
+.dl.de{background:var(--df-del)}.dl.de .ln{background:var(--df-deln)}.dl.de .dc b{color:var(--pr-del)}
+.dl.hh{background:var(--df-hunk);color:var(--muted)}
+.dfmeta{padding:8px 12px;color:var(--muted);font-size:12.5px}
+.dc i{font-style:normal}.dc .hk{color:var(--hl-k)}.dc .hs{color:var(--hl-s)}.dc .hc{color:var(--hl-c);font-style:italic}.dc .hn{color:var(--hl-n)}
+.chgst{font-size:12.5px;color:var(--muted);font-family:var(--mono,ui-monospace,Consolas,monospace);margin:2px 2px 4px}
+.chgfiles{display:flex;flex-direction:column;border:1px solid var(--line2);border-radius:9px;padding:4px 0;font:12.5px/1.6 var(--mono,ui-monospace,Consolas,monospace)}
+.chgf{display:flex;gap:8px;padding:1px 10px;align-items:center}
+.chgc{font:600 11px/16px var(--sans,inherit);padding:0 5px;border-radius:4px;background:var(--hover2);color:var(--muted)}
+.chgc.cM{color:var(--warn,#b7791f)}.chgc.cA,.chgc.cN{color:var(--pr-add)}.chgc.cD{color:var(--pr-del)}
+.revd{font-size:13.5px;line-height:1.6;display:flex;flex-direction:column;gap:6px}.revd .lbl2{font-size:12px;color:var(--muted);margin-top:6px}
+.revd select,.revd textarea{width:100%;box-sizing:border-box}
+.trhead .prhb{display:inline-flex;align-items:center;gap:4px;flex:none}
+.trhead .prhb .ic{width:14px;height:14px}
+@media (max-width:860px){.trhead .prhb .spl{display:none}.prbtn span{display:none}.prbtn{padding:0;width:30px;justify-content:center}.spanel.prpanel{width:100%}}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="top">
-    <span class="brand" id="brand" title="回到总线消息"><i data-ic="messages"></i><span class="btx"> 会话消息总线</span><span id="phoneTag" style="display:none;font-weight:400;font-size:12px;color:var(--muted)"> · 手机</span></span>
+    <span class="brand" id="brand" title="回到总线消息"><i data-ic="messages"></i><span class="btx"> CC Msg</span><span id="phoneTag" style="display:none;font-weight:400;font-size:12px;color:var(--muted)"> · 手机</span></span>
     <select class="projsel" id="projSel" title="切换项目"></select>
     <button class="stdot mob" id="stDot" title="状态"></button>
     <div class="pills" id="pills"></div>
@@ -1036,6 +1139,8 @@ body.lg-bottom .sfoot{display:flex;position:sticky;bottom:0;margin-top:auto;z-in
           <button id="mSM" class="admin"><i data-ic="listx"></i>会话管理（搜索 / 归档 / 删除 / 还原）…</button>
           <button id="mCSync" class="admin needcdesk" title="这台电脑上没装 Claude 桌面端时不显示"><i data-ic="sync"></i>同步 Claude 会话到当前账号…</button>
           <button id="mXSync" class="admin"><i data-ic="download"></i>把 Codex 对话同步进 Claude…</button>
+          <button id="mPRs"><i data-ic="gitpr"></i>GitHub PR 列表…</button>
+          <button id="mChg"><i data-ic="gitdiff"></i>本地改动 / 代码审查…</button>
           <button id="mInst" class="admin"><i data-ic="wrench"></i>安装 / 升级 / 修复</button>
           <button id="mTest" class="admin"><i data-ic="activity"></i>自检</button>
           <button id="mRm" class="admin"><i data-ic="listx"></i>从列表移除</button>
@@ -1112,6 +1217,12 @@ body.lg-bottom .sfoot{display:flex;position:sticky;bottom:0;margin-top:auto;z-in
 const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
 // ---------- SVG 图标（Lucide，ISC 许可；Claude / Codex / Cursor 用官方 logo）----------
 const ICON = {
+  gitpr: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><path d="M6 9v12"/>',
+  gitmerge: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+  gitbranch: '<line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  gitdiff: '<path d="M12 3v14"/><path d="M5 10h14"/><path d="M5 21h14"/>',
+  eye: '<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
+  dot: '<circle cx="12" cy="12" r="4"/>',
   messages: '<path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/>',
   refresh: '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
   more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
@@ -1875,8 +1986,8 @@ function msgHtml(m){
   return `<div class="${cls}" id="m-${esc(m.id)}">
     <div class="meta">${badge}<span class="who a-${esc(a)}">${logo(a)}${esc(nameOf(m.from.name))}</span>
       <span class="mono">→ ${esc(m.to)}</span><span title="${esc(new Date(m.ts*1000).toLocaleString())}">${hm(m.ts)}</span><span class="mono">#${esc(m.id.slice(0,6))}</span></div>
-    <div class="txt ${long?"clamp":""}">${esc(m.text)}</div>
-    ${long?`<a class="link more" data-more>展开全文</a>`:""}${linked}
+    <div class="txt ${long?"clamp":""}">${prLinkify(esc(m.text))}</div>
+    ${long?`<a class="link more" data-more>展开全文</a>`:""}${prCards(m.text)}${linked}
     <div class="acts">${a!=="user"?`<button data-reply="${esc(keyOf(a, shortOf(m.from)))}" title="回复这个会话">回复</button>`:""}
       <button data-copy="${esc(k==="task"?m.id:(m.reply_to||m.id))}" title="复制编号">复制编号</button></div></div>`;
 }
@@ -2202,6 +2313,8 @@ function openSession(x){
   const live = sessList.find(s => s.agent === x.agent && s.sid === x.sid) || x;
   $("#trHead").innerHTML = `<button class="mback" onclick="mBack()" title="返回总线消息">${ic("back")}</button>${bbAvatar(live, sessState(live)[0], 30)}<span class="nm a-${esc(x.agent)}">${logo(x.agent)}${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
     <button class="spbtn" id="spBtn" style="display:none" title="查看这个会话派出去的子任务">${ic("users")}<span class="spl">子任务</span><span class="spn" id="spN">0</span><span class="spr" id="spRun"></span></button>
+    <button class="spbtn prhb" id="chgBtn" title="看这个项目本地的改动（git status / diff），可以发给会话做代码审查">${ic("gitdiff")}<span class="spl">改动</span></button>
+    <button class="spbtn prhb" id="prsBtn" title="这个项目在 GitHub 上的 PR（用本机 gh 只读查看）">${ic("gitpr")}<span class="spl">PR</span></button>
     <button class="rf" id="trRefresh" title="从头重读这个会话的记录">${ic("refresh")}</button>
     ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">${ic("handoff")}<span class="tcl"> 交给 Claude</span></button>` : ""}
     <span class="note" tabindex="0" title="${esc(x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : x.agent==="cursor" ? "回复经总线送达 Cursor，标成「用户本人」发的：它下次提交消息、调用工具或一轮结束时收到，闲着叫不醒" : "回复经总线送达 Claude（闲着会被叫醒），标成「用户本人 · 经 agent-bridge 网页」，它会当成你直接说的话；项目要先 ⋯ → 安装 / 升级 / 修复 换上新版总线")}">${ic("info")}</span>`;
@@ -2210,6 +2323,8 @@ function openSession(x){
   $("#trRefresh").onclick = e => { spin(e.currentTarget); trOffset = -1; trEntries = []; trResetState(true); pollTranscript(true); };
   if (!same) { trOffset = -1; trEntries = []; trResetState(false); $("#trView").innerHTML = `<div class="empty">正在读会话记录…</div>`; }
   $("#spBtn").onclick = () => spOpenP ? spClose() : spShow();
+  $("#chgBtn").onclick = () => (prOpenP && prCur && prCur.t === "chg") ? prClose() : (prStack = [], prCur = null, chgOpen());
+  $("#prsBtn").onclick = () => (prOpenP && prCur && prCur.t === "list") ? prClose() : (prStack = [], prCur = null, prListOpen());
   spOnOpen(x, same);
   pollTranscript(true);
 }
@@ -2250,13 +2365,13 @@ function busInHtml(e, kp){
   const bk = kp + "b" + e.pos + (e.mid || e.key).slice(-12), nl = e.text.split("\n").length;
   if (e.user) {      // 你本人从网页 / 手机经总线发来的：画成你的气泡，标一下「经总线」
     const long = e.text.length > 700 || nl > 14, cl = long && !trUnclamp.has(bk);
-    return `<div class="bub u viabus ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bvia">${ic("mail")}经总线 · ${esc(e.via ? e.via.replace("agent-bridge ", "") : "网页")}${e.kind === "task" ? " · 派活" + (e.mid ? " #" + esc(e.mid.slice(0, 6)) : "") : ""}${e.note ? " · 预览" : ""}</div><div class="bx">${esc(e.text)}</div>
+    return `<div class="bub u viabus ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bvia">${ic("mail")}经总线 · ${esc(e.via ? e.via.replace("agent-bridge ", "") : "网页")}${e.kind === "task" ? " · 派活" + (e.mid ? " #" + esc(e.mid.slice(0, 6)) : "") : ""}${e.note ? " · 预览" : ""}</div><div class="bx">${prLinkify(esc(e.text))}</div>${prCards(e.text)}
       ${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}${e.ts?`<div class="bt">${hm(e.ts)}</div>`:""}</div>`;
   }
   const long = e.text.length > 600 || nl > 12, cl = long && !trUnclamp.has(bk);
   const k = BUS_IN_K[e.kind] || "消息", idt = e.mid && e.kind !== "msg" ? " #" + e.mid.slice(0, 6) : "";
   return `<div class="buscard in ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bch">${ic("messages")}<b title="${esc(e.frm)}">${esc(e.frm || "别的会话")}</b><span class="bck">${k}${esc(idt)}</span>${e.note ? '<span class="bck">预览 · 全文在 inbox</span>' : ""}${e.ts?`<span class="bst">${hm(e.ts)}</span>`:""}</div>
-    <div class="bcx">${esc(e.text)}</div>${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}</div>`;
+    <div class="bcx">${prLinkify(esc(e.text))}</div>${prCards(e.text)}${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}</div>`;
 }
 function busOutHtml(t, kp){
   const o = t.id ? trToolOut[t.id] : null, dk = kp + "o" + t.pos;
@@ -2264,7 +2379,7 @@ function busOutHtml(t, kp){
   return t.bus.map((b, i) => {
     const bk = dk + "_" + i, nl = b.text.split("\n").length, long = b.text.length > 600 || nl > 12, cl = long && !trUnclamp.has(bk);
     return `<div class="buscard out ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bch">${ic("mail")}<span style="flex:none">发给</span><b title="${esc(b.to)}">${esc(b.to || "（未写对象）")}</b><span class="bck">${BUS_OUT_K[b.kind] || "消息"}</span>${st}</div>
-      <div class="bcx">${esc(b.text)}</div>${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}
+      <div class="bcx">${prLinkify(esc(b.text))}</div>${prCards(b.text)}${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}
       ${i === t.bus.length - 1 ? `<details class="bcraw" data-dk="${esc(dk)}" ${trDet.has(dk) ? "open" : ""}><summary>命令和输出</summary><pre>${esc(t.input || t.text)}</pre>${o ? `<pre class="${o.err ? "err" : ""}">${esc(o.out || "（没有输出）")}</pre>` : ""}</details>` : ""}</div>`;
   }).join("");
 }
@@ -2322,6 +2437,7 @@ function mdInline(s){       // s 已经转义过
   s = s.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>");      // __粗__ 不认：代码里的 __init__ 太常见
   s = s.replace(/(^|[^*\w])\*([^*\s](?:[^*\n]*[^*\s])?)\*(?![*\w])/g, "$1<em>$2</em>");
   s = s.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
+  s = prLinkify(s);
   return s.replace(/\u0000(\d+)\u0000/g, (m, i) => `<code>${codes[+i]}</code>`);
 }
 function mdCode(code, lang){
@@ -2480,7 +2596,7 @@ function trListHtml(entries, kp, sub){
     if (e.role !== "user" && e.role !== "assistant") continue;
     const isU = e.role === "user", nl = e.text.split("\n").length;
     const bk = kp + e.pos, long = isU ? e.text.length > 700 || nl > 14 : e.text.length > 3000 || nl > 60, cl = long && !trUnclamp.has(bk);
-    html += `<div class="bub ${isU?"u":"a"} ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bx${isU?"":" md"}">${isU ? esc(e.text) : mdHtml(e.text)}</div>
+    html += `<div class="bub ${isU?"u":"a"} ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bx${isU?"":" md"}">${isU ? prLinkify(esc(e.text)) : mdHtml(e.text)}</div>${prCards(e.text)}
       ${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}${e.ts?`<div class="bt">${hm(e.ts)}</div>`:""}</div>`;
   }
   flush();
@@ -2757,6 +2873,282 @@ $("#sendBtn").onclick = async () => {
   b.disabled = false; pollMessages();
 };
 
+// ---------- GitHub PR 预览 / 查看 / 代码审查（全部只读：gh / git 只查不改；审查请求经总线发给会话） ----------
+// 对话和总线消息里的 PR / issue 引用（完整链接、owner/repo#123）画成小标签 + 预览卡片；点开右侧 PR 面板看说明、检查、提交、改动和评论
+const PR_RE = /(^|[\s(（:：,，、\[【"'])(?:(https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(?:pull|issues)\/(\d+))(?:[\/#?][^\s<)）\]】"']*)?|([A-Za-z0-9][\w-]{0,38})\/([\w.-]{1,100})#(\d{1,7}))(?=$|[\s)）.,，。:：;；!！?？、\]】"'])/g;
+let PRC = {};             // ref -> {t, v}（v=null 表示在查）
+const prKey = (o, r, n) => `${o}/${r}#${n}`;
+function prRefs(text){
+  const out = []; let m; PR_RE.lastIndex = 0;
+  const s = String(text || "").replace(/```[\s\S]*?```/g, " ").replace(/`[^`\n]*`/g, " ");
+  while ((m = PR_RE.exec(s))) { const k = m[2] ? prKey(m[3], m[4], m[5]) : prKey(m[6], m[7], m[8]);
+    if (/^\d+$/.test(m[6] || "x") || /\.(py|js|ts|md|json|txt|html|rs|go)$/i.test(m[7] || "")) continue;
+    if (!out.includes(k)) out.push(k); }
+  return out;
+}
+// 已转义的文本里把引用换成小标签（跳过 <a …>…</a> 和 <code>）
+function prLinkify(s){
+  const keep = [];
+  s = s.replace(/<a\b[\s\S]*?<\/a>|<code>[\s\S]*?<\/code>|\u0000\d+\u0000/g, x => { keep.push(x); return "\u0001" + (keep.length - 1) + "\u0001"; });
+  s = s.replace(PR_RE, (all, pre, url, o1, r1, n1, o2, r2, n2) => {
+    if (o2 && (/^\d+$/.test(o2) || /\.(py|js|ts|md|json|txt|html|rs|go)$/i.test(r2))) return all;
+    const k = url ? prKey(o1, r1, n1) : prKey(o2, r2, n2);
+    return pre + prChip(k, url ? all.slice(pre.length) : k);
+  });
+  return s.replace(/\u0001(\d+)\u0001/g, (m, i) => keep[+i]);
+}
+function prChip(k, label){
+  const v = (PRC[k] || {}).v, st = v && v.ok ? (v.kind === "issue" ? "is-" : "") + v.state : "";
+  const short = label && label.startsWith("https://") ? k : (label || k);
+  return `<a class="prchip ${esc(st)}" data-pr="${esc(k)}" href="https://github.com/${esc(k.replace("#", v && v.kind === "issue" ? "/issues/" : "/pull/"))}" title="${esc(v && v.ok ? v.title : "预览 " + k)}">${ic("gitpr")}${esc(short)}</a>`;
+}
+function relT(iso){
+  if (!iso) return ""; const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 60) return "刚刚"; if (s < 3600) return `${Math.floor(s/60)}分钟前`; if (s < 86400) return `${Math.floor(s/3600)}小时前`;
+  if (s < 30 * 86400) return `${Math.floor(s/86400)}天前`; const d = new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+const PR_ST = {open: "打开", draft: "草稿", merged: "已合并", closed: "已关闭"};
+const IS_ST = {open: "打开", closed: "已关闭"};
+function prBadge(v){ const st = v.kind === "issue" ? "is-" + v.state : v.state;
+  return `<span class="prst ${esc(st)}">${ic(v.kind === "issue" ? "dot" : v.state === "merged" ? "gitmerge" : "gitpr")}${(v.kind === "issue" ? IS_ST : PR_ST)[v.state] || esc(v.state)}</span>`; }
+function prCardInner(k){
+  const c = PRC[k], v = c && c.v;
+  if (!v) return `<div class="prc1"><span class="prst ld"><span class="spinr"></span>读取中</span><span class="prrepo">${esc(k.replace("#", " #"))}</span></div>`;
+  const av = v.avatar ? `<img class="prav" src="${esc(v.avatar)}&s=40" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : `<span class="prav"></span>`;
+  return `<div class="prc1">${prBadge(v)}<span class="prrepo">${esc(v.repo)} #${v.number}</span><span class="prtm" title="${esc(new Date(v.merged || v.closed || v.created).toLocaleString())}">${relT(v.merged || v.closed || v.updated || v.created)}</span></div>
+    <div class="prtt">${esc(v.title)}</div>
+    <div class="prc3">${av}<span class="prau">${esc(v.author || "")}</span>${v.kind === "pr" && v.additions != null ? `<span class="pradd">+${v.additions}</span><span class="prdel">-${v.deletions}</span><span class="prfn">${v.files}个文件</span>` : v.kind === "issue" ? `<span class="prfn">${v.comments || 0} 条评论</span>` : ""}</div>`;
+}
+function prCards(text){
+  const refs = prRefs(text).slice(0, 4); if (!refs.length) return "";
+  return `<div class="prcards">${refs.map(k => { prFetch(k); const v = (PRC[k] || {}).v;
+    if (v && !v.ok) return "";      // 查不到（没装 gh / 没权限）：只留文字里的链接
+    return `<div class="prcard" data-pr="${esc(k)}" data-prc="${esc(k)}" title="点开查看">${prCardInner(k)}</div>`; }).join("")}</div>`;
+}
+function prFetch(k, force){
+  const c = PRC[k], now = Date.now();
+  if (c && !force) { if (!c.v) return; const ttl = !c.v.ok ? 60e3 : (c.v.state === "open" || c.v.state === "draft") ? 120e3 : 3600e3; if (now - c.t < ttl) return; }
+  PRC[k] = {t: now, v: c && c.v ? c.v : null, busy: true};
+  api(`/api/gh/ref?ref=${encodeURIComponent(k)}${force ? "&fresh=1" : ""}`).catch(e => ({ok: false, error: String(e.message || e)})).then(v => {
+    PRC[k] = {t: Date.now(), v};
+    $$(`[data-prc="${CSS.escape(k)}"]`).forEach(el => { if (!v.ok) el.remove(); else el.innerHTML = prCardInner(k); });
+    $$(`.prchip[data-pr="${CSS.escape(k)}"]`).forEach(el => { if (v.ok) { el.classList.add((v.kind === "issue" ? "is-" : "") + v.state); el.title = v.title; } });
+  });
+}
+document.addEventListener("click", e => {
+  const el = e.target.closest && e.target.closest("[data-pr]"); if (!el) return;
+  e.preventDefault(); e.stopPropagation();
+  const k = el.dataset.pr, v = (PRC[k] || {}).v;
+  if (v && !v.ok) return openUrl(el.getAttribute("href") || `https://github.com/${k.replace("#", "/pull/")}`);
+  if (v && v.kind === "issue") return openUrl(v.url);
+  prOpen(k, true);
+}, true);
+
+// ---------- 右侧 PR 面板（复用子任务面板的样式） ----------
+const prPanel = document.createElement("aside");
+prPanel.className = "spanel prpanel"; prPanel.id = "prPanel"; prPanel.setAttribute("aria-hidden", "true");
+prPanel.innerHTML = `<div class="sph"><button class="spback" id="prBack" title="返回">${ic("back")}</button><div class="spht"><b id="prTitle">PR</b><span id="prSub"></span></div><span id="prActs"></span><button class="spx" id="prX" title="关闭（Esc）">✕</button></div><div class="prtabs" id="prTabs"></div><div class="spbody" id="prBody"></div>`;
+document.body.appendChild(prPanel);
+let prStack = [], prCur = null, prOpenP = false, prTab = "ov", prD = {}, prDiffs = {};
+function prShow(){ prOpenP = true; prPanel.classList.add("open"); prPanel.setAttribute("aria-hidden", "false"); if (typeof spOpenP !== "undefined" && spOpenP) spClose(); }
+function prClose(){ prOpenP = false; prPanel.classList.remove("open"); prPanel.setAttribute("aria-hidden", "true"); prStack = []; prCur = null; }
+$("#prX").onclick = prClose;
+$("#prBack").onclick = () => { const p = prStack.pop(); if (p) prGo(p, false); };
+document.addEventListener("keydown", e => { if (e.key === "Escape" && prOpenP && !$("#dlg").classList.contains("open")) { e.preventDefault(); prClose(); } });
+function prGo(st, push){
+  if (push && prCur) prStack.push(prCur);
+  prCur = st; prShow(); $("#prBack").style.visibility = prStack.length ? "visible" : "hidden";
+  if (st.t === "pr") prRenderPr(); else if (st.t === "list") prRenderList(); else chgRender();
+}
+function prOpen(ref, fresh){ prTab = "ov"; prGo({t: "pr", ref}, prOpenP); prLoad(ref, fresh); }
+function prSetHead(title, sub, acts, tabs){
+  $("#prTitle").textContent = title; $("#prSub").innerHTML = sub || ""; $("#prActs").innerHTML = acts || "";
+  $("#prTabs").innerHTML = tabs || ""; $("#prTabs").style.display = tabs ? "" : "none";
+}
+async function prLoad(ref, fresh){
+  if (!prD[ref] || fresh) { prD[ref] = prD[ref] || {busy: true}; prD[ref].busy = true; if (prCur && prCur.ref === ref) prRenderPr(); }
+  try { prD[ref] = await api(`/api/gh/pr?ref=${encodeURIComponent(ref)}`); } catch(e) { prD[ref] = {ok: false, error: String(e.message || e)}; }
+  if (prCur && prCur.ref === ref) prRenderPr();
+}
+function prRenderPr(){
+  const ref = prCur.ref, d = prD[ref], v = (PRC[ref] || {}).v;
+  const url = (d && d.url) || (v && v.url) || `https://github.com/${ref.replace("#", "/pull/")}`;
+  const acts = `<button class="prbtn" id="prRev" title="把这个 PR 发给一个 Claude / Codex 会话，请它只读审查">${ic("eye")}<span>代码审查</span></button><button class="prbtn ic1" id="prWeb" title="在浏览器打开">${ic("external")}</button><button class="prbtn ic1" id="prRf" title="刷新">${ic("refresh")}</button>`;
+  const tabs = !d || !d.ok ? "" : [["ov", "概览"], ["files", `文件 <i>${d.files.length}</i>`], ["commits", `提交 <i>${d.commits.length}</i>`], ["talk", `评论 <i>${d.reviews.length + d.comments.length}</i>`]]
+    .map(([k, t]) => `<button class="${prTab === k ? "on" : ""}" data-tab="${k}">${t}</button>`).join("");
+  prSetHead(`${ref.split("#")[0].split("/")[1]} #${ref.split("#")[1]}`, d && d.ok ? prBadge(Object.assign({kind: "pr"}, d)) : "", acts, tabs);
+  $("#prWeb").onclick = () => openUrl(url);
+  $("#prRf").onclick = e => { spin(e.currentTarget); delete prDiffs[ref]; prFetch(ref, true); prLoad(ref, true); };
+  $("#prRev").onclick = () => reviewDlg({ref, title: d && d.title});
+  $$("#prTabs [data-tab]").forEach(b => b.onclick = () => { prTab = b.dataset.tab; prRenderPr(); $("#prBody").scrollTop = 0; });
+  const B = $("#prBody");
+  if (!d || d.busy) { B.innerHTML = `<div class="empty"><span class="spinr"></span> 正在用 gh 读取 PR…</div>`; return; }
+  if (!d.ok) { B.innerHTML = `<div class="prerr">${ic("warn")}<div><b>读不到这个 PR</b><div>${esc(d.error)}</div><div class="prhint">需要这台电脑装了 GitHub CLI 并登录（gh auth login），且当前账号能看这个仓库。</div><a class="link" data-open="${esc(url)}">在浏览器打开</a></div></div>`;
+    B.querySelector("[data-open]").onclick = () => openUrl(url); return; }
+  if (prTab === "ov") {
+    const ck = d.checks || [], okN = ck.filter(c => /SUCCESS|NEUTRAL|SKIPPED/.test(c.conclusion || "")).length, badN = ck.filter(c => /FAIL|ERROR|CANCEL|TIMED/.test(c.conclusion || "")).length;
+    B.innerHTML = `<div class="prov"><div class="prtt big">${esc(d.title)}</div>
+      <div class="prmeta">${esc(d.author || "")} 想把 <code>${esc(d.head)}</code> 合并进 <code>${esc(d.base)}</code> · ${relT(d.created)}创建${d.merged ? " · " + relT(d.merged) + "合并" : ""}</div>
+      <div class="prmeta"><span class="pradd">+${d.additions}</span> <span class="prdel">-${d.deletions}</span> · ${d.files_n} 个文件 · ${d.commits.length} 个提交${d.review_decision ? " · " + esc({APPROVED: "已批准", CHANGES_REQUESTED: "要求修改", REVIEW_REQUIRED: "待审查"}[d.review_decision] || d.review_decision) : ""}${(d.labels || []).map(l => ` <span class="prlbl">${esc(l)}</span>`).join("")}</div>
+      <div class="lbl">检查 ${ck.length ? `· ${okN} 通过${badN ? ` · <span class="prdel">${badN} 失败</span>` : ""}${ck.length - okN - badN ? ` · ${ck.length - okN - badN} 进行中` : ""}` : ""}</div>
+      ${ck.length ? `<div class="prchecks">${ck.map(c => { const s = /SUCCESS/.test(c.conclusion || "") ? "ok" : /FAIL|ERROR|TIMED/.test(c.conclusion || "") ? "bad" : /CANCEL|SKIPPED|NEUTRAL/.test(c.conclusion || "") ? "skip" : "run";
+        return `<div class="prck ${s}" ${c.url ? `data-open="${esc(c.url)}"` : ""}>${s === "ok" ? ic("check") : s === "bad" ? ic("x") : s === "skip" ? ic("dot") : '<span class="spinr"></span>'}<span>${esc(c.workflow ? c.workflow + " / " : "")}${esc(c.name || "")}</span></div>`; }).join("")}</div>` : `<div class="prhint">没有检查</div>`}
+      <div class="lbl">说明</div><div class="prdesc md">${d.body.trim() ? mdHtml(d.body) : '<span class="prhint">（没写说明）</span>'}</div></div>`;
+  } else if (prTab === "files") {
+    const df = prDiffs[ref];
+    if (!df) { B.innerHTML = `<div class="empty"><span class="spinr"></span> 正在读改动…</div>`;
+      prDiffs[ref] = {busy: true};
+      api(`/api/gh/diff?ref=${encodeURIComponent(ref)}`).catch(e => ({ok: false, error: String(e.message || e)})).then(r => { prDiffs[ref] = r; if (prCur && prCur.ref === ref && prTab === "files") prRenderPr(); });
+      return; }
+    if (df.busy) { B.innerHTML = `<div class="empty"><span class="spinr"></span> 正在读改动…</div>`; return; }
+    B.innerHTML = df.ok ? diffHtml(df.diff, df.truncated) : `<div class="prerr">${ic("warn")}<div>${esc(df.error)}</div></div>`; diffBind(B);
+  } else if (prTab === "commits") {
+    B.innerHTML = `<div class="prlist">${d.commits.map(c => `<div class="prcm"><code>${esc(c.oid)}</code><span class="prcmh">${esc(c.head)}</span><span class="prtm">${esc(c.author || "")} · ${relT(c.date)}</span></div>`).join("") || '<div class="empty">没有提交</div>'}</div>`;
+  } else {
+    const items = d.reviews.map(r => Object.assign({rv: true}, r)).concat(d.comments).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const RS = {APPROVED: ["ok", "批准"], CHANGES_REQUESTED: ["bad", "要求修改"], COMMENTED: ["", "审查意见"], DISMISSED: ["", "已撤销"]};
+    B.innerHTML = items.map(x => `<div class="prcmt"><div class="prcmth"><b>${esc(x.author || "")}</b>${x.rv ? `<span class="prrs ${(RS[x.state] || [""])[0]}">${esc((RS[x.state] || ["", x.state])[1])}</span>` : ""}<span class="prtm">${relT(x.date)}</span></div>${x.body.trim() ? `<div class="md">${mdHtml(x.body)}</div>` : ""}</div>`).join("") || `<div class="empty">还没有评论或审查</div>`;
+  }
+  B.querySelectorAll("[data-open]").forEach(x => x.onclick = () => openUrl(x.dataset.open));
+}
+
+// ---------- 统一 diff 查看器：按文件折叠，行号 + 简单语法高亮 ----------
+const HL_KW = new Set("abstract and as async await break case catch class const continue def default del delete do elif else enum export extends false final finally fn for from func function go if impl import in interface is lambda let match mod mut new nil none not null or package pass private protected pub public raise return self static struct super switch this throw true try type typeof use var void while with yield None True False".split(" "));
+const HL_RE = /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d[\d_.xXa-fA-F]*\b)|([A-Za-z_$][\w$]*)/g;
+function hlLine(s, lang){
+  if (!lang) return esc(s);
+  let out = "", last = 0, m; HL_RE.lastIndex = 0;
+  while ((m = HL_RE.exec(s))) {
+    if (m[1] && ((m[1][0] === "#" && !/^(py|sh|rb|yaml|yml|toml|ps1|r|pl|cfg|ini|gitignore|dockerfile|mk|cmake)$/.test(lang)) || (m[1].startsWith("//") && /^(py|sh|yaml|yml|toml)$/.test(lang)))) {
+      out += esc(s.slice(last, m.index + 1)); last = m.index + 1; HL_RE.lastIndex = m.index + 1; continue; }
+    out += esc(s.slice(last, m.index));
+    const t = esc(m[0]);
+    out += m[1] ? `<i class="hc">${t}</i>` : m[2] ? `<i class="hs">${t}</i>` : m[3] ? `<i class="hn">${t}</i>` : HL_KW.has(m[4]) ? `<i class="hk">${t}</i>` : t;
+    last = m.index + m[0].length;
+  }
+  return out + esc(s.slice(last));
+}
+function diffParse(text){
+  const files = []; let f = null;
+  for (const l of String(text || "").replace(/\r/g, "").split("\n")) {
+    if (l.startsWith("diff --git ")) { const m = l.match(/^diff --git a\/(.*?) b\/(.*)$/); f = {path: m ? m[2] : l.slice(11), old: m ? m[1] : "", lines: [], add: 0, del: 0, meta: []}; files.push(f); continue; }
+    if (!f) continue;
+    if (!f.lines.length && !l.startsWith("@@")) { if (/^(new file|deleted file|rename|similarity|Binary)/.test(l)) f.meta.push(l); continue; }
+    f.lines.push(l); if (l[0] === "+") f.add++; else if (l[0] === "-") f.del++;
+  }
+  return files;
+}
+let diffFiles = [];
+function diffHtml(text, truncated){
+  diffFiles = diffParse(text);
+  if (!diffFiles.length) return `<div class="empty">没有改动</div>`;
+  const ta = diffFiles.reduce((a, f) => a + f.add, 0), td = diffFiles.reduce((a, f) => a + f.del, 0);
+  const many = diffFiles.length > 25;
+  return `<div class="dfsum">${diffFiles.length} 个文件 · <span class="pradd">+${ta}</span> <span class="prdel">-${td}</span>${truncated ? " · 太大，只显示了前一部分" : ""}<span class="dfall"><a class="link" data-dfx="1">全部展开</a> · <a class="link" data-dfx="0">全部收起</a></span></div>` +
+    diffFiles.map((f, i) => { const open = (!many || i < 3) && f.lines.length < 1500;
+      const tag = f.meta.some(x => x.startsWith("new file")) ? '<span class="dftag add">新增</span>' : f.meta.some(x => x.startsWith("deleted")) ? '<span class="dftag del">删除</span>' : f.meta.some(x => x.startsWith("rename")) ? '<span class="dftag">改名</span>' : "";
+      return `<details class="dff" data-i="${i}" ${open ? "open" : ""}><summary><span class="tgc">${ic("chev")}</span><span class="dfp" title="${esc(f.path)}">${esc(f.path)}</span>${tag}<span class="pradd">+${f.add}</span><span class="prdel">-${f.del}</span></summary><div class="dfb">${open ? diffFileHtml(f) : ""}</div></details>`; }).join("");
+}
+function diffFileHtml(f){
+  const ext = (f.path.match(/\.([\w]+)$/) || ["", f.path.split("/").pop().toLowerCase()])[1].toLowerCase();
+  const lang = /^(py|js|mjs|cjs|ts|tsx|jsx|java|kt|go|rs|c|h|cc|cpp|hpp|cs|rb|php|swift|sh|ps1|lua|gd|toml|yaml|yml|json|html|css|scss|vue|svelte|sql|r|pl|cfg|ini|dockerfile|cmake|mk|iss)$/.test(ext) ? ext : "";
+  if (!f.lines.length) return `<div class="dfmeta">${esc(f.meta.join(" · ") || "没有文本改动")}</div>`;
+  let o = 0, n = 0, out = "";
+  for (const l of f.lines.slice(0, 5000)) {
+    if (l.startsWith("@@")) { const m = l.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)/); if (m) { o = +m[1]; n = +m[2]; } out += `<div class="dl hh"><span class="ln"></span><span class="ln"></span><span class="dc">${esc(l)}</span></div>`; continue; }
+    if (l.startsWith("\\")) { out += `<div class="dl hh"><span class="ln"></span><span class="ln"></span><span class="dc">${esc(l)}</span></div>`; continue; }
+    const c = l[0], body = l.slice(1);
+    if (c === "+") out += `<div class="dl ad"><span class="ln"></span><span class="ln">${n++}</span><span class="dc"><b>+</b>${hlLine(body, lang)}</span></div>`;
+    else if (c === "-") out += `<div class="dl de"><span class="ln">${o++}</span><span class="ln"></span><span class="dc"><b>-</b>${hlLine(body, lang)}</span></div>`;
+    else out += `<div class="dl"><span class="ln">${o++}</span><span class="ln">${n++}</span><span class="dc"><b> </b>${hlLine(body, lang)}</span></div>`;
+  }
+  if (f.lines.length > 5000) out += `<div class="dfmeta">（这个文件改得太多，只显示前 5000 行）</div>`;
+  return `<div class="dft">${out}</div>`;
+}
+function diffBind(B){
+  B.querySelectorAll("details.dff").forEach(d => d.ontoggle = () => { const b = d.querySelector(".dfb"); if (d.open && !b.innerHTML) b.innerHTML = diffFileHtml(diffFiles[+d.dataset.i]); });
+  B.querySelectorAll("[data-dfx]").forEach(a => a.onclick = () => B.querySelectorAll("details.dff").forEach(d => d.open = a.dataset.dfx === "1"));
+}
+
+// ---------- 项目的 PR 列表（git 远程 → gh pr list） ----------
+let prListD = {}, prListState = "open";
+function prListOpen(){ if (!cur) return toast("先选一个项目"); prGo({t: "list", root: cur.root}, prOpenP); prListLoad(); }
+async function prListLoad(){
+  const root = prCur.root, k = root + "|" + prListState; prListD[k] = Object.assign(prListD[k] || {}, {busy: true}); prRenderList();
+  try { prListD[k] = await api(`/api/gh/prs?root=${encodeURIComponent(root)}&state=${prListState}`); } catch(e) { prListD[k] = {ok: false, error: String(e.message || e)}; }
+  if (prCur && prCur.t === "list" && prCur.root === root) prRenderList();
+}
+function prRenderList(){
+  const root = prCur.root, d = prListD[root + "|" + prListState] || {busy: true}, p = projects.find(x => x.root === root);
+  prSetHead("PR 列表", esc((d.repo || (p && p.name) || "")) + (d.busy ? ' <span class="spinr"></span>' : ""), `<button class="prbtn ic1" id="prRf" title="刷新">${ic("refresh")}</button>`,
+    [["open", "开着的"], ["merged", "已合并"], ["closed", "已关闭"], ["all", "最近全部"]].map(([k, t]) => `<button class="${prListState === k ? "on" : ""}" data-st="${k}">${t}</button>`).join(""));
+  $("#prRf").onclick = e => { spin(e.currentTarget); prListLoad(); };
+  $$("#prTabs [data-st]").forEach(b => b.onclick = () => { prListState = b.dataset.st; prListLoad(); });
+  const B = $("#prBody");
+  if (d.busy && !d.items) { B.innerHTML = `<div class="empty"><span class="spinr"></span> 正在用 gh 读 PR 列表…</div>`; return; }
+  if (!d.ok && !d.items) { B.innerHTML = `<div class="prerr">${ic("warn")}<div><b>读不到 PR 列表</b><div>${esc(d.error)}</div></div></div>`; return; }
+  B.innerHTML = (d.items || []).map(x => {
+    return `<div class="prrow" data-ref="${esc(x.ref)}">${prBadge(Object.assign({kind: "pr"}, x))}<div class="spm"><div class="prtt">${esc(x.title)}</div><div class="sp2">#${x.number} · ${esc(x.author || "")} · ${esc(x.head)} → ${esc(x.base)} · <span class="pradd">+${x.additions}</span> <span class="prdel">-${x.deletions}</span> · ${relT(x.merged || x.updated)}</div></div><span class="spgo">${ic("chev")}</span></div>`; }).join("") || `<div class="empty">没有${{open: "开着的", merged: "已合并的", closed: "已关闭的", all: ""}[prListState]} PR</div>`;
+  B.querySelectorAll("[data-ref]").forEach(r => r.onclick = () => prOpen(r.dataset.ref));
+}
+
+// ---------- 本地改动（git status + diff，对比 HEAD 或某个主干的分叉点） ----------
+let chgD = {}, chgBase = "HEAD";
+function chgOpen(){ if (!cur) return toast("先选一个项目"); prGo({t: "chg", root: cur.root}, prOpenP); chgLoad(); }
+async function chgLoad(){
+  const root = prCur.root; chgD[root] = Object.assign(chgD[root] || {}, {busy: true}); chgRender();
+  try { chgD[root] = await api(`/api/git/changes?root=${encodeURIComponent(root)}&base=${encodeURIComponent(chgBase)}`); } catch(e) { chgD[root] = {ok: false, error: String(e.message || e)}; }
+  if (prCur && prCur.t === "chg" && prCur.root === root) chgRender();
+}
+function chgRender(){
+  const root = prCur.root, d = chgD[root] || {busy: true};
+  const bases = d.bases || ["HEAD"];
+  prSetHead("本地改动", (d.branch ? `${ic("gitbranch")}${esc(d.branch)}` : "") + (d.busy ? ' <span class="spinr"></span>' : ""),
+    `<button class="prbtn" id="prRev" title="把这些改动发给一个 Claude / Codex 会话，请它只读审查">${ic("eye")}<span>代码审查</span></button><button class="prbtn ic1" id="prRf" title="刷新">${ic("refresh")}</button>`,
+    `<label class="prbase">对比 <select id="chgBase">${bases.map(b => `<option value="${esc(b)}" ${b === chgBase ? "selected" : ""}>${b === "HEAD" ? "HEAD（未提交的改动）" : esc(b) + "（整个分支）"}</option>`).join("")}</select></label>${d.repo ? `<button data-prs>${ic("gitpr")}PR 列表</button>` : ""}`);
+  $("#prRf").onclick = e => { spin(e.currentTarget); chgLoad(); };
+  $("#prRev").onclick = () => reviewDlg({base: chgBase, n: (d.files || []).length});
+  $("#chgBase").onchange = e => { chgBase = e.target.value; chgLoad(); };
+  const pl = $("#prTabs [data-prs]"); if (pl) pl.onclick = () => prListOpen();
+  const B = $("#prBody");
+  if (d.busy && !d.files) { B.innerHTML = `<div class="empty"><span class="spinr"></span> 正在读 git 改动…</div>`; return; }
+  if (!d.ok) { B.innerHTML = `<div class="prerr">${ic("warn")}<div><b>读不到改动</b><div>${esc(d.error)}</div></div></div>`; return; }
+  const CODE = {"M": "改", "A": "增", "D": "删", "R": "名", "C": "复", "U": "冲", "?": "新"};
+  B.innerHTML = `<div class="chgst">${esc(d.status || "")}${d.shortstat ? " · " + esc(d.shortstat) : ""}${d.untracked ? ` · ${d.untracked} 个没跟踪的新文件` : ""}</div>
+    ${d.commits && d.commits.length ? `<div class="lbl">分支上的提交（${d.commits.length}）</div><div class="prlist">${d.commits.map(c => `<div class="prcm"><code>${esc(c.slice(0, 7))}</code><span class="prcmh">${esc(c.slice(8))}</span></div>`).join("")}</div>` : ""}
+    ${d.files.length ? `<div class="lbl">工作区（git status）</div><div class="chgfiles">${d.files.map(f => { const c = (f.code.trim()[0] || "M"); return `<div class="chgf"><span class="chgc c${esc(c === "?" ? "N" : c)}" title="${esc(f.code)}">${CODE[c] || esc(c)}</span><span>${esc(f.path)}</span></div>`; }).join("")}</div>` : ""}
+    <div class="lbl">改动</div>${diffHtml(d.diff, d.truncated)}`;
+  diffBind(B);
+}
+
+// ---------- 代码审查：选一个会话，经总线（以你本人的名义）发「请只读审查这个 PR / 这些改动」 ----------
+function reviewDlg(o){
+  if (!cur) return toast("先选一个项目");
+  const ok = sessList.filter(x => ["claude", "codex", "cursor"].includes(x.agent) && !x.archived);
+  if (!ok.length) return toast("这个项目还没有会话可以发");
+  const pick = view && ok.find(x => x.agent === view.agent && x.sid === view.sid) ? view : ok[0];
+  const what = o.ref ? `PR <b>${esc(o.ref)}</b>${o.title ? "：" + esc(o.title) : ""}` : `本地改动（对比 <b>${esc(o.base === "HEAD" ? "HEAD，没提交的" : o.base)}</b>，${o.n || 0} 个文件）`;
+  openDlg("代码审查", `<div class="revd"><div>请一个会话只读审查 ${what}。它会以「你本人」的名义收到请求，并被要求<b>不改代码、不推送、不在 GitHub 上评论 / 批准 / 合并</b>，把问题列出来回复你。</div>
+    <label class="lbl2">发给</label><select id="revTo">${ok.map(x => `<option value="${esc(x.agent + "|" + x.sid)}" ${x.sid === pick.sid ? "selected" : ""}>${esc(x.agent === "codex" ? "Codex" : x.agent === "cursor" ? "Cursor" : "Claude")} · ${esc(x.alias || x.title || x.short)} · ${esc(sessState(x)[1] || "")}</option>`).join("")}</select>
+    <label class="lbl2">补充说明（可选）</label><textarea id="revNote" rows="3" placeholder="比如：重点看并发 / 错误处理"></textarea></div>`,
+    `<button onclick="closeDlg()">取消</button><button class="primary" id="revGo">${ic("eye")} 发送审查请求</button>`);
+  $("#revGo").onclick = async () => {
+    const [agent, sid] = $("#revTo").value.split("|"), b = $("#revGo"); b.disabled = true; b.textContent = "发送中…";
+    try {
+      const r = await api("/api/review", Object.assign({root: cur.root, agent, sid, note: $("#revNote").value}, o.ref ? {ref: o.ref} : {base: o.base}));
+      closeDlg();
+      if (r.ok === false) { openDlg("❌ 没发出去", `<pre>${esc(r.output || r.error || "")}</pre>`); return; }
+      toast("✅ 已发出审查请求" + (r.via === "codex-queue" ? "（交给 Codex）" : "（经总线）"), 3200);
+      const x = ok.find(s => s.agent === agent && s.sid === sid); prClose(); if (x) openSession(x);
+      // 跟输入框发送一样：Claude / Cursor 要等它收到才进记录，先放一个「已发出」的气泡
+      const mid = (String(r.output || "").match(/已发送(?:消息|任务)\s+([0-9a-f]{12})/) || [])[1];
+      if (x && agent !== "codex" && mid && r.text) { trPending.push({vk: tabKey(x), text: r.text, kind: "msg", mid, ts: Date.now() / 1000}); trRender(true); }
+    } catch(e) { b.disabled = false; b.innerHTML = `${ic("eye")} 发送审查请求`; toast("❌ " + (e.message || e), 4000); }
+  };
+}
+
+$("#mPRs").onclick = () => { prStack = []; prCur = null; prListOpen(); };
+$("#mChg").onclick = () => { prStack = []; prCur = null; chgOpen(); };
 // ---------- 轮询 ----------
 function stopPolling(){ timers.forEach(clearInterval); timers = []; }
 function startPolling(){

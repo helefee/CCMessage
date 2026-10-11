@@ -5,7 +5,7 @@
   真要查私有仓库可设环境变量 AGENT_BRIDGE_GITHUB_TOKEN，程序里不存任何密钥）；
   AGENT_BRIDGE_UPDATE_URL 可以换成别的地址（测试用本机假发布）。
 - 启动后自动查（最多 6 小时一次，设置里可关）；设置里「检查更新」随时手动查。
-- Windows 安装版：新版的 AgentBridge-Setup-<版本>.exe 下到临时目录，用同一发布里的 .sha256 校验，
+- Windows 安装版：新版的 CCMsg-Setup-<版本>.exe（0.2.x 时叫 AgentBridge-Setup-，两个名字都认）下到临时目录，用同一发布里的 .sha256 校验，
   然后静默运行安装程序（按用户安装、不用管理员），本程序退出，装完自动重新打开。
 - 源码版 / Linux：只提示有新版本，用 git pull 更新。
 断网、GitHub 限流都只记一条错误，不影响别的功能。
@@ -76,7 +76,12 @@ def _get(url: str, timeout: float = 10, accept: str = "application/vnd.github+js
 def _parse(rel: dict) -> dict:
     tag = rel.get("tag_name") or ""
     assets = rel.get("assets") or []
-    setup = next((a for a in assets if re.match(r"(?i)^AgentBridge-Setup-.*\.exe$", a.get("name", ""))), None)
+    # 0.3.0 起安装包叫 CCMsg-Setup-<版本>.exe；之前的发布叫 AgentBridge-Setup-…（发布里两个都有时用新名字）
+    setup = None
+    for pat in (r"(?i)^CCMsg-Setup-.*\.exe$", r"(?i)^AgentBridge-Setup-.*\.exe$"):
+        setup = next((a for a in assets if re.match(pat, a.get("name", ""))), None)
+        if setup:
+            break
     sha = None
     if setup:
         sha = next((a for a in assets if a.get("name", "").lower() == (setup["name"] + ".sha256").lower()), None)
@@ -133,7 +138,7 @@ def auto_check_later(enabled, delay: float = 15) -> None:
 
 def _download(r: dict) -> None:
     try:
-        tmp = Path(tempfile.gettempdir()) / "AgentBridge-update"
+        tmp = Path(tempfile.gettempdir()) / "CCMsg-update"
         tmp.mkdir(exist_ok=True)
         with _get(r["sha_url"], 20, "application/octet-stream") as resp:
             want = resp.read().decode("utf-8", "replace").split()[0].strip().lower()
@@ -175,7 +180,7 @@ def download() -> dict:
 
 
 def apply(relaunch_args: list[str] | None = None) -> dict:
-    """静默运行下好的安装程序，然后让本程序退出；安装程序装完会重新打开 AgentBridge。"""
+    """静默运行下好的安装程序，然后让本程序退出；安装程序装完会重新打开 CC Msg。"""
     if not can_install() or DL["state"] != "ready" or not DL["file"]:
         raise ValueError("安装包还没下好")
     args = [DL["file"], "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/NORESTART", "/RELAUNCH=1"]
