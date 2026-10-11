@@ -171,6 +171,8 @@ def set_claude(scope: str, root: str | None, changes: dict, label: str = "claude
             if v and not re.match(r"^https?://[^\s]+$", v):
                 raise ValueError("Base URL 要以 http:// 或 https:// 开头")
         elif k == "apiKeyHelper":
+            if v:
+                keystore.helper_selftest(v)
             v = (keystore.helper_line(v) if v else None)
         else:
             v = _check_model(v)
@@ -294,6 +296,7 @@ def set_codex(scope: str, root: str | None, changes: dict, provider_auth: dict |
             raise ValueError(f"config.toml 里没有 [model_providers.{pid}]")
         t = mp[pid]
         if provider_auth.get("key"):
+            keystore.helper_selftest(provider_auth["key"])
             cmd = keystore.helper_cmd(provider_auth["key"])
             a = tk.table()
             a["command"] = cmd[0]
@@ -442,6 +445,7 @@ def migrate(tool: str, field: str, key_name: str) -> dict:
         keystore.put(key_name, v, f"Claude {k}（从 settings.json 迁移）")
         if keystore.get(key_name) != v:
             raise RuntimeError("存进凭据管理器后读回来不一致，没改配置")
+        keystore.helper_selftest(key_name)
         bid = backup(p, "migrate-claude")
         s["env"].pop(k)
         s["apiKeyHelper"] = keystore.helper_line(key_name)
@@ -459,6 +463,7 @@ def migrate(tool: str, field: str, key_name: str) -> dict:
         keystore.put(key_name, v, f"Codex {pid}（从 config.toml 迁移）")
         if keystore.get(key_name) != v:
             raise RuntimeError("存进凭据管理器后读回来不一致，没改配置")
+        keystore.helper_selftest(key_name)
         r = set_codex("user", None, {}, provider_auth={"id": pid, "key": key_name, "drop_experimental_bearer_token": True}, label="migrate-codex")
         return {"ok": r["ok"], "backup": r["backup"], "file": r["file"]}
     raise ValueError("tool 只能是 claude / codex")

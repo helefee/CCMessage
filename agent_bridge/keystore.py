@@ -169,7 +169,29 @@ def names() -> list[dict]:
 
 def helper_cmd(name: str) -> list[str]:
     """Claude / Codex 取 key 时要跑的命令（安装版是 CCMsg.exe key get NAME）。"""
-    return paths.self_cmd("key", "get", check_name(name))
+    name = check_name(name)
+    if paths.FROZEN:
+        return paths.self_cmd("key", "get", name)
+    return [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "keyhelper.py"), "key", "get", name]
+
+
+def helper_selftest(name: str) -> None:
+    """像 Claude / Codex 那样在别的目录里真跑一次取 key 命令，输出必须和存的一致；不一致就抛错（错误里不带 key）。"""
+    import hmac
+    import subprocess
+    import tempfile
+    want = get(name)
+    if not want:
+        raise RuntimeError(f"凭据管理器里没有 {name}")
+    kw = {"creationflags": 0x08000000} if sys.platform == "win32" else {}
+    try:
+        r = subprocess.run(helper_cmd(name), cwd=tempfile.gettempdir(), stdin=subprocess.DEVNULL,
+                           capture_output=True, timeout=30, **kw)
+    except Exception as e:
+        raise RuntimeError(f"取 key 命令跑不起来：{type(e).__name__}，没改配置") from None
+    got = r.stdout.decode("utf-8", "replace").strip()
+    if r.returncode != 0 or not hmac.compare_digest(got.encode(), want.strip().encode()):
+        raise RuntimeError(f"取 key 命令试跑结果不对（退出码 {r.returncode}），没改配置")
 
 
 def helper_line(name: str) -> str:
