@@ -379,6 +379,20 @@ Cursor（3.x）会读项目 `.claude/settings.json` 里的 Claude 钩子（设�
 - **CC Switch 历史（可选，一次性）**：「数据来源」里点「导入 CC Switch 历史」，只读打开它的数据库（被占用会自动重试），补回 Claude 已经清理掉的旧会话的用量；和会话日志里同一条消息 / 同一个 Codex 线程重复的跳过，它代理记的那份不导入，费用按这里的价格重算。
 - 部分规则和内置价格表来自 cc-switch / magpie / opencodex（都是 MIT），见 `THIRD_PARTY_NOTICES.md`。
 
+## 模型与 API（模型映射 / 子代理 / 思考强度 / key）
+
+⋯ 菜单 →「模型与 API…」，或设置页最上面那一行（只在电脑上；局域网 / 手机端访问一律 403，手机上也不显示入口）。
+
+- **和 CC Switch 共存**：切换供应商（Base URL / 账号）还是交给 CC Switch，这里只显示它当前选的是谁；装了 CC Switch 会有提示，它切换时可能会改写这里管的几项。
+- **Claude**：主模型（只对命令行 / 新会话有效，Claude 桌面版用自己的选择）、Opus / Sonnet / Haiku / Fable 别名映射、子代理模型、思考强度（`effortLevel`）。可选「用户级」或「当前项目」（项目级写 `<项目>/.claude/settings.local.json`，只放模型和思考强度）。
+- **Codex**：`model`、`review_model`、`model_reasoning_effort`、`[agents]` 子代理模型和思考强度；项目级写 `<项目>/.codex/config.toml`。
+- **预设**：官方登录 / 官方 API Key / OpenKey / 自定义——只是帮你填表，点「保存」才写。
+- **key**：存在 Windows 凭据管理器（`CCMsg/key/<名字>`）。Claude 通过 `apiKeyHelper`、Codex 通过 `[model_providers.x.auth]` 运行 `CCMsg.exe key get <名字>` 取 key，配置文件里不留明文。页面和接口只显示打码后的样子（`sk-...abcd`），永远不返回完整 key。注意：设了 `apiKeyHelper` 后 Claude 会改用 API key 计费，不再走订阅。
+- **怎么写的**：只改 CC Msg 管的这几项，其它键、注释、顺序原样保留（TOML 用 tomlkit）；每次写之前先备份到 `~/.agent-bridge/backups`，原子写入，写完再读回来核对；「备份」页一键还原。
+- **测试连接**：用当前地址和 key 发一个最小请求，显示 HTTP 状态（不会显示 key）。保存前会列出要改的项、哪些会话要重开、计费 / 桌面版提示。
+- **一键迁移明文 key / 统一子代理模型**：是按钮，**不会自动执行**；点了才做，做之前先备份。统一子代理模型会跳过 opencodex 生成的 `ocx-*` 代理。
+- **代理（opencodex / magpie）**：检测到就列出路由，`ocx-*` 代理显示它真正用的模型，可一键把 Claude / Codex 指向代理。
+
 ## 手机端
 
 电脑界面 ⋯ →「📱 手机端（扫码）」：打开局域网监听、出一次性配对二维码（3 分钟、只能用一次）。

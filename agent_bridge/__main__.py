@@ -188,6 +188,9 @@ def main(argv=None):
     if cmd in ("export", "codex-list", "to-claude"):
         from . import codex_bridge
         return codex_bridge.main([{"codex-list": "list"}.get(cmd, cmd), *rest]) or 0
+    if cmd == "key":                    # apiKeyHelper / Codex auth 命令用：从凭据管理器取 key（只打到 stdout）
+        from . import keystore
+        return keystore.main(rest)
     if cmd == "fx":                     # 桌面信件动画（服务在后台起它；也可以手动试）
         from . import fx
         return fx.main(rest) or 0
