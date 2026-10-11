@@ -1,4 +1,4 @@
-# CCMessage（agent-bridge）
+# CC Msg（CCMessage / agent-bridge）
 
 仓库：https://github.com/helefee/CCMessage ・ 许可证：[MIT](LICENSE) ・ **部署到自己的项目：看 [DEPLOY.md](DEPLOY.md)**
 
@@ -9,6 +9,8 @@
 - **派活**：带任务号的任务，对方做完用 `done` 交回结果，结果自动回到派活的会话。任意一边都能当主会话。
 - **会话视图**：网页里直接看每个 Claude / Codex 会话的对话记录，随时发消息给它。
 - **交接**：Codex 线程一键导出成交接文件交给 Claude 接着做（Claude → Codex 由 Codex 桌面端自动导入）。
+- **PR 预览 / 查看**：对话和总线消息里的 GitHub PR 链接、`owner/repo#123` 变成小标签 + 预览卡片（状态、标题、作者、+/-、文件数），点开右边的 PR 面板看说明、检查、提交、按文件折叠的 diff、评论。
+- **代码审查**：看项目本地的改动（git status + diff，对比 HEAD 或主干），或者某个 PR，一键发给一个 Claude / Codex 会话请它只读审查。
 - **手机端**：电脑上出一次性二维码，手机扫码配对后能看、能发消息。
 - **信件动画**（Windows）：Claude ↔ Codex 之间每来一条消息，桌面上有一封信从发件窗口飞到收件窗口。
 
@@ -39,16 +41,18 @@
 
 ### Windows 安装版（独立窗口，不用装 Python）
 
-下载 `AgentBridge-Setup-<版本>.exe`（Release 里有；GitHub Actions 每次构建的 Artifacts 里也有），双击装就行：
+下载 `CCMsg-Setup-<版本>.exe`（0.2.x 时叫 `AgentBridge-Setup-<版本>.exe`；Release 里有；GitHub Actions 每次构建的 Artifacts 里也有），双击装就行：
 
-- 装到 `%LOCALAPPDATA%\Programs\AgentBridge`，**只装给当前用户、不要管理员**；开始菜单里有「会话消息总线」，桌面图标可选；
+- 装到 `%LOCALAPPDATA%\Programs\AgentBridge`，**只装给当前用户、不要管理员**；开始菜单里有「CC Msg」，桌面图标可选；
+  安装目录特意沿用旧名字 `AgentBridge`：已经装过总线的项目，钩子里写的是 `.../Programs/AgentBridge/bus/bus.exe`，目录不变它们升级后照样能跑；
+  从 0.2.x 升级会删掉旧的「会话消息总线」快捷方式和 `AgentBridge.exe`（钉在任务栏上的旧图标要重新钉一次）；
   控制面板 / 设置 →「应用」里能卸载；再装新版本直接覆盖升级（正在跑的会先自动关掉）；
-- 里面是 Nuitka 编译好的程序（`AgentBridge.exe`）+ 一个单独编译的总线程序 `bus\bus.exe`，**没有 .py 源码，电脑上不用装 Python**；
+- 里面是 Nuitka 编译好的程序（`CCMsg.exe`）+ 一个单独编译的总线程序 `bus\bus.exe`，**没有 .py 源码，电脑上不用装 Python**；
   窗口用系统自带的 WebView2（Edge 内核）；
-- 窗口标题「会话消息总线」，大小、位置会记住；只开一个，再双击就把已有的窗口提到前面；
+- 窗口标题「CC Msg」，大小、位置会记住；只开一个，再双击就把已有的窗口提到前面；
 - 本机 8765 上已经有服务在跑（比如 start.cmd 开的）就直接连上它，关窗口不影响它；没有就在窗口进程里起服务，**关窗口 = 退出服务**；
 - 浏览器照样能打开同一个地址 http://127.0.0.1:8765/ ，⋯ 菜单里多一个「在浏览器中打开」；手机端照旧；
-- 命令行也能用：`AgentBridge.exe --port 8799 --no-browser`、`AgentBridge.exe doctor`、`AgentBridge.exe selftest`、`AgentBridge.exe install <项目目录>`（它是窗口程序，PowerShell 不等它、也接不到输出，在 PowerShell 里前面加 `cmd /c`）；
+- 命令行也能用：`CCMsg.exe --port 8799 --no-browser`、`CCMsg.exe doctor`、`CCMsg.exe selftest`、`CCMsg.exe install <项目目录>`（它是窗口程序，PowerShell 不等它、也接不到输出，在 PowerShell 里前面加 `cmd /c`）；
 - 出错日志：`~/.agent-bridge/desktop.log`。
 
 **钩子用 bus.exe**：用安装版给项目「安装 / 升级 / 修复」总线时，Claude 和 Codex 的钩子都改成
@@ -56,7 +60,7 @@
 项目里的总线目录（`.msgbus` 或 `.temp/msgbus`）照旧放消息、收件箱、在线记录，格式不变；原来的 `bus.py` 留着没动（源码方式还能用）。
 Codex 的钩子改了之后要在 Codex 的 `/hooks` 里重新信任一次；平时（不点安装 / 升级 / 修复）Codex 钩子一字不动，只有跑不起来了（比如写的 Python 已经不在）才改。
 卸载安装版后用了 bus.exe 的项目钩子就跑不起来了 —— 再装回来，或者用源码方式的「升级 / 修复」改回 Python。
-`AgentBridge.exe doctor`（源码方式 `python -m agent_bridge doctor`）会列出每个项目的钩子用的是什么。
+`CCMsg.exe doctor`（源码方式 `python -m agent_bridge doctor`）会列出每个项目的钩子用的是什么。
 
 **检查更新**：设置（齿轮）里有「版本 x.y.z · 检查更新」和「自动检查更新」（默认开，启动后、之后最多每 6 小时查一次 GitHub Releases 最新版）。
 有新版本时右下角出一张小卡片（带更新说明），点「立即更新」：下载安装包（有进度）→ 对一遍 Release 里的 `.sha256` → 关掉服务 → 静默装新版（当前用户、不弹 UAC）→ 自动重新打开。
@@ -65,11 +69,11 @@ Codex 的钩子改了之后要在 Codex 的 `/hooks` 里重新信任一次；平
 
 自己构建（要一个 64 位的系统 Python 3.11、网络、[Inno Setup](https://jrsoftware.org/isdl.php) 6.5+ 或 7；没有 Visual Studio 时 Nuitka 会自己下 MinGW64）：
 
-    build_desktop.cmd            # dist\AgentBridge\（编译好的文件夹）+ dist\AgentBridge-Setup-<版本>.exe（+ .sha256），中间跑 bus.exe 测速和总线自检
-    build_desktop.cmd -Zip       # 另外打成 dist\AgentBridge-<版本>-windows-x64.zip（免安装，解压就能用）
+    build_desktop.cmd            # dist\CCMsg\（编译好的文件夹）+ dist\CCMsg-Setup-<版本>.exe（+ .sha256），中间跑 bus.exe 测速和总线自检
+    build_desktop.cmd -Zip       # 另外打成 dist\CCMsg-<版本>-windows-x64.zip（免安装，解压就能用）
     build_desktop.cmd -NoInstaller -NoTest
 
-版本号只在 `agent_bridge/__init__.py` 的 `__version__` 里改；打 `v<版本>` 标签时 Actions 会核对两者一致，把安装包、`.sha256` 和 Linux 包挂到 Release 上。
+版本号只在 `agent_bridge/__init__.py` 的 `__version__` 里改；打 `v<版本>` 标签时 Actions 会核对两者一致，把安装包、`.sha256` 和 Linux 包挂到 Release 上（另外挂一份同内容的 `AgentBridge-Setup-<版本>.exe`，给只认旧名字的 0.2.x 自动更新用）。
 
 源码方式也能开窗口：`pip install pywebview` 后 `python -m agent_bridge desktop`；源码方式（start.cmd）的钩子照旧用 Python 跑项目里的 `bus.py`。
 
@@ -124,7 +128,7 @@ Codex 的钩子改了之后要在 Codex 的 `/hooks` 里重新信任一次；平
 
 **界面只有一个模式**：顶栏是项目、状态标签、主题按钮；
 两侧是 Claude / Codex 会话列表，中间是总线消息或打开的会话。出问题（没装好、Codex 暂停）时顶上冒一行提示。
-没有顶部标签页：点列表里的会话就在中间打开，标题栏最左边的 ‹ 或左上角「会话消息总线」回到总线消息。
+没有顶部标签页：点列表里的会话就在中间打开，标题栏最左边的 ‹ 或左上角「CC Msg」回到总线消息。
 
 **输入框只有一个「发送」**：网页上发的都是普通消息（总线消息页发给选中的对象，会话视图里发给这个会话）。网页不再派活，也没有任务看板了；
 派活是会话之间的事（`bus.py task` / `done` 照旧）：它们派的任务、交回的结果照样出现在总线消息流里，任务卡片上标「已完成 / 没做成」并带上交回的结果，
@@ -289,6 +293,20 @@ Cursor（3.x）会读项目 `.claude/settings.json` 里的 Claude 钩子（设�
   `--force` 表示它跑命令不再逐条问你 —— 这就是「后台」的意思，派活时写清楚不许碰什么。
 - 它用环境变量 `MSGBUS_AS=cursor:<对话>` 认身份，`done` 交活；没交就拿它最后一句回复兜底交回。日志在 `<总线>/workers/<任务号>.log`。
 - 后台开的对话在 Cursor 桌面端里大概率看不到（和 Codex 后台开的一样）。
+
+## PR 预览、查看和代码审查
+
+要这台电脑装了 [GitHub CLI](https://cli.github.com/)（`gh`）并 `gh auth login` 过；没装 / 没登录 / 当前账号看不了的仓库，引用就只是普通链接。
+全部**只读**：只用 `gh api`（查询）、`gh pr view / diff / list`，以及 `git status / diff / log / merge-base / remote`，不推送、不评论、不批准、不合并。
+
+- **PR 卡片**：会话对话（Claude / Codex 两种样式）和总线消息里出现 `https://github.com/<owner>/<repo>/pull/<号>`、`/issues/<号>` 或 `owner/repo#号`，
+  文字里变成小标签，下面多一张卡片：状态（打开 / 草稿 / 已合并 / 已关闭）、`仓库 #号`、多久以前、标题、作者头像和名字、`+加 -减`、改了几个文件。
+  查询结果有缓存：开着的 PR 2 分钟、已合并 / 关闭的 1 小时。
+- **PR 面板**：点卡片从右边滑出：概览（说明、检查状态、标签）、文件（按文件折叠的统一 diff，行号 + 语法高亮）、提交、评论 / 审查；右上角「在浏览器打开」。
+- **PR 列表**：会话标题栏的「PR」按钮（或 ⋯ →「GitHub PR 列表」）按项目的 git 远程列出开着的 / 已合并 / 已关闭的 PR。
+- **本地改动**：会话标题栏的「改动」按钮（或 ⋯ →「本地改动 / 代码审查」）看项目工作区的 `git status` 和 diff（对比 HEAD = 没提交的改动，或者对比 `origin/main` 等主干 = 整个分支），没跟踪的新文件也画出来。
+- **代码审查**：PR 面板和本地改动里都有「代码审查」：选一个 Claude / Codex 会话，加一句补充说明（可选），以你本人（`user:ui`）的名义把请求发过去
+  （Claude 经总线、Codex 用 codex queue），请求里写明 PR 号或改动的文件清单、怎么看改动，并要求它只读审查、不改代码不推送、按严重程度把问题回复你；发完自动打开那个会话看结果。
 
 ## 手机端
 

@@ -57,7 +57,7 @@
 
     python -m agent_bridge            # Windows 也可以双击 start.cmd；Linux / macOS 用 ./run.sh（先 ./install.sh）
 
-不想装 Python：用 Windows 安装版 `AgentBridge-Setup-<版本>.exe`（见 README「Windows 安装版」），效果一样，只是开在独立窗口里；它给项目装的钩子用自带的 `bus.exe`。
+不想装 Python：用 Windows 安装版 `CCMsg-Setup-<版本>.exe`（CC Msg）（见 README「Windows 安装版」），效果一样，只是开在独立窗口里；它给项目装的钩子用自带的 `bus.exe`。
 
 浏览器会自动打开 http://127.0.0.1:8765/ 。只听本机，别人访问不到。
 

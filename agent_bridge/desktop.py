@@ -23,7 +23,7 @@ import webbrowser
 
 from . import paths
 
-TITLE = "会话消息总线"
+TITLE = "CC Msg"
 STATE = paths.HOME / "desktop.json"
 LOG = paths.HOME / "desktop.log"
 ICON_ICO = paths.PKG / "icon.ico"
@@ -152,7 +152,7 @@ class Api:
         return True
 
     def open_url(self, url: str):
-        """只开 GitHub 上的发布页（更新说明里的链接），别的不开。"""
+        """只开 GitHub 上的页面（发布页、PR / issue、检查详情），别的不开。"""
         if isinstance(url, str) and url.startswith("https://github.com/"):
             webbrowser.open(url)
             return True
