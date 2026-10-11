@@ -1201,8 +1201,7 @@ mark.wd{background:var(--wd);color:inherit;border-radius:2px}mark.wa{background:
 .srow{position:relative}
 .lanc{position:absolute;top:50%;width:11px;height:11px;margin-top:-5.5px;border-radius:50%;box-sizing:border-box;z-index:2;cursor:crosshair;touch-action:none;
   display:flex;align-items:center;justify-content:center;transition:transform .12s,box-shadow .12s}
-.lanc.ls-r{right:3px}.lanc.ls-l{left:3px}
-.srow:has(.lanc.ls-r){padding-right:20px}.srow:has(.lanc.ls-l){padding-left:20px}
+.lanc.ls-r{right:-8px}.lanc.ls-l{left:-8px}      /* 锚点在行外侧的空白里，不挤头像（头像和 0.3.0 一样） */
 .lanc b{position:absolute;top:-9px;font-size:9px;line-height:10px;font-weight:700;color:var(--muted)}
 .lanc.ls-r b{right:-2px}.lanc.ls-l b{left:-2px}
 .lanc.lk-none{border:1.5px dashed var(--faint);background:var(--panel);opacity:0}
@@ -1247,7 +1246,7 @@ body.lkdragging .lksvg *{pointer-events:none!important}
 .lkchip.on.lk-o{color:var(--lk-o);border-color:color-mix(in srgb,var(--lk-o) 45%,transparent)}
 .lkchip.on.lk-g{color:var(--lk-g);border-color:color-mix(in srgb,var(--lk-g) 45%,transparent)}
 .lkchip.on.lk-og{color:var(--lk-o);border-color:color-mix(in srgb,var(--lk-g) 45%,transparent)}
-.lkchip.on span{display:inline!important}
+.lkchip .lkd{display:none}
 .lkpk{display:flex;flex-direction:column;gap:6px;font-size:13px}.lkpk code{font-size:12px}
 .lkpr{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line2);border-radius:9px;cursor:pointer}
 .lkpr:hover{background:var(--hover)}.lkpr .grow{display:flex;flex-direction:column;min-width:0}.lkpr .grow b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1257,13 +1256,82 @@ body.lkdragging .lksvg *{pointer-events:none!important}
 .badge.b-link{background:color-mix(in srgb,var(--lk-o) 16%,transparent);color:var(--lk-o)}
 .toast .lkundo{margin-left:8px;font-weight:600}
 @media (max-width:860px){.lanc{width:14px;height:14px;margin-top:-7px}.lanc.lk-none{display:none}.lkpop{width:calc(100vw - 16px)}}
+
+/* ---------- 两个侧栏开关（像 Cursor：左上角收左栏，右上角收右栏）+ 拖边改宽度 ---------- */
+.sbtg{display:inline-flex;align-items:center;justify-content:center;width:30px;height:28px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer;position:relative;flex:none}
+.sbtg:hover{background:var(--hover,var(--line2));color:var(--text)}
+.sbtg:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.sbtg .ic{width:18px;height:18px}
+.sbtg .ic .pf{fill:currentColor;stroke:none;opacity:.55;transition:opacity .18s}
+.sbtg.off .ic .pf{opacity:0}
+#tgL{margin-left:-6px}#tgR{margin-right:-6px;margin-left:auto}
+.sbtg .sdot{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;box-shadow:0 0 0 2px var(--panel);display:none;pointer-events:none}
+.sbtg.off.has .sdot{display:block}
+.sbtg .sdot.s-active{background:var(--accent)}.sbtg .sdot.s-stand{background:var(--ok)}.sbtg .sdot.s-mail{background:var(--lk-o,#cf6a3d)}
+body.sbanim .sbtg.off.has .sdot.s-active,body.sbanim .sbtg.ping .sdot{animation:sbpulse 1.6s ease-in-out infinite}
+.sbtg.ping{color:var(--accent)}
+@keyframes sbpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+.curnm{display:none;align-items:center;gap:5px;min-width:0;flex:1;font-size:15px;font-weight:600;cursor:pointer}
+.curnm .ic{width:16px;height:16px;flex:none;color:var(--muted)}
+.curnm span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pfst{font-style:normal;font-size:10.5px;line-height:16px;padding:0 5px;border-radius:5px;flex:none;white-space:nowrap;max-width:8em;overflow:hidden;text-overflow:ellipsis}
+.pfst.st-ok{background:var(--ok-weak);color:var(--ok)}.pfst.st-warn{background:var(--warn-weak);color:var(--warn)}
+.pfst.st-bad{background:var(--bad-weak);color:var(--bad)}.pfst.st-none{background:var(--line2);color:var(--muted)}
+.pfold .pfn[data-pick]:hover{text-decoration:underline;color:var(--accent)}
+.body{position:relative;--wlo:var(--wlw,250px);--wro:var(--wrw,280px);--wl:var(--wlo);--wr:var(--wro)}
+@media (max-width:1150px) and (min-width:861px){.body{--wlo:var(--wlw,205px);--wro:var(--wrw,235px)}}
+body.sbL-off .body{--wl:0px}body.sbR-off .body{--wr:0px}
+.sbrz{display:none}
+@media (min-width:861px){
+  .app .body{grid-template-columns:var(--wl) minmax(0,1fr) var(--wr)}
+  body.sbanim .app .body{transition:grid-template-columns .24s cubic-bezier(.2,.7,.2,1)}
+  #colL>*{min-width:var(--wlo)}#colR>*{min-width:var(--wro)}     /* 收起时内容不挤扁，像抽屉一样被裁掉 */
+  #colL,#colR{transition:visibility 0s}
+  .side.sboff{visibility:hidden;overflow:hidden;border:0!important}
+  body.sbanim .side.sboff{transition:visibility 0s linear .24s}
+  .sbrz{display:block;position:absolute;top:0;bottom:0;width:8px;z-index:6;cursor:col-resize;touch-action:none}
+  #rzL{left:calc(var(--wl) - 4px)}#rzR{right:calc(var(--wr) - 4px)}
+  .sbrz::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background .15s .1s}
+  .sbrz:hover::after,.sbrz.on::after{background:var(--accent)}
+  body.sbL-off #rzL,body.sbR-off #rzR{display:none}
+  body.sbresizing{cursor:col-resize;user-select:none}
+  body.sbresizing .app .body{transition:none!important}
+}
+@media (max-width:860px){.sbtg{display:none!important}.curnm{display:inline-flex}.curnm .pfst{display:none}}
+
+/* 会话标题栏的按钮：只放图标（名字在 tooltip / 读屏里），数字做成右上角小角标 */
+.trhead .hib{position:relative;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0!important;gap:0;flex:none;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--muted)}
+.trhead .hib:hover{background:var(--hover);color:var(--text);border-color:transparent}
+.trhead .hib.on{color:var(--accent);background:var(--hover)}
+.trhead .hib:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.trhead .hib .ic{width:17px;height:17px}
+.trhead .hib .spl,.trhead .hib .tcl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.trhead .hib .spn{position:absolute;top:-3px;right:-4px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:var(--accent);color:#fff;font-size:9.5px;font-weight:600;line-height:15px;text-align:center;box-shadow:0 0 0 2px var(--bg)}
+.trhead .hib .spr{position:absolute;bottom:-2px;right:-3px;font-size:0;gap:0;background:var(--bg);border-radius:50%;padding:1px}
+.trhead .hib .spr .spinr{width:9px;height:9px}
+.trhead .lkchip.on{color:var(--lk-o)}
+.trhead .lkchip.on.lk-g{color:var(--lk-g)}
+.trhead .lkchip .lkd{display:block;position:absolute;right:3px;bottom:3px;width:8px;height:8px;border-radius:50%;box-shadow:0 0 0 2px var(--bg);background:var(--lk-o)}
+.trhead .lkchip.lk-g .lkd{background:var(--lk-g)}.trhead .lkchip.lk-og .lkd{background:linear-gradient(90deg,var(--lk-o) 50%,var(--lk-g) 50%)}
+.trhead .lkchip:not(.on) .lkd{display:none}
+.trhead .lkchip.on .spn{background:var(--lk-o)}.trhead .lkchip.on.lk-g .spn{background:var(--lk-g)}
+@media (max-width:860px){.trhead .hib{width:32px;height:32px}}
+
+.pnrz{position:absolute;top:0;bottom:0;left:-4px;width:8px;z-index:3;cursor:col-resize;touch-action:none}
+.pnrz.pnrz-r{left:auto;right:-4px}
+.pnrz::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background .15s .1s}
+.pnrz:hover::after,.pnrz.on::after{background:var(--accent)}
+.fvside{position:relative}
+body.sbresizing .spanel{transition:none}
+@media (max-width:860px){.pnrz{display:none}.spanel,.spanel.prpanel,.spanel.fvpanel{width:100%!important}.fvside{width:100%!important}}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="top">
+    <button class="sbtg" id="tgL" aria-pressed="true"><i data-ic="panelL"></i><span class="sdot"></span></button>
     <span class="brand" id="brand" title="回到总线消息"><i data-ic="messages"></i><span class="btx"> CC Msg</span><span id="phoneTag" style="display:none;font-weight:400;font-size:12px;color:var(--muted)"> · 手机</span></span>
-    <select class="projsel" id="projSel" title="切换项目"></select>
+    <span class="curnm" id="curNm"></span>
     <button class="stdot mob" id="stDot" title="状态"></button>
     <div class="pills" id="pills"></div>
     <div class="slegend" id="sLegend"></div>
@@ -1295,9 +1363,11 @@ body.lkdragging .lksvg *{pointer-events:none!important}
         </div>
       </div>
     </div>
+    <button class="sbtg" id="tgR" aria-pressed="true"><i data-ic="panelR"></i><span class="sdot"></span></button>
   </header>
 
   <div class="body">
+    <div class="sbrz" id="rzL" title="拖动改宽度，双击恢复"></div><div class="sbrz" id="rzR" title="拖动改宽度，双击恢复"></div>
     <aside class="side sideL" id="colL"><div class="sfoot slegend" id="footL"></div></aside>
     <section class="center">
       <div>
@@ -1331,11 +1401,11 @@ body.lkdragging .lksvg *{pointer-events:none!important}
 
     <aside class="side" id="colR">
       <div class="card sesscard" id="cardClaude">
-        <h3><span class="a-claude"><i data-ic="claude" data-cls="logo"></i>Claude</span> 会话 <span id="nClaude"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><span class="sp winpos" id="posClaude"></span></h3>
+        <h3><span class="a-claude"><i data-ic="claude" data-cls="logo"></i>Claude</span> 会话 <span id="nClaude"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><button class="rf admin" data-addproj title="添加项目…"><i data-ic="plus"></i></button><span class="sp winpos" id="posClaude"></span></h3>
         <div id="sessClaude"><div class="grp">加载中…</div></div>
       </div>
       <div class="card sesscard" id="cardCodex">
-        <h3><span class="a-codex"><i data-ic="codex" data-cls="logo"></i>Codex</span> 会话 <span id="nCodex"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><span class="sp winpos" id="posCodex"></span></h3>
+        <h3><span class="a-codex"><i data-ic="codex" data-cls="logo"></i>Codex</span> 会话 <span id="nCodex"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><button class="rf admin" data-addproj title="添加项目…"><i data-ic="plus"></i></button><span class="sp winpos" id="posCodex"></span></h3>
         <div id="codexSt" class="grp" style="margin:0 0 4px"></div>
         <div id="sessCodex"><div class="grp">加载中…</div></div>
       </div>
@@ -1371,6 +1441,9 @@ const ICON = {
   more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   phone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  subtask: '<path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4c0 1.1.9 2 2 2h3"/><path d="M3 10v6c0 1.1.9 2 2 2h3"/>',
+  panelL: '<path class="pf" d="M5 4h4v16H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+  panelR: '<path class="pf" d="M15 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4z"/><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   sync: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
@@ -1457,12 +1530,20 @@ function stateOf(p){
 }
 async function loadProjects(){
   projects = await api("/api/projects");
-  const sel = $("#projSel");
-  sel.innerHTML = projects.map(p => `<option value="${esc(p.root)}">${esc(p.name)} · ${esc(stateOf(p)[1])}</option>`).join("")
-    + `<option value="__add">＋ 添加项目…</option>`;
-  if (cur) { const p = projects.find(x => x.root === cur.root); if (p) { cur = p; sel.value = p.root; renderTop(); } }
+  if (cur) { const p = projects.find(x => x.root === cur.root); if (p) { cur = p; renderTop(); } }
+  if (cur && typeof renderSessions === "function") renderSessions();      // 文件夹标题上的项目状态跟着更新
 }
-$("#projSel").onchange = e => { if (e.target.value === "__add") { e.target.value = cur ? cur.root : ""; addProject(); } else select(e.target.value); };
+// 当前项目：顶栏不再有下拉；名字只在窄屏顶栏露一下（点了去会话列表），电脑上看文件夹上的「当前」
+function renderCurName(){
+  const el = $("#curNm"); if (!el) return;
+  if (!cur) { el.innerHTML = ""; document.title = "CC Msg"; return; }
+  const [c, t] = stateOf(cur);
+  el.innerHTML = `${ic("folder")}<span>${esc(cur.name || cur.root)}</span><i class="pfst st-${c || "none"}">${esc(t)}</i>`;
+  el.title = cur.root + "（当前项目）· 点开会话列表切换项目";
+  document.title = (cur.name || "") + " · CC Msg";
+}
+$("#curNm").onclick = () => { if (isMobile()) setM("sess"); };
+document.addEventListener("click", e => { if (e.target.closest("[data-addproj]")) { e.stopPropagation(); addProject(); } });
 
 // 状态说明（待命 / 活跃 / 空闲 + 当前项目在线会话的个数，不含后台新开 / 别派的）。放哪由设置定：顶部栏 / 贴窗口底部（缺省）/ 隐藏
 const LEGEND_POS = [["top", "顶部栏"], ["bottom", "贴窗口底部"], ["hide", "隐藏"]];
@@ -1496,6 +1577,7 @@ function renderSettings(){
   $("#setBody").innerHTML = `
     <div class="setrow"><div class="sl">${ic("contrast")}<div><b>主题</b><div class="sd">只影响这台设备</div></div></div>${segHtml("themeSeg", [["light", "浅色"], ["dark", "深色"], ["system", "跟随系统"]], themeMode())}</div>
     <div class="setrow"><div class="sl">${ic("activity")}<div><b>状态说明位置</b><div class="sd">待命 / 活跃 / 空闲 和各有几个会话</div></div></div>${segHtml("legSeg", LEGEND_POS, legendPos())}</div>
+    <div class="setrow"><div class="sl">${ic("sparkles")}<div><b>界面动画</b><div class="sd">侧栏收起 / 展开等过渡（系统设了「减少动画」时也不放）</div></div></div>${segHtml("uiAnimSeg", [["1", "开"], ["0", "关"]], store.get("msgbus.uianim") === "0" ? "0" : "1")}</div>
     <div class="setrow"><div class="sl">${ic("sparkles")}<div><b>网页信件动画</b><div class="sd">新消息时网页里飞一封信（只影响这台设备）</div></div></div>${segHtml("webFxSeg", [["1", "开"], ["0", "关"]], webFx ? "1" : "0")}</div>
     <div class="setrow admin needfx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">Windows 桌面上窗口之间飞（电脑上全局）</div></div></div>${segHtml("fxSeg", [["1", "开"], ["0", "关"]], fxOn ? "1" : "0")}</div>
     <div class="setrow admin onlynofx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">只有 Windows 上有；这台电脑上不放（网页信件动画照常）</div></div></div></div>
@@ -1506,6 +1588,7 @@ function renderSettings(){
   $$("#themeSeg button").forEach(b => b.onclick = () => setTheme(b.dataset.v));
   $$("#legSeg button").forEach(b => b.onclick = () => { store.set("msgbus.legend", b.dataset.v); applyLegendPos(); renderSettings(); });
   $$("#webFxSeg button").forEach(b => b.onclick = () => setWebFx(b.dataset.v === "1"));
+  $$("#uiAnimSeg button").forEach(b => b.onclick = () => { store.set("msgbus.uianim", b.dataset.v); renderSettings(); });
   $$("#fxSeg button").forEach(b => b.onclick = async () => { try { fxOn = (await api("/api/settings", {fx: b.dataset.v === "1"})).fx; } catch(e){ toast("❌ " + e.message); } renderSettings(); });
 }
 function openSettings(){
@@ -1526,7 +1609,7 @@ function renderTop(){
     (p.hook_py_missing ? pill("bad", "钩子的 Python 不在了", "钩子里写的这个 Python 已经不在了：" + (p.hook_py_gone||[]).join("、")) : "") +
     (p.error?pill("bad","配置出错",p.error):"");
   const sc = {ok:"var(--ok)", warn:"var(--warn)", bad:"var(--bad)", "":"var(--faint)"}[stateOf(p)[0]];
-  $("#stDot").style.setProperty("--sd", sc); renderLegend();
+  $("#stDot").style.setProperty("--sd", sc); renderLegend(); renderCurName();
   const need = !p.bus_dir || !p.installed || p.bus_outdated;
   const b = $("#instBtn"); b.style.display = need ? "" : "none";
   b.textContent = !p.bus_dir ? "一键安装" : "升级 / 修复";
@@ -1545,7 +1628,7 @@ async function select(root){
   if (moved) xpSess[cur.root] = sessList;                       // 切走的项目：它的会话留在自己的文件夹里
   cur = np; const cached = xpSess[root]; delete xpSess[root];
   if (moved) { setFold("claude", root, true); setFold("codex", root, true); }  // 切到哪个项目，它的文件夹就展开（刷新页面时照记下的开合）
-  store.set("msgbus.cur", root); $("#projSel").value = root;
+  store.set("msgbus.cur", root);
   offset = -1; msgs = []; sessList = cached || []; view = null; applyMode(); markOpen();
   if (typeof spClose === "function") spClose();
   renderSessions();
@@ -2285,19 +2368,21 @@ function renderSessions(){
   const isRest = x => x.managed || x.ignore;
   // 文件夹：当前项目放最上面，其它按最近有动静的排；其它项目里没有这家会话的就不列
   const folderList = a => {
-    const fs = [{p: cur, list: of(sessList, a)}].concat(projects.filter(p => p.root !== cur.root && xpSess[p.root])
-      .map(p => ({p, list: of(xpSess[p.root], a)})).filter(f => f.list.length)
-      .sort((f, h) => byAge(f.list.filter(x => !isRest(x))[0] || f.list[0], h.list.filter(x => !isRest(x))[0] || h.list[0])));
+    // 所有登记的项目都列（顶栏没有项目下拉了，这里就是切项目的地方）；有会话的按最近动静排在前面，没会话的排后面
+    const fs = [{p: cur, list: of(sessList, a)}].concat(projects.filter(p => p.root !== cur.root)
+      .map(p => ({p, list: of(xpSess[p.root], a)}))
+      .sort((f, h) => (!f.list.length - !h.list.length) || (f.list.length && h.list.length ? byAge(f.list.filter(x => !isRest(x))[0] || f.list[0], h.list.filter(x => !isRest(x))[0] || h.list[0]) : 0)));
     return fs;
   };
   // 以前后台新开的对话、标了「别派」的对话（不会再接活）：不丢，收进每个文件夹底下一个默认折起的「其它」里，淡一点显示
+  const pst = p => { const [c, t] = stateOf(p); return c === "ok" ? "" : `<i class="pfst st-${c || "none"}" title="${esc(t)}">${esc(t)}</i>`; };   // 就绪不标，省地方
   const listHtml = (a, none) => folderList(a).map(({p, list}) => {
     const root = p.root, isCur = root === cur.root, main = list.filter(x => !isRest(x)), rest = list.filter(isRest), mk = a + "|" + root;
-    const body = (main.map(x => row(x, root)).join("") || `<div class="grp">${isCur && !p.bus_dir ? "这个项目还没装总线" : none}</div>`) +
+    const body = (main.map(x => row(x, root)).join("") || `<div class="grp">${!p.bus_dir ? "这个项目还没装总线" : none}</div>`) +
       (rest.length ? `<details class="smore" data-more="${esc(mk)}" ${sessMore.has(mk) ? "open" : ""}>
       <summary title="以前总线后台新开的、或标了「别派」的会话，不会再接活">其它 ${rest.length} 个（后台新开 / 别派）</summary>${rest.map(x => row(x, root)).join("")}</details>` : "");
     return `<details class="pfold${isCur ? " cur" : ""}" data-fold="${esc(mk)}" data-root="${esc(root)}" data-agent="${a}" ${foldOpen(a, root) ? "open" : ""}>
-      <summary title="${esc(root)}${isCur ? "（当前项目，总线消息看的是它）" : "（点开看会话；点其中的会话会切到这个项目）"}">${ic("chev", "fchev")}${ic("folder")}<span class="pfn">${esc(p.name || root)}</span>${isCur ? '<span class="pfcur">当前</span>' : ""}<span class="pfc">${main.length}</span></summary>
+      <summary title="${esc(root)}${isCur ? "（当前项目：总线消息、文件、改动、PR、安装都对它）" : "（点项目名切到这个项目；点箭头只展开看会话）"}">${ic("chev", "fchev")}${ic("folder")}<span class="pfn"${isCur ? "" : ' data-pick="1"'}>${esc(p.name || root)}</span>${pst(p)}${isCur ? '<span class="pfcur">当前</span>' : ""}<span class="pfc">${main.length}</span></summary>
       <div class="pfbody">${body}</div></details>`;
   }).join("");
   $("#sessClaude").innerHTML = listHtml("claude", "没有在线的 Claude 会话");
@@ -2306,6 +2391,8 @@ function renderSessions(){
   $("#sessCodex").innerHTML = listHtml("codex", "没有在线的 Codex 会话");
   $$(".smore").forEach(d => d.ontoggle = () => { if (d.open) sessMore.add(d.dataset.more); else sessMore.delete(d.dataset.more); });
   $$(".pfold").forEach(d => d.ontoggle = () => { if (d.open !== foldOpen(d.dataset.agent, d.dataset.root)) setFold(d.dataset.agent, d.dataset.root, d.open); });
+  $$(".pfold .pfn[data-pick]").forEach(n => n.onclick = e => { e.preventDefault(); e.stopPropagation(); const r = n.closest(".pfold").dataset.root, p = projects.find(q => q.root === r);
+    select(r).then(() => p && toast(`已切到项目「${p.name}」`, 1600)); });
   const g = a => of(sessList, a).filter(x => !isRest(x));
   $("#nClaude").textContent = g("claude").length ? `（${g("claude").length}）` : "";
   $("#nCodex").textContent = g("codex").length ? `（${g("codex").length}）` : "";
@@ -2319,6 +2406,7 @@ function renderSessions(){
   markOpen();
   fillTo();
   lkRedraw();
+  if (typeof sbDots === "function") sbDots();
 }
 // ---------- 连线：把 Claude 会话和 Codex 会话连起来，谁给谁派活 ----------
 // 锚点：连了线的会话行上、朝另一栏那一侧的小圆点（橙 = Claude 派给 Codex，深绿 = Codex 派给 Claude，双向两色）。
@@ -2353,6 +2441,10 @@ function lkAnchor(x){
 // 端点：行上的锚点；行在折起的文件夹里 → 文件夹标题；滚出去了 → 贴在列表上 / 下边；整栏看不见 → 屏幕边上
 function lkPoint(agent, sid){
   const card = $(agent === "claude" ? "#cardClaude" : "#cardCodex");
+  if (sbOffEl(card)) {             // 这一栏收起了：端点贴在中间区域朝它那一边，画虚线
+    const c = $(".center").getBoundingClientRect(), left = card.closest(".side").id === "colL";
+    return {x: left ? c.left + 2 : c.right - 2, y: c.top + c.height * .42, s: left ? 1 : -1, cut: true, edge: true};
+  }
   if (!visibleEl(card)) return null;
   const side = lkSide(agent), sc = card.closest(".side") || card, cr = sc.getBoundingClientRect();
   const row = $(`.srow:not(.xp)[data-agent="${agent}"][data-sid="${CSS.escape(sid)}"]`);
@@ -2570,13 +2662,15 @@ function lkPicker(x){
 function lkHead(){
   const b = $("#lkBtn"); if (!b || !view) return;
   const ls = lkOf(view.agent, view.sid);
-  if (!ls.length) { b.className = "spbtn prhb lkchip"; b.innerHTML = `${ic("link")}<span class="spl">连接到…</span>`; b.title = "把这个会话和另一家的会话连线，指定谁给谁派活"; return; }
+  if (!ls.length) { b.className = "spbtn prhb lkchip hib"; b.innerHTML = `${ic("link")}<span class="spl">连接到…</span>`; b.title = "连接到…：把这个会话和另一家的会话连线，指定谁给谁派活"; b.setAttribute("aria-label", "连接到…"); return; }
   const other = view.agent === "claude" ? "codex" : "claude";
   const o = ls.some(l => lkDirFor(view.agent, l).o), i = ls.some(l => lkDirFor(view.agent, l).i);
   const arr = o && i ? "⇄" : o ? "→" : "←", og = ls.some(l => l.dir !== "x2c"), gr = ls.some(l => l.dir !== "c2x");
-  b.className = `spbtn prhb lkchip on ${og && gr ? "lk-og" : og ? "lk-o" : "lk-g"}`;
-  b.innerHTML = `${ic("link")}<span>已连线 ${arr} ${esc(ls.length === 1 ? lkShort(other, ls[0][other]) : ls.length + " 个会话")}</span>`;
-  b.title = ls.map(l => `${LK_DIR[l.dir]}：${lkName("claude", l.claude)} / ${lkName("codex", l.codex)}`).join("\n") + "\n点开看详情、改方向或断开";
+  b.className = `spbtn prhb lkchip hib on ${og && gr ? "lk-og" : og ? "lk-o" : "lk-g"}`;
+  const lbl = `已连线 ${arr} ${ls.length === 1 ? lkShort(other, ls[0][other]) : ls.length + " 个会话"}`;
+  b.innerHTML = `${ic("link")}<span class="spl">${esc(lbl)}</span><i class="lkd"></i>${ls.length > 1 ? `<span class="spn">${ls.length}</span>` : ""}`;
+  b.setAttribute("aria-label", lbl);
+  b.title = lbl + "\n" + ls.map(l => `${LK_DIR[l.dir]}：${lkName("claude", l.claude)} / ${lkName("codex", l.codex)}`).join("\n") + "\n点开看详情、改方向或断开";
 }
 document.addEventListener("click", e => {
   const b = e.target.closest && e.target.closest("#lkBtn"); if (!b || !view) return;
@@ -2632,6 +2726,7 @@ function placeCards(){
   else { L.appendChild(cx); R.insertBefore(cl, R.firstChild); }
   L.appendChild($("#footL")); R.appendChild($("#footR"));     // 状态说明条永远在栏的最后（贴底）
   if (typeof renderLegend === "function") renderLegend();
+  if (typeof sbDots === "function") sbDots();
   if (typeof lkRedraw === "function" && typeof cur !== "undefined" && cur && sessList.length) renderSessions();
   // Codex 那一栏用 Codex 桌面版的样子（电脑上一栏只放一家，整栏换；手机上两家叠一起，只换 Codex 那张卡）
   cx.classList.add("cx");
@@ -2648,13 +2743,111 @@ async function pollLayout(){
 matchMedia("(max-width:860px)").addEventListener("change", placeCards);
 placeCards(); pollLayout(); setInterval(pollLayout, 4000);
 
+// ---------- 两个侧栏：收起 / 展开（Ctrl+B 左栏，Ctrl+Alt+B 右栏），拖边改宽度；都记在这台设备 ----------
+// 手机 / 窄窗口照旧（底部导航切会话列表），开关不显示。
+var SB = {L: store.get("msgbus.sbL") !== "0", R: store.get("msgbus.sbR") !== "0"};
+const SB_MIN = 170, SB_MAX = 560;
+function uiAnim(){ return store.get("msgbus.uianim") !== "0" && !matchMedia("(prefers-reduced-motion: reduce)").matches; }
+function sbCol(k){ return $(k === "L" ? "#colL" : "#colR"); }
+function sbOffEl(el){ const c = el && el.closest && el.closest(".side"); return !!c && !isMobile() && c.classList.contains("sboff"); }
+function sbKeyOf(agent){ const c = $(agent === "claude" ? "#cardClaude" : "#cardCodex"); const col = c && c.closest(".side"); return col ? (col.id === "colL" ? "L" : "R") : null; }
+function sbAgent(k){ return sbCol(k).querySelector("#cardClaude") ? "claude" : "codex"; }
+function sbName(k){ return sbAgent(k) === "claude" ? "Claude 会话" : "Codex 会话"; }
+function sbApply(anim){
+  const b = document.body, on = uiAnim() && anim;
+  b.classList.toggle("sbanim", on);
+  b.classList.toggle("sbL-off", !SB.L); b.classList.toggle("sbR-off", !SB.R);
+  ["L", "R"].forEach(k => {
+    const col = sbCol(k), w = +store.get("msgbus.sbW" + k) || 0;
+    col.classList.toggle("sboff", !SB[k]);
+    if (!SB[k]) col.setAttribute("inert", ""); else col.removeAttribute("inert");
+    $(".body").style[w ? "setProperty" : "removeProperty"](k === "L" ? "--wlw" : "--wrw", w ? w + "px" : "");
+  });
+  if (typeof sbFit === "function") sbFit();
+  sbDots();
+  lkRedraw(); if (on) { const t0 = performance.now(); const f = () => { lkRedraw(); if (performance.now() - t0 < 320) requestAnimationFrame(f); }; requestAnimationFrame(f); }
+}
+function sbToggle(k, v){
+  SB[k] = v == null ? !SB[k] : !!v; store.set("msgbus.sb" + k, SB[k] ? "1" : "0");
+  if (!SB[k]) { if (lkPop) lkPopClose(); if (typeof lkPin !== "undefined") lkPin.clear(); }
+  sbApply(true);
+}
+// 收起时开关上留个小点：这一栏当前项目里有活跃的（蓝，会跳）/ 待命的（绿）会话；有信飞进来时闪一下
+function sbDots(){
+  if (!window.SB || !$("#tgL")) return;
+  ["L", "R"].forEach(k => {
+    const btn = $("#tg" + k); if (!btn) return;
+    const a = sbAgent(k), side = k === "L" ? "左" : "右", key = k === "L" ? "Ctrl+B" : "Ctrl+Alt+B";
+    const list = (typeof sessList !== "undefined" ? sessList : []).filter(x => (x.agent === a || (a === "claude" && x.agent === "cursor")) && !x.managed && !x.ignore);
+    const n = {active: 0, stand: 0}; list.forEach(x => { const st = sessState(x)[0]; if (st in n) n[st]++; });
+    const dot = btn.querySelector(".sdot"), mail = btn.classList.contains("ping");
+    dot.className = "sdot " + (mail ? "s-mail" : n.active ? "s-active" : "s-stand");
+    btn.classList.toggle("off", !SB[k]); btn.classList.toggle("has", mail || n.active + n.stand > 0);
+    btn.setAttribute("aria-pressed", SB[k] ? "true" : "false");
+    const stat = [n.active && `活跃 ${n.active}`, n.stand && `待命 ${n.stand}`].filter(Boolean).join(" · ");
+    btn.title = `${SB[k] ? "收起" : "展开"}${side}栏（${sbName(k)}）  ${key}` + (!SB[k] && stat ? `\n收起中：${stat}` : "");
+    btn.setAttribute("aria-label", btn.title);
+  });
+}
+function sbPing(agent){
+  const k = sbKeyOf(agent); if (!k || SB[k] || isMobile()) return null;
+  const b = $("#tg" + k); b.classList.add("ping"); sbDots();
+  clearTimeout(b._pt); b._pt = setTimeout(() => { b.classList.remove("ping"); sbDots(); }, 4000);
+  const r = b.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2};
+}
+$("#tgL").onclick = () => sbToggle("L"); $("#tgR").onclick = () => sbToggle("R");
+document.addEventListener("keydown", e => {
+  if (e.code !== "KeyB" || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.repeat || isMobile()) return;
+  e.preventDefault(); sbToggle(e.altKey ? "R" : "L");
+});
+// 拖边改宽度（双击恢复默认）：鼠标 / 触屏 / 笔都走 pointer 事件；拖的时候按帧更新（rAF），连线跟着走；手机 / 窄窗口不让拖
+const CENTER_MIN = 420;            // 中间聊天区至少留这么宽
+function rzBind(h, o){
+  h.style.touchAction = "none";
+  h.addEventListener("pointerdown", e => {
+    if (isMobile() || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.preventDefault(); e.stopPropagation(); try { h.setPointerCapture(e.pointerId); } catch(_) {}
+    const w0 = o.get(), x0 = e.clientX; let w = w0, raf = 0;
+    document.body.classList.add("sbresizing"); h.classList.add("on");
+    const mv = ev => { w = Math.round(Math.max(o.min(), Math.min(o.max(), w0 + o.dir * (ev.clientX - x0))));
+      if (!raf) raf = requestAnimationFrame(() => { raf = 0; o.set(w); lkRedraw(); }); };
+    const up = () => { h.removeEventListener("pointermove", mv); h.removeEventListener("pointerup", up); h.removeEventListener("pointercancel", up);
+      cancelAnimationFrame(raf); o.set(w); o.save(w); document.body.classList.remove("sbresizing"); h.classList.remove("on"); lkRedraw(); };
+    h.addEventListener("pointermove", mv); h.addEventListener("pointerup", up); h.addEventListener("pointercancel", up);
+  });
+  h.addEventListener("dblclick", e => { e.stopPropagation(); o.reset(); lkRedraw(); });
+}
+function sbOtherW(k){ const o = k === "L" ? "R" : "L"; return SB[o] ? sbCol(o).getBoundingClientRect().width : 0; }
+["L", "R"].forEach(k => rzBind($("#rz" + k), {
+  dir: k === "L" ? 1 : -1,
+  get: () => sbCol(k).getBoundingClientRect().width,
+  min: () => SB_MIN,
+  max: () => Math.max(SB_MIN, Math.min(SB_MAX, innerWidth - sbOtherW(k) - CENTER_MIN)),
+  set: w => $(".body").style.setProperty(k === "L" ? "--wlw" : "--wrw", w + "px"),
+  save: w => store.set("msgbus.sbW" + k, String(w)),
+  reset: () => { store.set("msgbus.sbW" + k, ""); sbApply(true); },
+}));
+// 窗口变窄时：记下的宽度太宽、把中间挤得太小 → 临时按比例缩（不改记下的值）
+function sbFit(){
+  if (isMobile()) return;
+  const bd = $(".body"), wl = +store.get("msgbus.sbWL") || 0, wr = +store.get("msgbus.sbWR") || 0;
+  const L = SB.L ? (wl || 250) : 0, R = SB.R ? (wr || 280) : 0, room = innerWidth - CENTER_MIN;
+  const k = L + R > room && room > 0 ? Math.max(SB_MIN * ((L ? 1 : 0) + (R ? 1 : 0)), room) / (L + R) : 1;
+  if (wl) bd.style.setProperty("--wlw", Math.round(Math.max(SB_MIN, wl * k)) + "px");
+  if (wr) bd.style.setProperty("--wrw", Math.round(Math.max(SB_MIN, wr * k)) + "px");
+}
+window.addEventListener("resize", sbFit);
+$(".body").addEventListener("transitionend", e => { if (e.target === $(".body")) lkRedraw(); });
+sbApply(false);
+
 // ---------- 网页里的信件动画：从发件会话那一栏飞到收件会话那一栏 ----------
 let webFx = store.get("msgbus.webfx") !== "0", flying = 0;
 const FX_COLOR = {claude:"#d97757", codex:"#10a37f", user:"#6b5bd2"};
 const FX_KIND = {task:"任", result:"结", msg:"信"};
 function shortOfSid(agent, sid){ return agent === "codex" ? String(sid).slice(-6) : String(sid).slice(0,6); }
-function visibleEl(el){ if (!el) return null; const r = el.getBoundingClientRect(); return (r.width && r.height && el.offsetParent !== null) ? el : null; }
-function edgePoint(agent){        // 那一栏看不见（手机）时：按它在哪一侧，从屏幕边上进出
+function visibleEl(el){ if (!el || (typeof sbOffEl === "function" && sbOffEl(el))) return null; const r = el.getBoundingClientRect(); return (r.width && r.height && el.offsetParent !== null) ? el : null; }
+function edgePoint(agent){        // 那一栏看不见（手机）时：按它在哪一侧，从屏幕边上进出；电脑上那一栏收起了 → 飞到顶栏它的开关上
+  const sp = typeof sbPing === "function" && sbPing(agent); if (sp) return sp;
   const left = (agent === "claude") === (claudeSide === "left");
   return {x: left ? 26 : innerWidth - 26, y: innerHeight * 0.45};
 }
@@ -2734,15 +2927,16 @@ function openSession(x){
   if (isMobile()) setM("bus");
   const live = sessList.find(s => s.agent === x.agent && s.sid === x.sid) || x;
   $("#trHead").innerHTML = `<button class="mback" onclick="mBack()" title="返回总线消息">${ic("back")}</button>${bbAvatar(live, sessState(live)[0], 30)}<span class="nm a-${esc(x.agent)}">${logo(x.agent)}${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
-    <button class="spbtn" id="spBtn" style="display:none" title="查看这个会话派出去的子任务">${ic("users")}<span class="spl">子任务</span><span class="spn" id="spN">0</span><span class="spr" id="spRun"></span></button>
-    <button class="spbtn prhb lkchip" id="lkBtn"></button>
-    <button class="spbtn prhb" id="fvBtn" title="浏览这个项目的文件（只读），看文件差异、历史">${ic("folder")}<span class="spl">文件</span></button>
-    <button class="spbtn prhb" id="chgBtn" title="看这个项目本地的改动（git status / diff），可以发给会话做代码审查">${ic("gitdiff")}<span class="spl">改动</span></button>
-    <button class="spbtn prhb" id="prsBtn" title="这个项目在 GitHub 上的 PR（用本机 gh 只读查看）">${ic("gitpr")}<span class="spl">PR</span></button>
-    <button class="rf" id="trRefresh" title="从头重读这个会话的记录">${ic("refresh")}</button>
-    ${x.agent==="codex" ? `<button id="toClaude" title="导出成交接文件，交给 Claude 接着做">${ic("handoff")}<span class="tcl"> 交给 Claude</span></button>` : ""}
+    <button class="spbtn hib" id="spBtn" style="display:none" title="子任务：查看这个会话派出去的子任务">${ic("subtask")}<span class="spl">子任务</span><span class="spn" id="spN">0</span><span class="spr" id="spRun"></span></button>
+    <button class="spbtn prhb lkchip hib" id="lkBtn"></button>
+    <button class="spbtn prhb hib" id="fvBtn" title="文件：浏览这个项目的文件（只读），看文件差异、历史">${ic("folder")}<span class="spl">文件</span></button>
+    <button class="spbtn prhb hib" id="chgBtn" title="改动：看这个项目本地的改动（git status / diff），可以发给会话做代码审查">${ic("gitdiff")}<span class="spl">改动</span></button>
+    <button class="spbtn prhb hib" id="prsBtn" title="PR：这个项目在 GitHub 上的 PR（用本机 gh 只读查看）">${ic("gitpr")}<span class="spl">PR</span></button>
+    ${x.agent==="codex" ? `<button class="spbtn hib" id="toClaude" title="交给 Claude：导出成交接文件，让 Claude 接着做">${ic("handoff")}<span class="tcl"> 交给 Claude</span></button>` : ""}
+    <button class="spbtn hib" id="trRefresh" title="刷新：从头重读这个会话的记录">${ic("refresh")}</button>
     <span class="note" tabindex="0" title="${esc(x.agent==="codex" ? "回复会作为一条用户输入交给 Codex（codex queue）" : x.agent==="cursor" ? "回复经总线送达 Cursor，标成「用户本人」发的：它下次提交消息、调用工具或一轮结束时收到，闲着叫不醒" : "回复经总线送达 Claude（闲着会被叫醒），标成「用户本人 · 经 agent-bridge 网页」，它会当成你直接说的话；项目要先 ⋯ → 安装 / 升级 / 修复 换上新版总线")}">${ic("info")}</span>`;
   $("#toFixed").innerHTML = `发给 <b class="a-${esc(x.agent)}">${esc(nm)}</b>`;
+  $$("#trHead .hib").forEach(b => b.setAttribute("aria-label", (b.title || "").split("\n")[0]));
   if ($("#toClaude")) $("#toClaude").onclick = () => handToClaude(x);
   $("#trRefresh").onclick = e => { spin(e.currentTarget); trOffset = -1; trEntries = []; trResetState(true); pollTranscript(true); };
   if (!same) { trOffset = -1; trEntries = []; trResetState(false); $("#trView").innerHTML = `<div class="empty">正在读会话记录…</div>`; }
@@ -3161,7 +3355,8 @@ function spBtnUpdate(){
   b.style.display = n ? "" : "none";
   $("#spN").textContent = n;
   $("#spRun").innerHTML = run ? `<span class="spinr"></span>${run}` : "";
-  b.title = n ? `这个会话派出去 ${n} 个子任务${run ? `，${run} 个还在跑` : ""}；点开查看` : "";
+  b.title = n ? `子任务：这个会话派出去 ${n} 个${run ? `，${run} 个还在跑` : ""}；点开查看` : ""; b.setAttribute("aria-label", b.title);
+  b.classList.toggle("run", !!run);
   b.classList.toggle("on", spOpenP);
 }
 function spOnOpen(x, same){
@@ -4067,6 +4262,26 @@ $("#mLink").onclick = () => view ? lkPicker(lkSess(view.agent, view.sid) || view
 $("#mPRs").onclick = () => { prStack = []; prCur = null; prListOpen(); };
 $("#mChg").onclick = () => { prStack = []; prCur = null; chgOpen(); };
 // ---------- 轮询 ----------
+
+// ---------- 右侧滑出面板（子任务 / PR·改动 / 文件）和文件树：拖内侧边改宽度，双击恢复；每个面板各记各的 ----------
+const PANEL_RZ = [["subPanel", 320], ["prPanel", 420], ["fvPanel", 560]];
+function pnApply(){
+  PANEL_RZ.forEach(([id]) => { const p = document.getElementById(id), w = +store.get("msgbus.pw." + id) || 0; if (p) p.style.width = w ? Math.min(w, innerWidth - 120) + "px" : ""; });
+  const fs = $("#fvPanel .fvside"), fw = +store.get("msgbus.pw.fvside") || 0; if (fs) fs.style.width = fw ? fw + "px" : "";
+}
+PANEL_RZ.forEach(([id, min]) => {
+  const p = document.getElementById(id); if (!p) return;
+  const h = document.createElement("div"); h.className = "pnrz"; h.title = "拖动改宽度，双击恢复"; p.appendChild(h);
+  rzBind(h, {dir: -1, get: () => p.getBoundingClientRect().width, min: () => Math.min(min, innerWidth - 120), max: () => Math.max(min, innerWidth - 120),
+    set: w => { p.style.width = w + "px"; }, save: w => store.set("msgbus.pw." + id, String(w)),
+    reset: () => { store.set("msgbus.pw." + id, ""); p.style.width = ""; }});
+});
+(() => { const fs = $("#fvPanel .fvside"); if (!fs) return;
+  const h = document.createElement("div"); h.className = "pnrz pnrz-r"; h.title = "拖动改文件树宽度，双击恢复"; fs.appendChild(h);
+  rzBind(h, {dir: 1, get: () => fs.getBoundingClientRect().width, min: () => 160, max: () => Math.max(160, $("#fvPanel").getBoundingClientRect().width - 320),
+    set: w => { fs.style.width = w + "px"; }, save: w => store.set("msgbus.pw.fvside", String(w)), reset: () => { store.set("msgbus.pw.fvside", ""); fs.style.width = ""; }});
+})();
+pnApply(); window.addEventListener("resize", pnApply);
 function stopPolling(){ timers.forEach(clearInterval); timers = []; }
 function startPolling(){
   stopPolling(); pollMessages(); pollSessions(); pollCodex(); pollOtherSessions();
