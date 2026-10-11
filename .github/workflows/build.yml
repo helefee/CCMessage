@@ -1,0 +1,96 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-desktop:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.11"
+          architecture: x64
+      - name: Cache embeddable Python
+        uses: actions/cache@v4.2.3
+        with:
+          path: build/python-*-embed-amd64.zip
+          key: py-embed-3.11.9
+      - name: Build dist\AgentBridge (+ zip, selftest with the embedded Python)
+        shell: cmd
+        run: build_desktop.cmd -Zip
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: AgentBridge-windows-x64
+          path: dist/AgentBridge-windows-x64.zip
+          if-no-files-found: error
+
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.11"
+      - name: install.sh in a temp copy (temp HOME)
+        run: |
+          set -eux
+          export HOME="$RUNNER_TEMP/home"; mkdir -p "$HOME"
+          APP="$RUNNER_TEMP/agent-bridge"
+          git archive --format=tar --prefix=agent-bridge/ HEAD | tar -x -C "$RUNNER_TEMP"
+          cd "$APP"
+          bash install.sh
+          sh run.sh selftest
+      - name: smoke test (server, home page, API, LAN gate)
+        run: |
+          set -eux
+          export HOME="$RUNNER_TEMP/home"
+          cd "$RUNNER_TEMP/agent-bridge"
+          sh run.sh --no-browser --port 8799 --host 0.0.0.0 > "$RUNNER_TEMP/server.log" 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8799/api/ping && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8799/ | grep -q "会话消息总线"
+          curl -fsS http://127.0.0.1:8799/api/me | grep -q '"local": true'
+          curl -fsS http://127.0.0.1:8799/api/projects
+          IP=$(hostname -I | awk '{print $1}')
+          test "$(curl -s -o /dev/null -w '%{http_code}' "http://$IP:8800/api/projects")" = 401
+          sh run.sh pair --port 8799 | grep -q "/pair?c="
+          kill %1 || true
+          cat "$RUNNER_TEMP/server.log"
+      - name: package
+        run: |
+          set -eux
+          mkdir -p dist
+          git archive --format=tar.gz --prefix=agent-bridge/ -o dist/agent-bridge-linux.tar.gz HEAD
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: agent-bridge-linux
+          path: dist/agent-bridge-linux.tar.gz
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows-desktop, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4.3.0
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2.3.2
+        with:
+          files: |
+            out/AgentBridge-windows-x64.zip
+            out/agent-bridge-linux.tar.gz
+          generate_release_notes: true
