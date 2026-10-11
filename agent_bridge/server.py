@@ -531,7 +531,7 @@ def run_bus(root: Path, args: list[str], stdin: str | None = None, cwd: Path | N
     bus_rel = find_bus_dir(root)
     if not bus_rel:
         raise ValueError("这个项目还没装总线")
-    env = dict(os.environ, PYTHONUTF8="1")
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
     for k in ("CLAUDE_CODE_SESSION_ID", "CLAUDECODE", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CURSOR_AGENT", "MSGBUS_AS"):
         env.pop(k, None)
     return subprocess.run(bus_argv(root, bus_rel) + args,
@@ -591,7 +591,7 @@ def selftest(root: Path) -> dict:
         steps.append(("✓" if good else "✗") + " Codex → Claude 回信")
         ok &= good
         # 待命：模拟 Claude 闲下来（Stop 钩子后台跑），再发一条，看它是否以退出码 2 结束并带出内容
-        env = dict(os.environ, PYTHONUTF8="1")
+        env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
         for k in ("CLAUDE_CODE_SESSION_ID", "CLAUDECODE", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "CURSOR_AGENT", "MSGBUS_AS"):
             env.pop(k, None)
         lp = subprocess.Popen(bus_argv(root, bus_rel) + ["hook", "claude", "--rewake", "--max-secs", "20"],
@@ -939,7 +939,7 @@ class FxWatcher:
                 args = self.queue.pop(0)
             try:
                 subprocess.run(paths.self_cmd("fx", *args), timeout=20, cwd=str(TOOL.parent),
-                               env=dict(os.environ, PYTHONUTF8="1"), capture_output=True, creationflags=NO_WINDOW)
+                               env=dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8"), capture_output=True, creationflags=NO_WINDOW)
             except Exception:
                 pass
 
@@ -1724,7 +1724,7 @@ class Handler(BaseHTTPRequestHandler):
                 root = norm_root(body["root"])
                 out_dir = root / (find_bus_dir(root) or ".msgbus") / "exports"
                 r = subprocess.run(paths.self_cmd("export", body["sid"], "--out", str(out_dir)), cwd=str(TOOL.parent),
-                                   capture_output=True, timeout=120, env=dict(os.environ, PYTHONUTF8="1"),
+                                   capture_output=True, timeout=120, env=dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8"),
                                    creationflags=NO_WINDOW)
                 out = r.stdout.decode("utf-8", "replace").strip()
                 if r.returncode != 0:

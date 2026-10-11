@@ -27,6 +27,44 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+
+# ---------- 编码兜底 ----------
+# 安装版的 bus.exe（Nuitka）不认 PYTHONUTF8：中文 Windows 上标准输入会按 GBK（cp936）解码、坏字节变成 \udc80 这类代理字符，
+# 写记录时 encode("utf-8") 就炸（「没发出去 … surrogates not allowed」）。所以正文一律从字节读、自己解码，命令行参数也修一遍。
+def decode_bytes(b: bytes) -> str:
+    """先 UTF-8（带不带 BOM 都行），不行再 GBK / 系统代码页，最后兜底用替换字符，永远不抛错。"""
+    if b.startswith(b"\xef\xbb\xbf"):
+        b = b[3:]
+    for enc in ("utf-8", "gb18030"):
+        try:
+            return b.decode(enc)
+        except UnicodeDecodeError:
+            pass
+    return b.decode("utf-8", "replace")
+
+
+def fix_text(s: str) -> str:
+    """把被错误代码页 + surrogateescape 解出来的字符串还原：按当初的编码退回字节，再按 UTF-8 / GBK 重新解码。"""
+    if not isinstance(s, str) or not any("\ud800" <= ch <= "\udfff" for ch in s):
+        return s
+    import locale
+    for enc in dict.fromkeys(filter(None, (getattr(sys.stdin, "encoding", None), locale.getpreferredencoding(False),
+                                           sys.getfilesystemencoding(), "utf-8", "gb18030"))):
+        try:
+            return decode_bytes(s.encode(enc, "surrogateescape"))
+        except (UnicodeError, LookupError):
+            pass
+    return s.encode("utf-8", "replace").decode("utf-8")      # 实在还原不了：坏字符换成 ?，至少发得出去
+
+
+def clean_text(s: str) -> str:
+    """最后一道：任何还残留的代理字符都换掉，保证能写成 UTF-8。"""
+    s = fix_text(s)
+    return s.encode("utf-8", "replace").decode("utf-8") if any("\ud800" <= ch <= "\udfff" for ch in s) else s
+
+
+sys.argv = [fix_text(a) for a in sys.argv]
+
 # 编译成 bus.exe（Nuitka）时 __file__ 在程序目录里，总线目录要靠 --dir / MSGBUS_DIR / 从当前目录往上找
 FROZEN = "__compiled__" in globals()
 
@@ -491,7 +529,7 @@ def match_target(to: str, rec: dict) -> bool:
 
 
 def read_text(arg: str) -> str:
-    text = (arg if arg != "-" else sys.stdin.read()).strip()
+    text = clean_text(arg if arg != "-" else decode_bytes(sys.stdin.buffer.read() if sys.stdin else b"")).strip()
     if not text:
         sys.exit("正文是空的")
     return text
@@ -524,7 +562,7 @@ def post(agent: str, sid: str, me: dict, to: str, text: str, kind="msg", reply_t
     }
     if reply_to:
         msg["reply_to"] = reply_to
-    line = (json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8")
+    line = (json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8", "replace")     # 万一还有坏字符：换成 ? 也别发不出去
     with FileLock():
         with open(MSGS, "ab") as f:
             f.write(line)
@@ -1532,7 +1570,7 @@ def cmd_codex_worker(args) -> None:
         p = subprocess.Popen(cmd, cwd=str(ROOT), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT,
                              creationflags=0x08000000 if os.name == "nt" else 0)   # CREATE_NO_WINDOW：别弹控制台窗口
-        p.stdin.write(task_prompt(task).encode("utf-8"))
+        p.stdin.write(task_prompt(task).encode("utf-8", "replace"))
         p.stdin.close()
         deadline = now_ts() + WORKER_TIMEOUT
         with open(log, "wb") as lf:
@@ -1779,7 +1817,7 @@ def recall_task(tid: str, who: dict) -> tuple[bool, str]:
         msg = {"id": uuid.uuid4().hex[:12], "ts": now_ts(), "kind": "recall", "from": who, "to": task.get("to"),
                "to_keys": [], "reply_to": tid, "text": "撤回任务 #" + tid}
         with open(MSGS, "ab") as f:
-            f.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8"))
+            f.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8", "replace"))
     return True, f"已撤回任务 {tid}（对方不会收到）"
 
 
@@ -2348,7 +2386,7 @@ def rewake_listen(agent: str, sid: str, cwd: str, max_secs: float) -> None:
             continue
         msgs = pull_new(agent, sid, me)
         if msgs:
-            sys.stderr.buffer.write((deliver_head(msgs) + "\n\n" + render(msgs)).encode("utf-8"))
+            sys.stderr.buffer.write((deliver_head(msgs) + "\n\n" + render(msgs)).encode("utf-8", "replace"))
             sys.stderr.flush()
             try:
                 pf.unlink()
@@ -2415,7 +2453,7 @@ def cursor_stop(sid: str, cwd: str, me: dict) -> None:
         msgs = pull_new("cursor", sid, me) if any(m.get("kind") != "notice" for m in peek) else []
         if msgs:
             text = "📨 msgbus：" + deliver_head(msgs, "其他 AI 会话") + "\n\n" + render(msgs)
-            sys.stdout.buffer.write(json.dumps({"followup_message": cursorize(text, sid)}, ensure_ascii=False).encode("utf-8"))
+            sys.stdout.buffer.write(json.dumps({"followup_message": cursorize(text, sid)}, ensure_ascii=False).encode("utf-8", "replace"))
             return
         if now_ts() >= end:
             return
@@ -2425,7 +2463,7 @@ def cursor_stop(sid: str, cwd: str, me: dict) -> None:
 def cmd_hook(args) -> None:
     agent = args.agent
     try:
-        data = json.loads(sys.stdin.buffer.read().decode("utf-8") or "{}")
+        data = json.loads(decode_bytes(sys.stdin.buffer.read()) or "{}")
     except Exception:
         data = {}
     # Cursor 会照跑 .claude/settings.json 里的钩子（带 CLAUDE_PROJECT_DIR），得认出来，别登记成 Claude 会话
@@ -2509,13 +2547,13 @@ def cmd_hook(args) -> None:
     if not ctx:
         return
     if is_cursor:
-        sys.stdout.buffer.write(json.dumps({"additional_context": cursorize("\n\n".join(ctx), sid)}, ensure_ascii=False).encode("utf-8"))
+        sys.stdout.buffer.write(json.dumps({"additional_context": cursorize("\n\n".join(ctx), sid)}, ensure_ascii=False).encode("utf-8", "replace"))
         return
     out = {"hookSpecificOutput": {"hookEventName": event, "additionalContext": "\n\n".join(ctx)}}
     if msgs:
         out["systemMessage"] = f"📨 msgbus：收到 {len(msgs)} 条消息（来自 " + \
             "、".join(sorted({m['from']['name'] for m in msgs})) + "）"
-    sys.stdout.buffer.write(json.dumps(out, ensure_ascii=False).encode("utf-8"))
+    sys.stdout.buffer.write(json.dumps(out, ensure_ascii=False).encode("utf-8", "replace"))
 
 
 def main() -> None:
