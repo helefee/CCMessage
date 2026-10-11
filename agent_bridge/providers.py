@@ -33,7 +33,8 @@ CLAUDE_MODELS = {"model": "model", "opus": "ANTHROPIC_DEFAULT_OPUS_MODEL", "sonn
                  "haiku": "ANTHROPIC_DEFAULT_HAIKU_MODEL", "fable": "ANTHROPIC_DEFAULT_FABLE_MODEL",
                  "subagent": "CLAUDE_CODE_SUBAGENT_MODEL"}
 CLAUDE_MAP_ENV = [v for k, v in CLAUDE_MODELS.items() if k != "model"]
-CODEX_MODELS = ["model", "review_model", "subagent"]
+CODEX_MODELS = ["model", "review_model", "subagent", "mem_extract", "mem_consolidate"]
+CATALOG_PREFIX = "ccmsg-models-"           # CC Msg 管的 Codex 模型目录：CODEX_HOME/ccmsg-models-<供应商 id>.json
 CODEX_BUILTIN = {"openai", "ollama", "lmstudio"}
 CODEX_SESSION_ID = "ccmsg-session"
 WIRE = ("responses", "chat")
@@ -124,11 +125,118 @@ def _clean(tool: str, p: dict) -> dict:
             raise ValueError(f"思考强度不认识：{eff}")
     out["effort"] = eff
     if tool == "codex":
+        se = p.get("subagent_effort") or None
+        if se and se not in modelcfg.CODEX_EFFORTS + ["none", "ultra", "max"]:
+            raise ValueError(f"子代理思考强度不认识：{se}")
+        out["subagent_effort"] = se
+        out["catalog"] = _clean_catalog(p.get("catalog"))
+    else:
+        out["picker"] = _clean_picker(p.get("picker"))
+        out["overrides"] = _clean_overrides(p.get("overrides"))
+    if tool == "codex":
         w = p.get("wire_api") or "responses"
         if w not in WIRE:
             raise ValueError("wire_api 只能是 responses / chat")
         out["wire_api"] = w
     return out
+
+
+def _clean_catalog(rows) -> list:
+    """Codex 模型目录的行：slug（真实模型名，请求里发的就是它）、name（/model 里显示的名字）、effort（默认思考强度）、ctx（上下文窗口）。"""
+    out, seen = [], set()
+    for r in (rows or [])[:60]:
+        if not isinstance(r, dict) or not str(r.get("slug") or "").strip():
+            continue
+        slug = modelcfg._check_model(str(r["slug"]).strip())
+        if slug in seen:
+            raise ValueError(f"模型目录里 {slug} 写了两次")
+        seen.add(slug)
+        eff = r.get("effort") or None
+        if eff and eff not in modelcfg.CODEX_EFFORTS + ["none", "ultra", "max"]:
+            raise ValueError(f"{slug} 的思考强度不认识：{eff}")
+        ctx = r.get("ctx")
+        if ctx not in (None, ""):
+            try:
+                ctx = int(ctx)
+            except (TypeError, ValueError):
+                raise ValueError(f"{slug} 的上下文窗口要是整数")
+            if not 1000 <= ctx <= 100_000_000:
+                raise ValueError(f"{slug} 的上下文窗口不合理：{ctx}")
+        else:
+            ctx = None
+        out.append({"slug": slug, "name": str(r.get("name") or "").strip()[:60] or None, "effort": eff, "ctx": ctx})
+    return out
+
+
+def _clean_picker(pk) -> dict | None:
+    """Claude 的 /model 选单（modelPicker）：[{model, label}]，replace=只显示这些。"""
+    if not isinstance(pk, dict):
+        return None
+    rows = []
+    for r in (pk.get("rows") or [])[:40]:
+        if isinstance(r, dict) and str(r.get("model") or "").strip():
+            rows.append({"model": modelcfg._check_model(str(r["model"]).strip()), "label": str(r.get("label") or "").strip()[:60] or None})
+    return {"rows": rows, "replace": bool(pk.get("replace"))} if rows else None
+
+
+def _clean_overrides(rows) -> list:
+    """Claude 的 modelOverrides：Anthropic 模型 ID → 实际发给供应商的模型名。"""
+    out, seen = [], set()
+    for r in (rows or [])[:40]:
+        if not isinstance(r, dict) or not str(r.get("from") or "").strip() or not str(r.get("to") or "").strip():
+            continue
+        a, b = modelcfg._check_model(str(r["from"]).strip()), modelcfg._check_model(str(r["to"]).strip())
+        if a in seen:
+            raise ValueError(f"modelOverrides 里 {a} 写了两次")
+        seen.add(a)
+        out.append({"from": a, "to": b})
+    return out
+
+
+def catalog_file(pid: str) -> Path:
+    return paths.CODEX_HOME / f"{CATALOG_PREFIX}{pid}.json"
+
+
+_EFF_DESC = {"none": "No reasoning", "minimal": "Minimal reasoning", "low": "Fast responses with lighter reasoning",
+             "medium": "Balances speed and reasoning depth", "high": "Greater reasoning depth for complex problems",
+             "xhigh": "Extra high reasoning depth for complex problems", "max": "Maximum reasoning depth", "ultra": "Ultra reasoning depth"}
+
+
+def catalog_json(p: dict) -> dict:
+    """生成 Codex 认的 model_catalog_json（openai/codex 0.162 的 ModelInfo 格式）。Codex 没有别名：
+    display_name 只是 /model 里显示的名字，请求里发的永远是 slug；元数据按 slug 最长前缀匹配。"""
+    models = []
+    for i, r in enumerate(p.get("catalog") or []):
+        eff = r.get("effort") or p.get("effort") or "medium"
+        levels = ["low", "medium", "high", "xhigh"]
+        if eff not in levels:
+            levels.append(eff)
+        m = {"slug": r["slug"], "display_name": r.get("name") or r["slug"], "description": r.get("name") or r["slug"],
+             "default_reasoning_level": eff,
+             "supported_reasoning_levels": [{"effort": e, "description": _EFF_DESC.get(e, e)} for e in levels],
+             "shell_type": "shell_command", "visibility": "list", "supported_in_api": True, "priority": 1000 + i,
+             "additional_speed_tiers": [], "service_tiers": [], "availability_nux": None, "upgrade": None,
+             "base_instructions": "You are Codex, a coding agent. You and the user share the same workspace and collaborate to achieve the user's goals.",
+             "default_reasoning_summary": "none", "supports_reasoning_summaries": True, "support_verbosity": False, "default_verbosity": None,
+             "apply_patch_tool_type": None, "truncation_policy": {"mode": "bytes", "limit": 10000},
+             "supports_parallel_tool_calls": False, "supports_image_detail_original": False, "supports_search_tool": False,
+             "experimental_supported_tools": [], "input_modalities": ["text", "image"], "effective_context_window_percent": 95}
+        if r.get("ctx"):
+            m["context_window"] = m["max_context_window"] = int(r["ctx"])
+        models.append(m)
+    return {"models": models}
+
+
+def write_catalog(p: dict) -> str | None:
+    """有目录行就写 CODEX_HOME/ccmsg-models-<id>.json（CC Msg 自己的文件，不碰 CC Switch 的），没有就删掉旧的。返回文件名。"""
+    f = catalog_file(p["id"])
+    if not p.get("catalog"):
+        if f.exists():
+            f.unlink()
+        return None
+    f.parent.mkdir(parents=True, exist_ok=True)
+    modelcfg.atomic_write(f, (json.dumps(catalog_json(p), ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+    return f.name
 
 
 def upsert(tool: str, prov: dict, secret: str | None = None) -> dict:
@@ -162,6 +270,8 @@ def upsert(tool: str, prov: dict, secret: str | None = None) -> dict:
     else:
         lst.append(c)
     save(d)
+    if tool == "codex":
+        write_catalog(c)
     return view_one(tool, c)
 
 
@@ -174,6 +284,8 @@ def delete(tool: str, pid: str, drop_key: bool = False) -> dict:
     if used:
         raise ValueError("这些项目还在用它，先取消项目覆盖：" + "、".join(used))
     d[tool].remove(p)
+    if tool == "codex" and catalog_file(pid).exists():
+        catalog_file(pid).unlink()
     if d["active"].get(tool) == pid:
         d["active"].pop(tool)
     save(d)
@@ -306,7 +418,31 @@ def _claude_values(p: dict, kn: str | None, scope: str) -> tuple[dict, dict]:
         env[var] = m.get(short) or blank
     if p.get("effort"):
         top["effortLevel"] = p["effort"]
+    ov = {r["from"]: r["to"] for r in p.get("overrides") or []}
+    if ov:
+        top["modelOverrides"] = ov
+    elif scope == "user":
+        top["modelOverrides"] = None
+    pk = p.get("picker")
+    if scope != "project":                       # modelPicker 只认用户层 / --settings（项目层会被 Claude Code 忽略）
+        if pk and pk.get("rows"):
+            top["modelPicker"] = {"options": [{"model": r["model"], **({"label": r["label"]} if r.get("label") else {})} for r in pk["rows"]],
+                                  **({"replaceBuiltInOptions": True} if pk.get("replace") else {})}
+        elif scope == "user":
+            top["modelPicker"] = None
     return env, top
+
+
+def _claude_owned(k: str) -> list:
+    out = []
+    for q in load()["claude"]:
+        try:
+            _, t = _claude_values(q, q.get("key") or "x", "user")
+        except Exception:
+            continue
+        if t.get(k) is not None:
+            out.append(t[k])
+    return out
 
 
 def _apply_claude_file(f: Path, p: dict, kn: str | None, scope: str, drop_plaintext: bool = False) -> dict:
@@ -317,6 +453,9 @@ def _apply_claude_file(f: Path, p: dict, kn: str | None, scope: str, drop_plaint
         raise PlaintextError(f"{f.name} 里有明文 key：" + "、".join(plain) + "。它会压过 CC Msg 设的 key，切换要把它拿掉（备份里还在）。确认后再切。",
                              [{"field": "env." + k, "masked": keystore.mask(cur_env[k])} for k in plain])
     env_set, top_set = _claude_values(p, kn, scope)
+    for k in ("modelPicker", "modelOverrides"):     # 只撤 CC Msg 自己写过的那份；你手写的 modelPicker / modelOverrides 不动
+        if k in top_set and top_set[k] is None and s.get(k) is not None and s.get(k) not in _claude_owned(k):
+            top_set.pop(k)
     bid = modelcfg.backup(f, f"switch-claude-{p['id']}")
     env = s.get("env") if isinstance(s.get("env"), dict) else None
     had_env = bool(env)
@@ -389,10 +528,25 @@ def _apply_codex_global(p: dict, kn: str | None, drop_plaintext: bool) -> dict:
             doc[k] = m[k]
     if p.get("effort"):
         doc["model_reasoning_effort"] = p["effort"]
-    if m.get("subagent"):
+    if m.get("subagent") or p.get("subagent_effort"):
         if "agents" not in doc:
             doc["agents"] = tk.table()
-        doc["agents"]["default_subagent_model"] = m["subagent"]
+        if m.get("subagent"):
+            doc["agents"]["default_subagent_model"] = m["subagent"]
+        if p.get("subagent_effort"):
+            doc["agents"]["default_subagent_reasoning_effort"] = p["subagent_effort"]
+    if m.get("mem_extract") or m.get("mem_consolidate"):
+        if "memories" not in doc:
+            doc["memories"] = tk.table()
+        if m.get("mem_extract"):
+            doc["memories"]["extract_model"] = m["mem_extract"]
+        if m.get("mem_consolidate"):
+            doc["memories"]["consolidation_model"] = m["mem_consolidate"]
+    cat = write_catalog(p)
+    if cat:
+        doc["model_catalog_json"] = cat            # 相对名：Codex 按 config.toml 所在目录解析
+    elif str(doc.get("model_catalog_json") or "").startswith(CATALOG_PREFIX):
+        del doc["model_catalog_json"]              # 只撤 CC Msg 自己写的；CC Switch 的目录不动
     out = tk.dumps(doc)
     import tomllib
     tomllib.loads(out)
@@ -462,6 +616,8 @@ def _clear_claude_project(f: Path) -> dict:
             s.pop("env")
     for k in ("apiKeyHelper",):
         s.pop(k, None)
+    if s.get("modelOverrides") is not None and s.get("modelOverrides") in _claude_owned("modelOverrides"):
+        s.pop("modelOverrides")
     modelcfg.atomic_write(f, (json.dumps(s, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
     return {"ok": True, "file": str(f), "backup": bid}
 
@@ -526,6 +682,15 @@ def codex_args(p: dict, kn: str | None) -> list[str]:
         a += ["-c", f"model_reasoning_effort={_toml_str(p['effort'])}"]
     if m.get("subagent"):
         a += ["-c", f"agents.default_subagent_model={_toml_str(m['subagent'])}"]
+    if p.get("subagent_effort"):
+        a += ["-c", f"agents.default_subagent_reasoning_effort={_toml_str(p['subagent_effort'])}"]
+    if m.get("mem_extract"):
+        a += ["-c", f"memories.extract_model={_toml_str(m['mem_extract'])}"]
+    if m.get("mem_consolidate"):
+        a += ["-c", f"memories.consolidation_model={_toml_str(m['mem_consolidate'])}"]
+    cat = write_catalog(p) if p.get("catalog") else None
+    if cat:
+        a += ["-c", f"model_catalog_json={_toml_str(str(catalog_file(p['id'])))}"]
     return a
 
 
@@ -544,7 +709,27 @@ def _newest(pat: str) -> str | None:
     return c[0] if c else None
 
 
+_EXE: dict = {}
+
+
+def _exe_cached(k, f, ttl=60):
+    v = _EXE.get(k)
+    if v and time.time() - v[0] < ttl and (v[1] is None or Path(v[1]).exists()):
+        return v[1]
+    r = f()
+    _EXE[k] = (time.time(), r)
+    return r
+
+
 def claude_exe() -> str | None:
+    return _exe_cached("claude", _claude_exe)
+
+
+def codex_exe() -> str | None:
+    return _exe_cached("codex", _codex_exe)
+
+
+def _claude_exe() -> str | None:
     p = os.environ.get("CLAUDE_CLI_PATH")
     if p and Path(p).exists():
         return p
@@ -561,7 +746,7 @@ def claude_exe() -> str | None:
     return None
 
 
-def codex_exe() -> str | None:
+def _codex_exe() -> str | None:
     p = os.environ.get("CODEX_CLI_PATH")
     if p and Path(p).exists():
         return p

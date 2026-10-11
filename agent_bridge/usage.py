@@ -587,12 +587,17 @@ def _ping(url: str) -> bool:
         return getattr(e, "code", 0) in (401, 403, 404)
 
 
+def _port_running(port):
+    from .modelcfg import port_running        # 共用后台测端口 + 30 秒缓存（Windows 上同步测一个关着的端口要 ~1 秒）
+    return port_running(port)
+
+
 def proxies() -> list[dict]:
     """检测 opencodex / magpie 本地代理（只看端口通不通；不读它们的令牌文件）。"""
     ocx_port = (_read_json(Path.home() / ".opencodex" / "config.json").get("port")) or 10100
     out = []
     for name, port, cfg in (("opencodex", int(ocx_port), Path.home() / ".opencodex"), ("magpie", 3425, None)):
-        out.append({"name": name, "port": port, "configured": bool(cfg and cfg.exists()), "running": _ping(f"http://127.0.0.1:{port}/")})
+        out.append({"name": name, "port": port, "configured": bool(cfg and cfg.exists()), "running": _port_running(port)})
     return out
 
 
