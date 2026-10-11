@@ -4943,7 +4943,9 @@ function mcClaude(){
     const r = await api("/api/modelcfg/test", {tool: "claude", base_url: f.ANTHROPIC_BASE_URL, key: f._key, model: f.ANTHROPIC_DEFAULT_HAIKU_MODEL || "claude-haiku-4-5", use_settings_key: !f._key}).catch(e => ({ok: false, error: e.message}));
     tb.disabled = false; $("#mcTestOut").innerHTML = mcTestHtml(r); };
 }
-function mcTestHtml(r){ return r.ok ? `<div class="miss" style="border-color:var(--ok);background:var(--ok-weak)">连通：HTTP ${r.status}，${r.ms} ms（${esc(r.url)}）</div>` : `<div class="miss">${r.status ? "HTTP " + r.status + "：" : ""}${esc(r.error || r.detail || "失败")}</div>`; }
+function mcTestHtml(r){
+  if (r.ok) return `<div class="miss" style="border-color:var(--ok);background:var(--ok-weak)">连通：HTTP ${r.status}，${r.ms} ms${r.note ? "；" + esc(r.note) : ""}<div class="dim" style="font-size:11.5px">${esc(r.url || "")}</div></div>`;
+  return `<div class="miss"><b>${r.status ? "HTTP " + r.status : "没连上"}</b>${r.reason ? " · " + esc(r.reason) : ""}${r.detail ? `<div style="font-size:12px">${esc(r.detail)}</div>` : ""}${r.hint ? `<div style="font-size:12px"><b>建议：</b>${esc(r.hint)}</div>` : ""}${r.url ? `<div class="dim" style="font-size:11.5px">${esc(r.url)}${r.ms != null ? "，" + r.ms + " ms" : ""}</div>` : ""}${!r.status && !r.reason && r.error ? esc(r.error) : ""}</div>`; }
 function mcCodex(){
   const st = MC.d.codex.user, v = st.values;
   const ef = ["", "minimal", "low", "medium", "high", "xhigh"];

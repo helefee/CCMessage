@@ -15,6 +15,7 @@ import re
 import shutil
 import sqlite3
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -471,32 +472,131 @@ def migrate(tool: str, field: str, key_name: str) -> dict:
 
 # ---------------- 测试连接 ----------------
 
+def _ua() -> str:
+    from . import __version__
+    return f"CCMsg/{__version__}"
+
+
+def _http(method: str, url: str, headers: dict, body: dict | None = None, timeout: float = 20) -> tuple[int | None, str]:
+    """返回 (状态码, 正文前一段)；连不上时状态码是 None、正文是错误说明。
+    一定带 User-Agent：Python 默认的 "Python-urllib/x.y" 会被不少中转站前面的 Cloudflare 直接拦（403 / error code: 1010）。"""
+    h = {"user-agent": _ua(), "accept": "application/json", **headers}
+    if body is not None:
+        h["content-type"] = "application/json"
+    req = urllib.request.Request(url, data=json.dumps(body).encode() if body is not None else None, headers=h, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, r.read(200000).decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        try:
+            txt = e.read(4000).decode("utf-8", "replace")
+        except Exception:
+            txt = ""
+        return e.code, txt
+    except Exception as e:
+        r = getattr(e, "reason", None) or e
+        return None, f"{type(r).__name__}: {r}"
+
+
+def _short(txt: str) -> str:
+    """错误正文里最有用的一句（JSON 的 error.message / message，否则第一行）。"""
+    try:
+        j = json.loads(txt)
+        e = j.get("error") if isinstance(j, dict) else None
+        m = (e.get("message") if isinstance(e, dict) else e) or (j.get("message") if isinstance(j, dict) else None) or (j.get("detail") if isinstance(j, dict) else None)
+        if m:
+            return str(m)[:200]
+    except (ValueError, AttributeError):
+        pass
+    if "<html" in txt.lower():
+        t = re.search(r"<title>(.*?)</title>", txt, re.I | re.S)
+        return ("网页：" + t.group(1).strip()[:120]) if t else "返回的是网页，不是 API"
+    return " ".join(txt.split())[:200]
+
+
+def _reason(st: int | None, txt: str, tool: str, base: str, model: str | None) -> str:
+    low = (txt or "").lower()
+    if st is None:
+        if "certificate" in low or "ssl" in low:
+            return "SSL 证书校验失败（公司代理 / 抓包软件？）"
+        if "timed out" in low or "timeout" in low:
+            return "超时：地址连不上或太慢"
+        if "getaddrinfo" in low or "name or service" in low or "nodename" in low:
+            return "域名解析失败：地址写错了，或者没联网"
+        if "refused" in low:
+            return "连接被拒绝：端口上没有服务（本地代理没开？）"
+        return "连不上"
+    if re.search(r"error code: 10(10|12|20)", low) or ("cloudflare" in low and st in (403, 503)):
+        return "被中转站前面的 Cloudflare 拦了（不是 key 的问题）"
+    if st == 401:
+        return "key 不对或已失效"
+    if st == 403:
+        return "没有权限：key 不对、额度用完，或这个 key 不能用这个模型"
+    if st == 404:
+        if tool == "codex" and not base.rstrip("/").endswith("/v1"):
+            return "地址不对：OpenAI 兼容地址一般以 /v1 结尾"
+        if tool == "claude" and base.rstrip("/").endswith("/v1"):
+            return "地址多了 /v1：Claude 的 Base URL 不带 /v1（会自动加 /v1/messages）"
+        return "地址不对（404）"
+    if st in (400, 422) and model and ("model" in low):
+        return f"模型 {model} 不可用"
+    if st == 429:
+        return "被限流或额度用完"
+    if st >= 500:
+        return "中转站 / 服务端出错"
+    if 200 <= st < 300:
+        return ""
+    return f"HTTP {st}"
+
+
 def test_connection(tool: str, base_url: str | None, key_name: str | None, model: str | None, use_settings_key: bool = False) -> dict:
-    """发一个最小请求，只回状态码 / 耗时 / 简短错误（会把 key 从错误文本里抹掉）。"""
+    """发一个最小请求，只回状态码 / 耗时 / 简短原因（会把 key 从错误文本里抹掉）。
+    Codex：GET <base>/models（不花钱），再看模型在不在列表里；Claude：POST <base>/v1/messages，max_tokens=1。"""
     key = keystore.get(key_name) if key_name else None
     if not key and use_settings_key and tool == "claude":
         env = (_read_json(claude_file("user", None)).get("env") or {})
         key = env.get("ANTHROPIC_AUTH_TOKEN") or env.get("ANTHROPIC_API_KEY")
     if not key:
-        return {"ok": False, "error": "没有可用的 key（官方登录用 OAuth / ChatGPT 登录，CC Msg 测不了；在 Claude 里 /status、Codex 里 /status 看）"}
+        missing = key_name and not keystore.get(key_name)
+        return {"ok": False, "status": None, "reason": f"凭据管理器里没有 {key_name}（重新保存一次 key）" if missing else "没有可用的 key（官方登录用 OAuth / ChatGPT 登录，CC Msg 测不了；在 Claude 里 /status、Codex 里 /status 看）"}
     t0 = time.time()
+    note = hint = ""
     if tool == "claude":
         base = (base_url or "https://api.anthropic.com").rstrip("/")
-        body = json.dumps({"model": model or "claude-haiku-4-5", "max_tokens": 1, "messages": [{"role": "user", "content": "ping"}]}).encode()
-        req = urllib.request.Request(base + "/v1/messages", body, {"content-type": "application/json", "x-api-key": key,
-                                                                  "authorization": "Bearer " + key, "anthropic-version": "2023-06-01"})
+        url = base + "/v1/messages"
+        st, txt = _http("POST", url, {"x-api-key": key, "authorization": "Bearer " + key, "anthropic-version": "2023-06-01"},
+                        {"model": model or "claude-haiku-4-5", "max_tokens": 1, "messages": [{"role": "user", "content": "ping"}]})
+        if st == 404 and base.endswith("/v1"):
+            s2, _ = _http("POST", base[:-3] + "/v1/messages", {"x-api-key": key, "authorization": "Bearer " + key, "anthropic-version": "2023-06-01"},
+                          {"model": model or "claude-haiku-4-5", "max_tokens": 1, "messages": [{"role": "user", "content": "ping"}]})
+            if s2 and s2 != 404:
+                hint = f"去掉末尾的 /v1（{base[:-3]}）就能连上"
     else:
         base = (base_url or "https://api.openai.com/v1").rstrip("/")
-        req = urllib.request.Request(base + "/models", headers={"authorization": "Bearer " + key})
-    try:
-        with urllib.request.urlopen(req, timeout=20) as r:
-            st, txt = r.status, r.read(400).decode("utf-8", "replace")
-    except urllib.error.HTTPError as e:
-        st, txt = e.code, e.read(400).decode("utf-8", "replace")
-    except Exception as e:
-        st, txt = None, f"{type(e).__name__}: {e}"
-    txt = txt.replace(key, "***")
-    return {"ok": bool(st and 200 <= st < 300), "status": st, "ms": int((time.time() - t0) * 1000), "detail": txt[:300], "url": base}
+        url = base + "/models"
+        st, txt = _http("GET", url, {"authorization": "Bearer " + key})
+        if st == 404 and not base.endswith("/v1"):
+            s2, _ = _http("GET", base + "/v1/models", {"authorization": "Bearer " + key})
+            if s2 and 200 <= s2 < 300:
+                hint = f"Base URL 少了 /v1：改成 {base}/v1 就能连上"
+        if st and 200 <= st < 300 and model:
+            try:
+                ids = [str(m.get("id")) for m in (json.loads(txt).get("data") or []) if isinstance(m, dict)]
+            except (ValueError, AttributeError):
+                ids = []
+            if ids and model not in ids:
+                ms = int((time.time() - t0) * 1000)
+                return {"ok": False, "status": st, "ms": ms, "url": url, "reason": f"连上了，但模型 {model} 不在这个中转的模型列表里",
+                        "detail": "它有：" + "、".join(ids[:12]) + ("…" if len(ids) > 12 else "")}
+            note = (f"模型 {model} 在列表里" if ids else "") + (f"（共 {len(ids)} 个模型）" if ids else "")
+    txt = (txt or "").replace(key, "***")
+    ok = bool(st and 200 <= st < 300)
+    out = {"ok": ok, "status": st, "ms": int((time.time() - t0) * 1000), "url": url}
+    if ok:
+        out["note"] = note
+    else:
+        out.update(reason=_reason(st, txt, tool, base, model), detail=_short(txt), hint=hint)
+    return out
 
 
 # ---------------- 汇总给页面 ----------------

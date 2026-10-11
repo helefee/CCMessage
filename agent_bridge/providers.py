@@ -728,6 +728,6 @@ def ccswitch_import(ids: list[str]) -> dict:
 def test(tool: str, pid: str) -> dict:
     p = get(tool, pid)
     if p["mode"] != "key":
-        return {"ok": False, "error": "官方登录用 OAuth / ChatGPT 登录，CC Msg 测不了"}
+        return {"ok": False, "status": None, "reason": "官方登录用 OAuth / ChatGPT 登录，CC Msg 测不了（在 Claude / Codex 里 /status 看）"}
     m = p.get("models") or {}
     return modelcfg.test_connection(tool, p["base_url"], p.get("key"), m.get("model") if tool == "codex" else (m.get("haiku") or m.get("model")))
