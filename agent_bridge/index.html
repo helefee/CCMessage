@@ -6,6 +6,7 @@
 <script>/* 主题：先按记下的值设好，免得先白后黑闪一下；没记 / 记的是 system = 跟随系统 */
 try { var t = localStorage.getItem("msgbus.theme"); if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t); } catch (e) {}</script>
 <title>会话消息总线</title>
+<link rel="icon" href="/icon.png">
 <style>
 :root{
   --bg:#f4f5f7;--panel:#fff;--panel2:#fafbfc;--line:#e2e5e9;--line2:#eef0f3;--text:#1c2127;--muted:#6a737d;--faint:#9aa3ad;
@@ -204,6 +205,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .step{padding:2px 0}
 .step.ok{color:var(--ok)}.step.bad{color:var(--bad)}
 body.phone .admin{display:none!important}
+body.nofx .needfx, body.nocdesk .needcdesk{display:none!important}
+body:not(.inapp) #mBrowser{display:none!important}
+body:not(.nofx) .onlynofx{display:none}
 /* 只有一个模式（原来的简洁 / 完整合并了）：功能都在，次要信息做小、折叠，或放进悬停提示 */
 .srow .sub{font-size:11px}
 .card h3{margin-bottom:4px}
@@ -389,6 +393,9 @@ code{background:var(--hover);border-radius:6px}
 .seg{border:0;border-radius:999px;background:var(--hover);padding:2px}
 .seg button{border-radius:999px;background:transparent;padding:3px 12px}
 .seg button.on{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+/* 深色下 --panel 比分段底色还暗，选中的那格看不出来：换成亮一点的 */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button.on{background:#3a3a3a;box-shadow:none}}
+:root[data-theme="dark"] .seg button.on{background:#3a3a3a;box-shadow:none}
 .cin{max-width:860px;margin:0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:26px;padding:6px 6px 6px 16px;
   box-shadow:var(--shadow);align-items:flex-end}
 .cin textarea{border:0;background:transparent;padding:8px 0;min-height:24px}
@@ -1016,14 +1023,15 @@ body.lg-bottom .sfoot{display:flex;position:sticky;bottom:0;margin-top:auto;z-in
           <button id="mPhone" class="admin"><i data-ic="phone"></i>手机端（扫码）…</button>
           <button id="mAdd" class="admin"><i data-ic="plus"></i>添加项目…</button>
           <button id="mSM" class="admin"><i data-ic="listx"></i>会话管理（搜索 / 归档 / 删除 / 还原）…</button>
-          <button id="mCSync" class="admin"><i data-ic="sync"></i>同步 Claude 会话到当前账号…</button>
+          <button id="mCSync" class="admin needcdesk" title="这台电脑上没装 Claude 桌面端时不显示"><i data-ic="sync"></i>同步 Claude 会话到当前账号…</button>
           <button id="mXSync" class="admin"><i data-ic="download"></i>把 Codex 对话同步进 Claude…</button>
           <button id="mInst" class="admin"><i data-ic="wrench"></i>安装 / 升级 / 修复</button>
           <button id="mTest" class="admin"><i data-ic="activity"></i>自检</button>
           <button id="mRm" class="admin"><i data-ic="listx"></i>从列表移除</button>
           <button id="mUninst" class="danger admin"><i data-ic="trash"></i>卸载…</button>
           <hr class="admin" style="border:0;border-top:1px solid var(--line);margin:4px 0">
-          <button id="mFxTest" class="admin"><i data-ic="play"></i>试放桌面信件动画</button>
+          <button id="mFxTest" class="admin needfx"><i data-ic="play"></i>试放桌面信件动画</button>
+          <button id="mBrowser"><i data-ic="external"></i>在浏览器中打开</button>
           <button id="mSet"><i data-ic="gear"></i>设置…</button>
         </div>
       </div>
@@ -1105,6 +1113,7 @@ const ICON = {
   trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
   mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
   play: '<path d="M6 3l14 9-14 9z"/>',
+  external: '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   term: '<path d="m4 17 6-6-6-6"/><path d="M12 19h8"/>',
   file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
   pencil: '<path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/>',
@@ -1174,6 +1183,7 @@ function stateOf(p){
   if (p.exists === false) return ["bad","目录不存在"];
   if (!p.bus_dir) return ["", "未安装"];
   if (!p.installed) return ["warn","钩子不全"];
+  if (p.hook_py_missing) return ["warn","总线可修复"];
   if ((p.codex_trusted||[]).length < (p.codex_total||3)) return ["warn","待信任 Codex 钩子"];
   if (p.bus_outdated) return ["warn","可升级"];
   return ["ok","就绪"];
@@ -1220,7 +1230,8 @@ function renderSettings(){
     <div class="setrow"><div class="sl">${ic("contrast")}<div><b>主题</b><div class="sd">只影响这台设备</div></div></div>${segHtml("themeSeg", [["light", "浅色"], ["dark", "深色"], ["system", "跟随系统"]], themeMode())}</div>
     <div class="setrow"><div class="sl">${ic("activity")}<div><b>状态说明位置</b><div class="sd">待命 / 活跃 / 空闲 和各有几个会话</div></div></div>${segHtml("legSeg", LEGEND_POS, legendPos())}</div>
     <div class="setrow"><div class="sl">${ic("sparkles")}<div><b>网页信件动画</b><div class="sd">新消息时网页里飞一封信（只影响这台设备）</div></div></div>${segHtml("webFxSeg", [["1", "开"], ["0", "关"]], webFx ? "1" : "0")}</div>
-    <div class="setrow admin"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">Windows 桌面上窗口之间飞（电脑上全局）</div></div></div>${segHtml("fxSeg", [["1", "开"], ["0", "关"]], fxOn ? "1" : "0")}</div>`;
+    <div class="setrow admin needfx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">Windows 桌面上窗口之间飞（电脑上全局）</div></div></div>${segHtml("fxSeg", [["1", "开"], ["0", "关"]], fxOn ? "1" : "0")}</div>
+    <div class="setrow admin onlynofx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">只有 Windows 上有；这台电脑上不放（网页信件动画照常）</div></div></div></div>`;
   $$("#themeSeg button").forEach(b => b.onclick = () => setTheme(b.dataset.v));
   $$("#legSeg button").forEach(b => b.onclick = () => { store.set("msgbus.legend", b.dataset.v); applyLegendPos(); renderSettings(); });
   $$("#webFxSeg button").forEach(b => b.onclick = () => setWebFx(b.dataset.v === "1"));
@@ -1237,10 +1248,11 @@ function renderTop(){
   const ch=(p.claude_hooks||[]).length, cx=(p.codex_hooks||[]).length, tr=(p.codex_trusted||[]).length;
   const pill=(cls,t,tip)=>`<span class="pill ${cls}" title="${esc(tip||"")}">${t}</span>`;
   $("#pills").innerHTML =
-    pill(p.bus_dir ? (p.bus_outdated?"warn":"ok") : "bad", p.bus_dir ? (p.bus_outdated?"总线可升级":"总线") : "未安装", p.bus_dir ? `${p.root}\\${p.bus_dir}\\bus.py` : "") +
+    pill(p.bus_dir ? (p.bus_outdated?"warn":"ok") : "bad", p.bus_dir ? (p.hook_py_missing?"总线可修复":p.bus_outdated?"总线可升级":"总线") : "未安装", p.bus_dir ? `${p.root}\\${p.bus_dir}\\bus.py` + ((p.hook_py||[]).length ? `\n钩子用的 Python：${p.hook_py.join("、")}` : "") : "") +
     pill(ch===CT?"ok":ch?"warn":"bad", `Claude 钩子 ${ch}/${CT}`, (p.claude_files||[]).join("、")) +
     pill(cx===XT?"ok":cx?"warn":"bad", `Codex 钩子 ${cx}/${XT}`, ".codex/hooks.json") +
     pill(tr===XT?"ok":"warn", `Codex 信任 ${tr}/${XT}`, "在 Codex 的 /hooks 里设为信任") +
+    (p.hook_py_missing ? pill("bad", "钩子的 Python 不在了", "钩子里写的这个 Python 已经不在了：" + (p.hook_py_gone||[]).join("、")) : "") +
     (p.error?pill("bad","配置出错",p.error):"");
   const sc = {ok:"var(--ok)", warn:"var(--warn)", bad:"var(--bad)", "":"var(--faint)"}[stateOf(p)[0]];
   $("#stDot").style.setProperty("--sd", sc); renderLegend();
@@ -1250,7 +1262,8 @@ function renderTop(){
   let tip = "";
   if (!p.bus_dir) tip = "这个项目还没装总线：点 ⋯ →「安装 / 升级 / 修复」。";
   else if (!p.installed || p.bus_outdated) tip = "总线要升级或修复：点 ⋯ →「安装 / 升级 / 修复」。";
-  if (p.bus_dir && ch>0 && ch<CT) tip = "Claude 钩子不全：缺闲时待命的 Stop 钩子时，闲着的 Claude 会话收不到消息。点「升级 / 修复」补上。";
+  if (p.hook_py_missing) tip = "总线可修复：钩子里写的 Python（" + (p.hook_py_gone||[]).join("、") + "）已经不在了（多半是桌面版文件夹挪了），钩子跑不起来。点「升级 / 修复」换成现在能用的；Codex 改了钩子后要在 /hooks 里重新信任。";
+  else if (p.bus_dir && ch>0 && ch<CT) tip = "Claude 钩子不全：缺闲时待命的 Stop 钩子时，闲着的 Claude 会话收不到消息。点「升级 / 修复」补上。";
   else if (cx===XT && tr<XT) tip = "还差一步：在 Codex 里打开这个项目，进钩子管理（/hooks）把 msgbus 钩子设为信任。没信任时 Codex 仍能被叫醒、用 inbox 收消息。";
   $("#banner").style.display = tip ? "" : "none"; $("#banner").textContent = tip;
   $("#compose").style.display = p.bus_dir ? "" : "none";
@@ -1338,6 +1351,10 @@ sysDark.addEventListener("change", renderThemeUi);       // 跟随系统时 CSS 
 renderThemeUi();
 let fxOn = true;
 async function loadFx(){ try { fxOn = (await api("/api/settings")).fx; } catch(e) {} if (typeof renderSettings === "function") renderSettings(); }
+// 桌面版窗口（pywebview）里：⋯ 多一个「在浏览器中打开」（同一个地址，浏览器里照样能用）
+function markInApp(){ if (window.pywebview && window.pywebview.api && window.pywebview.api.open_browser) document.body.classList.add("inapp"); }
+window.addEventListener("pywebviewready", markInApp); markInApp();
+$("#mBrowser").onclick = () => { try { window.pywebview.api.open_browser(location.pathname + location.search + location.hash); } catch(e) { toast("❌ " + e.message); } };
 $("#mFxTest").onclick = async () => { await api("/api/fx/test", {dir:"c2x", kind:"task"}); setTimeout(() => api("/api/fx/test", {dir:"x2c", kind:"result"}), 300);
   const c = sessList.find(s => s.agent === "claude"), x = sessList.find(s => s.agent === "codex");
   if (c && x) { flyMail({from:{agent:"claude", sid:c.sid}, to_keys:["codex-" + x.sid], kind:"task"});
@@ -1348,7 +1365,12 @@ loadFx();
 // ---------- 手机端 ----------
 let isLocal = true, pairTimer = null;
 async function loadMe(){
-  try { const me = await api("/api/me"); isLocal = me.local; } catch(e) {}
+  try {
+    const me = await api("/api/me"); isLocal = me.local;
+    // 能力：桌面信件动画只有 Windows 有；没装 Claude 桌面端（比如 Linux 上只用命令行）就不显示「同步 Claude 会话」
+    document.body.classList.toggle("nofx", me.fx === false);
+    document.body.classList.toggle("nocdesk", me.claude_desktop === false);
+  } catch(e) {}
   document.body.classList.toggle("phone", !isLocal);
   $("#phoneTag").style.display = isLocal ? "none" : "";
 }

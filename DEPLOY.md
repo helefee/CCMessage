@@ -57,6 +57,8 @@
 
     python -m agent_bridge            # Windows 也可以双击 start.cmd；macOS / Linux 用 ./start.sh
 
+不想装 Python：用桌面版 `AgentBridge.exe`（见 README「Windows 桌面版」），效果一样，只是开在独立窗口里。
+
 浏览器会自动打开 http://127.0.0.1:8765/ 。只听本机，别人访问不到。
 
 - 换端口：`python -m agent_bridge --port 9000`
