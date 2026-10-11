@@ -185,6 +185,12 @@ def norm_root(path: str) -> Path:
 
 # ---------- 项目登记 ----------
 
+def proj_root(path: str) -> Path:
+    """已登记的项目目录（文件查看、git 改动、PR 列表只认这些）；不是的话报 Denied（403）。"""
+    from . import files
+    return files.check_root(norm_root(path), [r.get("root") for r in load_registry()])
+
+
 def load_registry() -> list[dict]:
     return read_json(REGISTRY, [])
 
@@ -730,6 +736,52 @@ def session_roles(root: Path) -> dict:
     return out
 
 
+# ---------- 连线（Claude 会话 ↔ Codex 会话，谁给谁派活） ----------
+# 总线读的是项目总线目录里的 links.json；~/.agent-bridge/links.json 存一份（按项目），总线目录丢了 / 重装能补回来
+LINKS_MIRROR = DATA / "links.json"
+
+
+def links_get(root: Path) -> list[dict]:
+    bus_rel = find_bus_dir(root)
+    if not bus_rel:
+        return []
+    p = root / bus_rel / "links.json"
+    mirror = read_json(LINKS_MIRROR, {})
+    if not p.exists() and mirror.get(str(root)):
+        write_json(p, {"links": mirror[str(root)]})          # 总线目录里的丢了：从备份补回来
+    rows = read_json(p, {}).get("links", [])
+    return [x for x in rows if isinstance(x, dict) and x.get("claude") and x.get("codex")
+            and x.get("dir") in ("c2x", "x2c", "both")]
+
+
+def links_set(root: Path, args: list[str]) -> dict:
+    r = run_bus(root, args + ["--json"])
+    out = (r.stdout + r.stderr).decode("utf-8", "replace").strip()
+    if r.returncode != 0:
+        raise ValueError(out[-400:] or "连线失败")
+    links = json.loads(out.splitlines()[-1]).get("links", [])
+    mirror = read_json(LINKS_MIRROR, {})
+    mirror[str(root)] = links
+    write_json(LINKS_MIRROR, mirror)
+    return {"ok": True, "links": links}
+
+
+def links_restore(root: Path, links: list) -> dict:
+    """撤回：把连线整个改回之前那一份（只认格式对的条目）。"""
+    bus_rel = find_bus_dir(root)
+    if not bus_rel:
+        raise ValueError("这个项目还没装总线")
+    ok = re.compile(r"[0-9A-Za-z_-]{4,80}")
+    rows = [{"claude": x["claude"], "codex": x["codex"], "dir": x["dir"], "at": float(x.get("at") or time.time())}
+            for x in links if isinstance(x, dict) and ok.fullmatch(str(x.get("claude") or "")) and ok.fullmatch(str(x.get("codex") or ""))
+            and x.get("dir") in ("c2x", "x2c", "both")]
+    write_json(root / bus_rel / "links.json", {"links": rows})
+    mirror = read_json(LINKS_MIRROR, {})
+    mirror[str(root)] = rows
+    write_json(LINKS_MIRROR, mirror)
+    return {"ok": True, "links": rows}
+
+
 def sessions(root: Path) -> list[dict]:
     r = run_bus(root, ["who", "--json"])
     try:
@@ -738,7 +790,17 @@ def sessions(root: Path) -> list[dict]:
         return []
     now = time.time()
     roles = session_roles(root)
+    links = links_get(root)
     for x in rows:
+        # 连了线的：只给 Claude 派 = 主、只接活 = 辅（替代自动判断；用户手动设的仍然优先）
+        mine = []
+        for l in links:
+            if x.get("agent") == "claude" and l["claude"] == x.get("sid"):
+                mine.append({"peer": "codex:" + l["codex"], "out": l["dir"] in ("c2x", "both"), "in": l["dir"] in ("x2c", "both"), "dir": l["dir"]})
+            elif x.get("agent") == "codex" and l["codex"] == x.get("sid"):
+                mine.append({"peer": "claude:" + l["claude"], "out": l["dir"] in ("x2c", "both"), "in": l["dir"] in ("c2x", "both"), "dir": l["dir"]})
+        if mine:
+            x["links"] = mine
         x["listening"] = now - x.get("listening", 0) <= 150
         # 会话记录 90 秒内有写入 = 正在干活（比「待命」标记可靠：老版本的待命进程干活时不退）
         try:
@@ -746,6 +808,10 @@ def sessions(root: Path) -> list[dict]:
         except OSError:
             x["busy"] = False
         x.update(roles.get(f"{x.get('agent')}-{x.get('sid')}", {}))
+        if x.get("links"):
+            o, i = any(m["out"] for m in x["links"]), any(m["in"] for m in x["links"])
+            if o != i:
+                x["role"], x["role_note"] = ("main", "连线：给别的会话派活") if o else ("aux", "连线：接别的会话派的活")
         if not x.get("role") and x.get("owner_name"):        # 被认领的 Codex 对话：没活时也算辅
             x["role"], x["role_note"] = "aux", "归 " + str(x["owner_name"]).rsplit(" [", 1)[0] + " 用"
         if x.get("role_set") in ("main", "aux"):            # 用户手动设的优先
@@ -756,7 +822,7 @@ def sessions(root: Path) -> list[dict]:
             x["role_manual"] = True
     return [{k: v for k, v in x.items() if k in ("agent", "sid", "short", "name", "title", "alias", "age", "originator",
                                                   "listening", "owner_name", "managed", "role", "role_note",
-                                                  "role_manual", "role_set", "ignore")}
+                                                  "role_manual", "role_set", "ignore", "links")}
             for x in rows if x.get("agent") != "user"]
 
 
@@ -1037,11 +1103,13 @@ _dev_lock = threading.Lock()
 LAN = {"srv": None, "ip": None, "port": None, "bind": None, "bind_port": None}
 PORT = {"n": 8765}
 # 手机（局域网）能用的地址；其余只认本机
-PHONE_GET = {"/", "/bloub-icons.json", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions",
+PHONE_GET = {"/", "/bloub-icons.json", "/api/ping", "/api/me", "/api/projects", "/api/status", "/api/messages", "/api/sessions", "/api/links",
              "/api/settings", "/api/codex", "/api/tasks", "/api/transcript", "/api/layout",
              "/api/transcript/subtasks", "/api/transcript/subtask", "/api/transcript/subtask-list",
-             "/api/gh/ref", "/api/gh/pr", "/api/gh/diff", "/api/gh/prs", "/api/git/changes"}
-PHONE_POST = {"/api/send", "/api/reply", "/api/export", "/api/role", "/api/codex/resume", "/api/review"}
+             "/api/gh/ref", "/api/gh/pr", "/api/gh/diff", "/api/gh/prs", "/api/git/changes",
+             "/api/files/ls", "/api/files/find", "/api/files/read", "/api/files/diff", "/api/files/refs", "/api/files/log",
+             "/api/files/blame"}
+PHONE_POST = {"/api/link", "/api/unlink", "/api/links/restore", "/api/recall", "/api/send", "/api/reply", "/api/export", "/api/role", "/api/codex/resume", "/api/review"}
 
 
 # ---------- 会话管理器 / 同步与还原（只认电脑本机） ----------
@@ -1260,6 +1328,8 @@ class Handler(BaseHTTPRequestHandler):
     def _err(self, e, code=400):
         if isinstance(e, _GONE):
             return  # 连接已断，回不了错误包
+        if type(e).__name__ == "Denied":      # files.Denied：越出项目目录 / 不是已登记的项目
+            code = 403
         self._json({"error": str(e)}, code)
 
     def _html(self, html: str, code=200, headers=()):
@@ -1405,6 +1475,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(project_status(norm_root(q["root"])))
             elif u.path == "/api/messages":
                 self._json(read_messages(norm_root(q["root"]), int(q.get("since", -1))))
+            elif u.path == "/api/links":
+                self._json(links_get(norm_root(q["root"])))
             elif u.path == "/api/sessions":
                 self._json(sessions(norm_root(q["root"])))
             elif u.path == "/api/settings":
@@ -1426,10 +1498,29 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(gh.pr_diff(q.get("ref", "")))
             elif u.path == "/api/gh/prs":
                 from . import gh
-                self._json(gh.pr_list(norm_root(q["root"]), q.get("state") or "all"))
+                self._json(gh.pr_list(proj_root(q["root"]), q.get("state") or "all"))
             elif u.path == "/api/git/changes":
                 from . import gh
-                self._json(gh.local_changes(norm_root(q["root"]), q.get("base") or "HEAD"))
+                self._json(gh.local_changes(proj_root(q["root"]), q.get("base") or "HEAD"))
+            elif u.path.startswith("/api/files/"):
+                from . import files
+                root, op = proj_root(q["root"]), u.path.rsplit("/", 1)[1]
+                if op == "ls":
+                    self._json(files.ls(root, q.get("dir") or ""))
+                elif op == "find":
+                    self._json(files.find(root, q.get("q") or ""))
+                elif op == "read":
+                    self._json(dict(files.read(root, q.get("path") or "", q.get("ref") or None), vscode=files.has_vscode() and self._local()))
+                elif op == "diff":
+                    self._json(files.diff(root, q.get("path") or "", q.get("a") or "HEAD", q.get("b") or "WORKTREE"))
+                elif op == "refs":
+                    self._json(files.refs(root, q.get("path") or None))
+                elif op == "log":
+                    self._json(files.log(root, q.get("path") or ""))
+                elif op == "blame":
+                    self._json(files.blame(root, q.get("path") or ""))
+                else:
+                    self._err("没有这个地址", 404)
             elif u.path == "/api/tasks":
                 r = run_bus(norm_root(q["root"]), ["tasks", "--json"])
                 rows = json.loads(r.stdout.decode("utf-8") or "[]")
@@ -1469,16 +1560,40 @@ class Handler(BaseHTTPRequestHandler):
                 if r.returncode != 0:
                     raise ValueError(out or "设置失败")
                 self._json({"ok": True, "output": out})
+            elif path == "/api/links/restore":
+                self._json(links_restore(norm_root(body["root"]), body.get("links") or []))
+            elif path == "/api/recall":
+                tid = str(body.get("id") or "")
+                if not re.fullmatch(r"[0-9a-f]{6,12}", tid):
+                    raise ValueError("任务号不对")
+                who = "phone" if getattr(self, "device", None) else "ui"
+                r = run_bus(norm_root(body["root"]), ["--as", f"user:{who}", "recall", tid])
+                out = (r.stdout + r.stderr).decode("utf-8", "replace").strip()
+                self._json({"ok": r.returncode == 0, "output": out.lstrip("✓✗ ")})
+            elif path in ("/api/link", "/api/unlink"):
+                c, x = str(body.get("claude") or ""), str(body.get("codex") or "")
+                if not all(re.fullmatch(r"[0-9A-Za-z_-]{4,80}", v) for v in (c, x) if v) or not (c or x):
+                    raise ValueError("会话不对")
+                args = [path.rsplit("/", 1)[1]] + ([f"claude:{c}"] if c else []) + ([f"codex:{x}"] if x else [])
+                if path == "/api/link":
+                    if not (c and x):
+                        raise ValueError("连线要一个 Claude 会话和一个 Codex 会话")
+                    args += ["--dir", body.get("dir") if body.get("dir") in ("c2x", "x2c", "both") else "c2x"]
+                self._json(links_set(norm_root(body["root"]), args))
+            elif path == "/api/files/open":
+                # 在 VS Code / 资源管理器里打开（只在电脑本机；手机端不在 PHONE_POST 里）
+                from . import files
+                self._json(files.open_external(proj_root(body["root"]), body.get("path") or "", body.get("how") or "", body.get("line")))
             elif path == "/api/review":
                 # 代码审查：把「请审查 PR / 本地改动」作为用户本人的一句话发给选中的会话（只发消息，不碰 git / GitHub）
                 from . import gh
                 if body.get("agent") not in ("claude", "codex", "cursor") or not body.get("sid"):
                     raise ValueError("先选一个会话")
-                root = norm_root(body["root"])
+                root = proj_root(body["root"])
                 ref = (body.get("ref") or "").strip()
                 if ref and not gh.parse_ref(ref):
                     raise ValueError("PR 引用不对")
-                local = None if ref else gh.local_changes(norm_root(body.get("src") or body["root"]), body.get("base") or "HEAD")
+                local = None if ref else gh.local_changes(root, body.get("base") or "HEAD")
                 if local is not None and not local.get("ok"):
                     raise ValueError(local.get("error") or "读不到本地改动")
                 if local is not None and not local.get("files") and not local.get("diff"):

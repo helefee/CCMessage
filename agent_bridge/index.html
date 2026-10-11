@@ -1116,6 +1116,147 @@ details.dff[open]>summary{border-bottom:1px solid var(--line2)}
 .trhead .prhb{display:inline-flex;align-items:center;gap:4px;flex:none}
 .trhead .prhb .ic{width:14px;height:14px}
 @media (max-width:860px){.trhead .prhb .spl{display:none}.prbtn span{display:none}.prbtn{padding:0;width:30px;justify-content:center}.spanel.prpanel{width:100%}}
+/* ---------- 文件查看 / 差异 ---------- */
+:root{--fv-add:#1a7f37;--fv-mod:#0969da;--fv-del:#cf222e;--lb-add-bg:#dafbe1;--lb-add:#1a7f37;--lb-del-bg:#ffebe9;--lb-del:#cf222e;--wd:rgba(255,129,130,.45);--wa:rgba(74,194,107,.45)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fv-add:#3fb950;--fv-mod:#58a6ff;--fv-del:#f85149;--lb-add-bg:#1f3a28;--lb-add:#56d364;--lb-del-bg:#4a1f22;--lb-del:#ff7b72;--wd:rgba(248,81,73,.45);--wa:rgba(46,160,67,.5)}}
+:root[data-theme="dark"]{--fv-add:#3fb950;--fv-mod:#58a6ff;--fv-del:#f85149;--lb-add-bg:#1f3a28;--lb-add:#56d364;--lb-del-bg:#4a1f22;--lb-del:#ff7b72;--wd:rgba(248,81,73,.45);--wa:rgba(46,160,67,.5)}
+.spanel.fvpanel{width:min(1180px,97vw);z-index:30}
+.fvpanel .sph #fvTitle{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-family:var(--mono)}
+.fvpanel .sph #fvSub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-family:var(--mono)}
+#fvActs{display:flex;gap:4px;flex:none}
+.fvwrap{flex:1;display:flex;min-height:0}
+.fvside{width:270px;flex:none;border-right:1px solid var(--line2);display:flex;flex-direction:column;min-height:0;background:var(--panel2)}
+.fvpanel.noside .fvside{display:none}
+.fvsearch{padding:8px;border-bottom:1px solid var(--line2)}
+.fvsearch input{width:100%;box-sizing:border-box;font-size:12.5px;padding:6px 9px;border-radius:8px}
+.fvtree{flex:1;overflow:auto;padding:4px 0 20px;font-size:12.5px}
+.fvtot{font-size:11px;color:var(--faint);padding:2px 10px 4px}
+.fvn{display:flex;align-items:center;gap:5px;padding:2px 8px;cursor:pointer;white-space:nowrap;color:var(--text);line-height:20px}
+.fvn:hover{background:var(--hover)}.fvn.sel{background:var(--accent-weak);color:var(--accent)}
+.fvn .ic{width:13px;height:13px;flex:none;color:var(--faint)}
+.fvn.dir .ic:nth-child(2){color:var(--warn,#b7791f)}
+.fvn .fvch{transition:transform .12s}.fvn.dir.open .fvch{transform:rotate(90deg)}
+.fvn span{overflow:hidden;text-overflow:ellipsis}
+.fvn i{font-style:normal;font-size:10.5px;color:var(--faint);margin-left:auto}
+.fvn em{font-style:normal;font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;direction:rtl;margin-left:auto;padding-left:6px}
+.fvn.more{color:var(--faint);cursor:default;font-size:11.5px}
+.fvmain{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+.fvbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line2);flex-wrap:wrap;flex:none}
+.fvbar:empty{display:none}
+.fvtabs,.fvseg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.fvtabs button,.fvseg button{border:0;border-radius:0;background:transparent;color:var(--muted);padding:3px 10px;font-size:12.5px;cursor:pointer}
+.fvtabs button+button,.fvseg button+button{border-left:1px solid var(--line)}
+.fvtabs button.on,.fvseg button.on{background:var(--accent-weak);color:var(--accent);font-weight:600}
+.fvnav{display:inline-flex;align-items:center;gap:3px}.fvnav i{font-style:normal;font-size:11.5px;color:var(--faint);min-width:30px}
+.fvinfo{margin-left:auto;font-size:11.5px;color:var(--faint)}
+.fvref{font:12px var(--mono);color:var(--muted)}
+.fvbody{flex:1;overflow:auto;padding:8px 10px 30px;min-height:0;overscroll-behavior:contain}
+.fvbody>.dft{border:1px solid var(--line2);border-radius:8px}
+.fvv .vl{display:flex;min-width:max-content;position:relative}
+.fvv .vl .ln{flex:none;width:52px;padding:0 8px 0 4px;text-align:right;color:var(--faint);user-select:none;border-right:2px solid transparent;font-variant-numeric:tabular-nums}
+.fvv .vl .dc{white-space:pre;padding:0 14px 0 10px}
+.fvv .vl.ma .ln{border-right-color:var(--fv-add)}.fvv .vl.mm .ln{border-right-color:var(--fv-mod)}
+.fvv .vl.md::after{content:"";position:absolute;left:52px;bottom:-4px;border:4px solid transparent;border-left-color:var(--fv-del);z-index:1}
+.fvv.untracked .vl .ln{border-right-color:var(--fv-add)}
+.fvv .vl.hit,.dl.flash,.sl.flash,.vl.flash{background:var(--accent-weak)!important;transition:background .3s}
+.fvbl{flex:none;width:170px;padding:0 6px;font:11px/1.55 var(--sans);color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-right:1px solid var(--line2);user-select:none}
+.fvbl.f{border-top:1px solid var(--line2)}.fvbl code{color:var(--accent);font-size:11px}
+.fvimg{text-align:center;padding:16px}.fvimg img{max-width:100%;max-height:70vh;background:repeating-conic-gradient(var(--hover) 0 25%,transparent 0 50%) 0 0/16px 16px;border:1px solid var(--line2);border-radius:6px}
+.fvmd{max-width:860px;margin:0 auto;padding:8px 18px;font-size:14px}
+.fvchunk{font-size:12px;color:var(--muted);margin:10px 2px 4px}
+.fvd .dl.dx,.fvd .sl.dx{background:var(--hover);color:var(--muted);cursor:pointer}
+.fvd .dl.dx:hover,.fvd .sl.dx:hover{background:var(--hover2);color:var(--text)}
+.fvd .dx .ic{width:12px;height:12px;transform:rotate(90deg);vertical-align:-2px}
+.dft.split{display:block}
+.sl{display:grid;grid-template-columns:44px minmax(0,1fr) 44px minmax(0,1fr)}
+.sl .ln{padding:0 6px;text-align:right;color:var(--faint);user-select:none;border-right:1px solid var(--line2);font-variant-numeric:tabular-nums}
+.sl .dc{white-space:pre-wrap;word-break:break-all;padding:0 8px}
+.sl .dc+.ln{border-left:1px solid var(--line2)}
+.sl .dc.full{grid-column:1/-1;padding:0 10px}
+.sl .de{background:var(--df-del)}.sl .ln.de{background:var(--df-deln)}.sl .ad{background:var(--df-add)}.sl .ln.ad{background:var(--df-addn)}
+.sl .ex{background:var(--hover)}
+.sl.hh{background:var(--df-hunk);color:var(--muted)}
+mark.wd{background:var(--wd);color:inherit;border-radius:2px}mark.wa{background:var(--wa);color:inherit;border-radius:2px}
+/* 对话里的文件：文件名小标签、+N −M 徽章（照 Codex 桌面版） */
+.fchip,.fref{cursor:pointer}
+.fchip{color:var(--text);font-weight:500;font-family:var(--mono);font-size:.95em;padding:0 2px;border-radius:4px}
+.fchip:hover,.fref:hover{text-decoration:underline;text-underline-offset:2px;background:var(--hover)}
+.fref{color:var(--accent)}code.fref{color:var(--accent)}
+.lbadge{display:inline-flex;align-items:center;gap:2px;margin:0 2px 0 4px;cursor:pointer;vertical-align:1px}
+.lbadge i{font:600 11px/16px var(--mono);font-style:normal;padding:0 4px;border-radius:4px}
+.lbadge .la{background:var(--lb-add-bg);color:var(--lb-add)}.lbadge .ld{background:var(--lb-del-bg);color:var(--lb-del)}
+.lbadge:hover i{filter:brightness(1.15)}
+.tsum{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-family:var(--sans)}
+.tsum .tfail{color:var(--bad)}
+.chgf{cursor:pointer;border-radius:5px}.chgf:hover{background:var(--hover)}.dfp.lnk{cursor:pointer}.dfp.lnk:hover{text-decoration:underline}
+.cxg>summary .cxgo{width:12px;height:12px;color:var(--faint);flex:none}
+.tools>summary .tsum{flex:0 1 auto}
+.cxg>summary .tsum{flex:0 1 auto}
+@media (max-width:860px){.spanel.fvpanel{width:100%}.fvside{width:100%;border-right:0}.fvpanel:not(.noside) .fvmain{display:none}.fvpanel.noside .fvmain{display:flex}
+  .fvbl{width:90px}}
+/* ---------- 连线 ---------- */
+:root{--lk-o:#cf6a3d;--lk-g:#2e7d36}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--lk-o:#e8875c;--lk-g:#5fb35a}}
+:root[data-theme="dark"]{--lk-o:#e8875c;--lk-g:#5fb35a}
+.srow{position:relative}
+.lanc{position:absolute;top:50%;width:11px;height:11px;margin-top:-5.5px;border-radius:50%;box-sizing:border-box;z-index:2;cursor:crosshair;touch-action:none;
+  display:flex;align-items:center;justify-content:center;transition:transform .12s,box-shadow .12s}
+.lanc.ls-r{right:3px}.lanc.ls-l{left:3px}
+.srow:has(.lanc.ls-r){padding-right:20px}.srow:has(.lanc.ls-l){padding-left:20px}
+.lanc b{position:absolute;top:-9px;font-size:9px;line-height:10px;font-weight:700;color:var(--muted)}
+.lanc.ls-r b{right:-2px}.lanc.ls-l b{left:-2px}
+.lanc.lk-none{border:1.5px dashed var(--faint);background:var(--panel);opacity:0}
+.srow:hover .lanc.lk-none,body.lkdragging .lanc.lk-none{opacity:.9}
+.lanc.lk-o{background:var(--lk-o)}.lanc.lk-g{background:var(--lk-g)}
+.lanc.lk-og{background:linear-gradient(90deg,var(--lk-o) 50%,var(--lk-g) 50%)}
+.lanc:not(.lk-none){box-shadow:0 0 0 2px var(--side,var(--panel))}
+.srow:hover .lanc,.srow.lkhi .lanc{transform:scale(1.3)}
+.srow.lkhi{background:var(--hover)}
+.srow.lkhi .lanc:not(.lk-none){box-shadow:0 0 0 2px var(--side,var(--panel)),0 0 0 5px color-mix(in srgb,var(--lk-o) 25%,transparent);animation:lkpulse 1.2s ease-in-out infinite}
+@keyframes lkpulse{50%{transform:scale(1.55)}}
+body.lkdragging,body.lkdragging *{cursor:crosshair!important;user-select:none}
+body.lkdragging .lksvg *{pointer-events:none!important}
+.lksvg{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:30;overflow:visible;display:none}
+.lksvg.on{display:block}
+.lksvg .lkp{fill:none;stroke-width:2.4;stroke-linecap:round;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.18))}
+.lksvg .lkp.lk-o{stroke:var(--lk-o)}.lksvg .lkp.lk-g{stroke:var(--lk-g)}
+.lksvg .lkah-o{fill:var(--lk-o)}.lksvg .lkah-g{fill:var(--lk-g)}
+.lksvg .lkdrag{stroke-dasharray:6 5;animation:lkdash .6s linear infinite}
+@keyframes lkdash{to{stroke-dashoffset:-11}}
+.lksvg .lkhit{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke;cursor:pointer}
+.lksvg g.lkl:hover .lkp,.lksvg g.lkl.sel .lkp{stroke-width:3.4}
+.lksvg .lkend{fill:var(--panel);stroke:var(--muted);stroke-width:1.5;pointer-events:none;cursor:grab;opacity:0;transition:opacity .12s}
+.lksvg g.lkl:hover .lkend,.lksvg g.lkl.sel .lkend{opacity:1;pointer-events:all}
+.lkpop{position:fixed;z-index:45;display:none;width:330px;max-width:calc(100vw - 16px);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:8px 10px 10px;font-size:13px}
+.lkpop .lkpt{display:flex;align-items:center;gap:8px;margin-bottom:4px}.lkpop .lkpt span{color:var(--muted);font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lkpop .lkpt b{flex:none}.lkpop .spx{margin-left:auto}
+.lkit{border-top:1px solid var(--line2);padding:8px 0 6px}
+.lkhd{display:flex;align-items:center;gap:6px;font-weight:600;min-width:0}.lkhd span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.lkhd .logo{width:14px;height:14px;flex:none}
+.lkarr{font-style:normal;font-weight:700;flex:none}.lkarr.d-c2x{color:var(--lk-o)}.lkarr.d-x2c{color:var(--lk-g)}
+.lkarr.d-both{background:linear-gradient(90deg,var(--lk-o),var(--lk-g));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lksub{font-size:11px;color:var(--faint);margin:2px 0 6px}
+.lkseg{display:grid!important;grid-template-columns:repeat(3,1fr)}.lkseg button{font-size:11.5px;white-space:nowrap;padding:3px 4px}
+.lkseg button.on.d-c2x{background:var(--lk-o);color:#fff;border-color:var(--lk-o)}
+.lkseg button.on.d-x2c{background:var(--lk-g);color:#fff;border-color:var(--lk-g)}
+.lkseg button.on.d-both{background:linear-gradient(90deg,var(--lk-o),var(--lk-g));color:#fff}
+.lkacts{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}.lkacts button{font-size:12px;padding:3px 9px}
+.lkacts .danger{color:var(--bad)}
+.lkft{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line2);padding-top:7px;flex-wrap:wrap}.lkft .hint{font-size:11px;color:var(--faint)}
+.lkft button{font-size:12px;padding:3px 9px;display:inline-flex;align-items:center;gap:4px}.lkft .ic{width:13px;height:13px}
+.lkchip.on.lk-o{color:var(--lk-o);border-color:color-mix(in srgb,var(--lk-o) 45%,transparent)}
+.lkchip.on.lk-g{color:var(--lk-g);border-color:color-mix(in srgb,var(--lk-g) 45%,transparent)}
+.lkchip.on.lk-og{color:var(--lk-o);border-color:color-mix(in srgb,var(--lk-g) 45%,transparent)}
+.lkchip.on span{display:inline!important}
+.lkpk{display:flex;flex-direction:column;gap:6px;font-size:13px}.lkpk code{font-size:12px}
+.lkpr{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line2);border-radius:9px;cursor:pointer}
+.lkpr:hover{background:var(--hover)}.lkpr .grow{display:flex;flex-direction:column;min-width:0}.lkpr .grow b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lkpr .grow i{font-style:normal;font-size:11px;color:var(--faint)}.lkpr select{font-size:12px}
+.msg.task.recalled .txt{text-decoration:line-through;opacity:.6}
+.badge.b-recall{background:var(--hover2,var(--line2));color:var(--muted)}
+.badge.b-link{background:color-mix(in srgb,var(--lk-o) 16%,transparent);color:var(--lk-o)}
+.toast .lkundo{margin-left:8px;font-weight:600}
+@media (max-width:860px){.lanc{width:14px;height:14px;margin-top:-7px}.lanc.lk-none{display:none}.lkpop{width:calc(100vw - 16px)}}
 </style>
 </head>
 <body>
@@ -1139,6 +1280,8 @@ details.dff[open]>summary{border-bottom:1px solid var(--line2)}
           <button id="mSM" class="admin"><i data-ic="listx"></i>会话管理（搜索 / 归档 / 删除 / 还原）…</button>
           <button id="mCSync" class="admin needcdesk" title="这台电脑上没装 Claude 桌面端时不显示"><i data-ic="sync"></i>同步 Claude 会话到当前账号…</button>
           <button id="mXSync" class="admin"><i data-ic="download"></i>把 Codex 对话同步进 Claude…</button>
+          <button id="mLink"><i data-ic="link"></i>连线（指定谁给谁派活）…</button>
+          <button id="mFiles"><i data-ic="folder"></i>文件（查看 / 差异 / 历史）…</button>
           <button id="mPRs"><i data-ic="gitpr"></i>GitHub PR 列表…</button>
           <button id="mChg"><i data-ic="gitdiff"></i>本地改动 / 代码审查…</button>
           <button id="mInst" class="admin"><i data-ic="wrench"></i>安装 / 升级 / 修复</button>
@@ -1228,6 +1371,7 @@ const ICON = {
   more: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
   phone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   sync: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/>',
   wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
@@ -1964,9 +2108,11 @@ setM("bus");
 
 // ---------- 消息流 ----------
 // 任务看板去掉了：会话之间派的活照样在消息流里显示成卡片，交回的结果从流里的 result 消息对上（reply_to = 任务编号）
-function resultOf(id){ for (let i = msgs.length - 1; i >= 0; i--) { const m = msgs[i]; if (m.kind === "result" && m.reply_to === id) return m; } return null; }
+function resultOf(id){ for (let i = msgs.length - 1; i >= 0; i--) { const m = msgs[i]; if ((m.kind === "result" || m.kind === "recall") && m.reply_to === id) return m; } return null; }
+let recallNo = {};      // 撤不回的任务：id → 原因
 function visible(m){
   const k = m.kind || "msg";
+  if (k === "recall") return false;           // 撤回记录不单独显示，画在那张任务卡上
   if (filter === "msg" && k !== "msg") return false;
   if (filter === "task" && k === "msg") return false;
   if (query) { const q = query.toLowerCase();
@@ -1975,21 +2121,26 @@ function visible(m){
 }
 function msgHtml(m){
   const a = m.from.agent, k = m.kind || "msg", fail = k==="result" && String(m.text).startsWith("【没做成】");
-  const r = k==="task" ? resultOf(m.id) : null, rfail = r && String(r.text).startsWith("【没做成】");
+  const r0 = k==="task" ? resultOf(m.id) : null, rec = r0 && r0.kind === "recall", r = rec ? null : r0, rfail = r && String(r.text).startsWith("【没做成】");
   let badge = "";
-  if (k==="task") badge = `<span class="badge b-task">任务</span>` + (r ? ` <span class="badge ${rfail?"b-bad":"b-ok"}">${rfail?"没做成":"已完成"}</span>` : "");
+  const tk = (m.to_keys || [])[0] || "", ta = tk.split("-")[0], ts = tk.slice(ta.length + 1);
+  const viaLink = k==="task" && (a === "claude" || a === "codex") && (ta === "claude" || ta === "codex") && ta !== a &&
+    LKS.some(l => l[a] === m.from.sid && l[ta] === ts);
+  if (k==="task") badge = `<span class="badge b-task">任务</span>` + (viaLink ? ` <span class="badge b-link" title="按连线派的">${ic("link")}连线</span>` : "")
+    + (rec ? ` <span class="badge b-recall" title="${esc(nameOf(r0.from.name || ""))} 撤回的，对方不会收到">已撤回</span>` : r ? ` <span class="badge ${rfail?"b-bad":"b-ok"}">${rfail?"没做成":"已完成"}</span>` : "")
+    + (recallNo[m.id] ? ` <span class="badge" title="${esc(recallNo[m.id])}">已送达</span>` : "");
   if (k==="result") badge = `<span class="badge ${fail?"b-bad":"b-ok"}">${fail?"没做成":"结果"}</span> <a class="link" data-jump="${esc(m.reply_to)}">回应任务 #${esc(String(m.reply_to).slice(0,6))}</a>`;
   const long = String(m.text).split("\n").length > 6 || String(m.text).length > 420;
   let linked = "";
   if (r) { const rt = String(r.text); linked = `<div class="linked"><span class="badge ${rfail?"b-bad":"b-ok"}">↳ ${esc(nameOf(r.from.name))}</span><div class="txt">${esc(rt.length>300?rt.slice(0,300)+"…":rt)}</div></div>`; }
-  const cls = ["msg", a==="user"?"mine":"", k==="task"?"task":"", k==="result"?"result":"", fail?"fail":""].join(" ");
+  const cls = ["msg", a==="user"?"mine":"", k==="task"?"task":"", k==="result"?"result":"", fail?"fail":"", rec?"recalled":""].join(" ");
   return `<div class="${cls}" id="m-${esc(m.id)}">
     <div class="meta">${badge}<span class="who a-${esc(a)}">${logo(a)}${esc(nameOf(m.from.name))}</span>
       <span class="mono">→ ${esc(m.to)}</span><span title="${esc(new Date(m.ts*1000).toLocaleString())}">${hm(m.ts)}</span><span class="mono">#${esc(m.id.slice(0,6))}</span></div>
     <div class="txt ${long?"clamp":""}">${prLinkify(esc(m.text))}</div>
     ${long?`<a class="link more" data-more>展开全文</a>`:""}${prCards(m.text)}${linked}
     <div class="acts">${a!=="user"?`<button data-reply="${esc(keyOf(a, shortOf(m.from)))}" title="回复这个会话">回复</button>`:""}
-      <button data-copy="${esc(k==="task"?m.id:(m.reply_to||m.id))}" title="复制编号">复制编号</button></div></div>`;
+      <button data-copy="${esc(k==="task"?m.id:(m.reply_to||m.id))}" title="复制编号">复制编号</button>${k==="task" && !r0 && !recallNo[m.id] ? `<button data-recall="${esc(m.id)}" title="对方还没收到时可以撤回（收到了就撤不回）">撤回</button>` : ""}</div></div>`;
 }
 function renderStream(keepScroll){
   const s = $("#stream"), atBottom = s.scrollHeight - s.scrollTop - s.clientHeight < 60;
@@ -2000,13 +2151,16 @@ function renderStream(keepScroll){
   if (!keepScroll || atBottom) { s.scrollTop = s.scrollHeight; unseen = 0; }
   $("#newPill").style.display = unseen ? "block" : "none";
   $("#nAll").textContent = msgs.length || ""; $("#nMsg").textContent = msgs.filter(m=>(m.kind||"msg")==="msg").length || "";
-  $("#nTask").textContent = msgs.filter(m=>(m.kind||"msg")!=="msg").length || "";
+  $("#nTask").textContent = msgs.filter(m=>!["msg", "recall"].includes(m.kind||"msg")).length || "";
 }
 $("#stream").addEventListener("click", e => {
   const el = e.target;
   if (el.dataset.more !== undefined) { const t = el.previousElementSibling; t.classList.toggle("clamp"); el.textContent = t.classList.contains("clamp") ? "展开全文" : "收起"; }
   else if (el.dataset.jump) jumpTo(el.dataset.jump);
   else if (el.dataset.reply) { setTo(el.dataset.reply); $("#text").focus(); }
+  else if (el.dataset.recall) { const id = el.dataset.recall; el.disabled = true; el.textContent = "撤回中…";
+    api("/api/recall", {root: cur.root, id}).then(r => { if (r.ok) { toast("✅ " + r.output, 2600); pollMessages(); } else { recallNo[id] = r.output; toast("撤不回：" + r.output, 4000); renderStream(true); } })
+      .catch(e => { toast("❌ " + (e.message || e), 4000); renderStream(true); }); }
   else if (el.dataset.copy) { navigator.clipboard?.writeText(el.dataset.copy).then(()=>toast("已复制 " + el.dataset.copy)).catch(()=>toast(el.dataset.copy)); }
 });
 $("#stream").addEventListener("scroll", () => { const s=$("#stream"); if (s.scrollHeight - s.scrollTop - s.clientHeight < 60) { unseen = 0; $("#newPill").style.display="none"; } });
@@ -2089,9 +2243,10 @@ async function pollSessions(){
   if (!cur) return; const root = cur.root;
   if (!cur.bus_dir) { sessList = []; renderSessions(); return; }
   try {
-    const list = await api(`/api/sessions?root=${encodeURIComponent(root)}`);
+    const [list] = await Promise.all([api(`/api/sessions?root=${encodeURIComponent(root)}`), lkPoll()]);
     if (!cur || cur.root !== root) return;      // 等的时候切了项目：这份是旧项目的，别覆盖
-    sessList = list; renderSessions();
+    sessList = list; renderSessions(); lkHead(); if (lkPop) lkPopRender();
+    const lsig = JSON.stringify(LKS.map(l => lkId(l) + l.dir)); if (lsig !== lkSig) { lkSig = lsig; if (!view) renderStream(true); }
   } catch(e) {}
 }
 // ---------- 会话列表：按项目分文件夹 ----------
@@ -2123,7 +2278,7 @@ function renderSessions(){
   const row = (x, root) => { const xp = root !== cur.root, [st, label] = sessState(x), key = keyOf(x.agent, x.short);
     return `<div class="srow${x.managed||x.ignore?" dim":""}${xp?" xp":""}" data-key="${esc(key)}" data-sid="${esc(x.sid)}" data-agent="${esc(x.agent)}"${xp?` data-root="${esc(root)}"`:""} title="${xp?"点击：切到这个项目并打开它的会话记录":"点击：打开它的会话记录"}">
       ${bbAvatar(x, st, 36)}<div class="grow"><div class="nm a-${esc(x.agent)}">${x.agent==="cursor"?'<span class="a-cursor" style="font-size:11px;font-weight:600;margin-right:4px">Cursor</span>':""}${esc(x.alias||x.title||"未命名")}</div>
-      <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div></div>`; };
+      <div class="sub">${esc(key)} · ${label}${st==="stand"?"":" · "+ago(x.age)}${x.managed?" · 总线新开":(x.originator==="codex_exec"?" · 无界面":"")}${x.owner_name?" · 归 "+esc(nameOf(x.owner_name)):""}</div></div>${xp ? "" : lkAnchor(x)}</div>`; };
   navBadge("sNav", 0);
   const byAge = (p, q) => (p.age ?? 1e12) - (q.age ?? 1e12);
   const of = (list, a) => (list || []).filter(x => x.agent === a || (a === "claude" && x.agent === "cursor")).sort(byAge);
@@ -2157,12 +2312,278 @@ function renderSessions(){
   $("#nClaude").title = $("#nCodex").title = "当前项目里在线的";
   renderLegend();
   $$(".srow").forEach(el => el.onclick = e => {
+    if (e.target.closest(".lanc")) return;      // 点 / 拖锚点是连线，不是打开会话
     if (el.dataset.root) { const x = (xpSess[el.dataset.root] || []).find(s => s.sid === el.dataset.sid && s.agent === el.dataset.agent); if (x) openXp(el.dataset.root, x); return; }
     const x = sessList.find(s => s.sid === el.dataset.sid && s.agent === el.dataset.agent); if (x) openSession(x);
   });
   markOpen();
   fillTo();
+  lkRedraw();
 }
+// ---------- 连线：把 Claude 会话和 Codex 会话连起来，谁给谁派活 ----------
+// 锚点：连了线的会话行上、朝另一栏那一侧的小圆点（橙 = Claude 派给 Codex，深绿 = Codex 派给 Claude，双向两色）。
+// 线平时不画：鼠标放到行 / 锚点上、拖锚点新建、弹出连线详情时才画；手机 / 窄窗口点锚点切换显示。
+// 拖锚点到另一栏的会话上 = 新建；拖线端的小圆圈到别的会话上 = 改连；每次改动都能撤回（提示条上的「撤回」或 Ctrl+Z）。
+var lkSig = "", LKS = [], lkHover = null, lkPin = new Set(), lkPop = null, lkDrag = null, lkUndo = null, lkRaf = 0, lkHoverT = 0, lkOverPath = null;
+const LK_DIR = {c2x: "Claude 派给 Codex", x2c: "Codex 派给 Claude", both: "互相派活"};
+const lkId = l => l.claude + "|" + l.codex;
+const lkKey = (agent, sid) => agent + ":" + sid;
+async function lkPoll(){
+  if (!cur || !cur.bus_dir) { LKS = []; return; }
+  try { const root = cur.root, l = await api(`/api/links?root=${encodeURIComponent(root)}`); if (cur && cur.root === root) LKS = l || []; } catch(e) {}
+}
+function lkOf(agent, sid){ return LKS.filter(l => l[agent] === sid); }
+// 从这个会话看：out = 它给对方派活，in = 对方给它派活
+function lkDirFor(agent, l){ const o = agent === "claude" ? ["c2x", "both"].includes(l.dir) : ["x2c", "both"].includes(l.dir);
+  const i = agent === "claude" ? ["x2c", "both"].includes(l.dir) : ["c2x", "both"].includes(l.dir); return {o, i}; }
+function lkSess(agent, sid){ return sessList.find(s => s.agent === agent && s.sid === sid); }
+function lkName(agent, sid){ const x = lkSess(agent, sid); return x ? (x.alias || x.title || "未命名") : "（不在列表里）"; }
+function lkShort(agent, sid){ const x = lkSess(agent, sid); return agent + ":" + (x ? x.short : shortOfSid(agent, sid)); }
+function lkSide(agent){ return isMobile() ? "r" : ((agent === "claude") === (claudeSide === "left") ? "r" : "l"); }
+// 会话行上的锚点（renderSessions 里每个当前项目的 Claude / Codex 行都带一个；没连线的只在鼠标放上去时显示成空心，可拖）
+function lkAnchor(x){
+  if (x.agent !== "claude" && x.agent !== "codex") return "";
+  const ls = lkOf(x.agent, x.sid);
+  const og = ls.some(l => l.dir !== "x2c"), gr = ls.some(l => l.dir !== "c2x");
+  const cls = !ls.length ? "lk-none" : og && gr ? "lk-og" : og ? "lk-o" : "lk-g";
+  const tip = ls.length ? `连着 ${ls.length} 个会话（鼠标放上来看线；拖到另一栏的会话上再连一个；点一下看详情）`
+    : `拖到另一栏的${x.agent === "claude" ? " Codex " : " Claude "}会话上连线：连了线，task --to ${x.agent === "claude" ? "codex" : "claude"} 直接派给它`;
+  return `<span class="lanc ${cls} ls-${lkSide(x.agent)}" data-lanc="1" title="${esc(tip)}">${ls.length > 1 ? `<b>${ls.length}</b>` : ""}</span>`;
+}
+// 端点：行上的锚点；行在折起的文件夹里 → 文件夹标题；滚出去了 → 贴在列表上 / 下边；整栏看不见 → 屏幕边上
+function lkPoint(agent, sid){
+  const card = $(agent === "claude" ? "#cardClaude" : "#cardCodex");
+  if (!visibleEl(card)) return null;
+  const side = lkSide(agent), sc = card.closest(".side") || card, cr = sc.getBoundingClientRect();
+  const row = $(`.srow:not(.xp)[data-agent="${agent}"][data-sid="${CSS.escape(sid)}"]`);
+  let el = row && row.querySelector(".lanc"), cut = false, onSum = false;
+  const closed = row && row.parentElement && row.parentElement.closest("details:not([open])");
+  if (closed) { el = closed.querySelector("summary"); onSum = true; }
+  if (!row) { el = card.querySelector("h3"); onSum = true; cut = true; }
+  const r = el.getBoundingClientRect();
+  let x = onSum ? (side === "r" ? Math.min(r.right, cr.right) - 6 : Math.max(r.left, cr.left) + 6) : r.left + r.width / 2, y = r.top + r.height / 2;
+  if (y < cr.top + 8) { y = cr.top + 8; cut = true; } else if (y > cr.bottom - 8) { y = cr.bottom - 8; cut = true; }
+  return {x, y, s: isMobile() ? -1 : side === "r" ? 1 : -1, cut: cut || onSum};      // 手机上两栏叠在一起：线往里弯
+}
+function lkCurve(p0, p1){
+  const k = Math.max(46, Math.abs(p1.x - p0.x) * .42);
+  return `M${p0.x},${p0.y} C${p0.x + p0.s * k},${p0.y} ${p1.x + p1.s * k},${p1.y} ${p1.x},${p1.y}`;
+}
+const lkSvg = (() => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.id = "lkSvg"; s.setAttribute("class", "lksvg"); document.body.appendChild(s); return s; })();
+function lkShownLinks(){
+  const keys = new Set(lkPin); if (lkHover) keys.add(lkHover); if (lkDrag && lkDrag.from) keys.add(lkDrag.from);
+  return LKS.filter(l => keys.has(lkKey("claude", l.claude)) || keys.has(lkKey("codex", l.codex)) || (lkPop && lkPop.ids.includes(lkId(l))) || lkOverPath === lkId(l));
+}
+function lkDraw(){
+  lkRaf = 0;
+  const show = lkShownLinks(), hi = new Set();
+  let h = `<defs>${["o", "g"].map(c => `<marker id="lkA${c}" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" class="lkah-${c}"/></marker>`).join("")}</defs>`;
+  for (const l of show) {
+    const pc = lkPoint("claude", l.claude), px = lkPoint("codex", l.codex);
+    if (!pc || !px) continue;
+    hi.add(lkKey("claude", l.claude)); hi.add(lkKey("codex", l.codex));
+    const id = esc(lkId(l)), dash = pc.cut || px.cut ? ' stroke-dasharray="5 4"' : "", both = l.dir === "both";
+    const off = both ? 3 : 0, sh = (p, d) => Object.assign({}, p, {y: p.y + d});
+    const seg = [];
+    if (l.dir !== "x2c") seg.push(["o", lkCurve(sh(pc, -off), sh(px, -off))]);            // 橙：Claude → Codex
+    if (l.dir !== "c2x") seg.push(["g", lkCurve(sh(px, off), sh(pc, off))]);              // 绿：Codex → Claude
+    h += `<g class="lkl${lkPop && lkPop.ids.includes(lkId(l)) ? " sel" : ""}" data-lk="${id}">` + seg.map(([c, d]) => `<path class="lkp lk-${c}" d="${d}"${dash} marker-end="url(#lkA${c})"/>`).join("")
+      + `<path class="lkhit" d="${lkCurve(pc, px)}"/>`
+      + (!lkDrag ? `<circle class="lkend" data-end="claude" cx="${pc.x + pc.s * 16}" cy="${pc.y}" r="5"/><circle class="lkend" data-end="codex" cx="${px.x + px.s * 16}" cy="${px.y}" r="5"/>` : "") + `</g>`;
+  }
+  if (lkDrag && lkDrag.p0 && lkDrag.pt) {
+    const c = lkDrag.color, tgt = lkDrag.target && lkPoint(lkDrag.target.agent, lkDrag.target.sid);
+    const p1 = tgt || {x: lkDrag.pt.x, y: lkDrag.pt.y, s: lkDrag.p0.x < lkDrag.pt.x ? -1 : 1};
+    h += `<path class="lkp lk-${c} lkdrag" d="${lkCurve(lkDrag.p0, p1)}" marker-end="url(#lkA${c})"/>`;
+    if (lkDrag.target) hi.add(lkKey(lkDrag.target.agent, lkDrag.target.sid));
+  }
+  lkSvg.innerHTML = h;
+  $$(".srow:not(.xp)").forEach(el => el.classList.toggle("lkhi", hi.has(lkKey(el.dataset.agent, el.dataset.sid)) && lkKey(el.dataset.agent, el.dataset.sid) !== lkHover));
+  lkSvg.classList.toggle("on", !!h && (show.length > 0 || !!lkDrag));
+}
+function lkRedraw(){ if (!lkRaf) lkRaf = requestAnimationFrame(lkDraw); }
+document.addEventListener("scroll", lkRedraw, true);
+window.addEventListener("resize", lkRedraw);
+document.addEventListener("toggle", lkRedraw, true);
+if (window.ResizeObserver) { const ro = new ResizeObserver(() => lkRedraw()); ["#cardClaude", "#cardCodex", "#colL", "#colR"].forEach(s => $(s) && ro.observe($(s))); }
+// 鼠标放到行上 → 画它的线（离开稍等一下，好让鼠标移到线上点）
+document.addEventListener("mouseover", e => {
+  if (lkDrag) return;
+  const row = e.target.closest && e.target.closest(".srow:not(.xp)");
+  const k = row && (row.dataset.agent === "claude" || row.dataset.agent === "codex") ? lkKey(row.dataset.agent, row.dataset.sid) : null;
+  if (k) { clearTimeout(lkHoverT); if (k !== lkHover) { lkHover = k; lkRedraw(); } return; }
+  if (e.target.closest && e.target.closest("#lkSvg g.lkl")) { clearTimeout(lkHoverT); return; }
+  if (lkHover) { clearTimeout(lkHoverT); lkHoverT = setTimeout(() => { lkHover = null; lkRedraw(); }, 260); }
+});
+lkSvg.addEventListener("mouseover", e => { const g = e.target.closest("g.lkl"); if (g) { lkOverPath = g.dataset.lk; clearTimeout(lkHoverT); } });
+lkSvg.addEventListener("mouseout", e => { const g = e.target.closest("g.lkl"); if (g && !(e.relatedTarget && g.contains(e.relatedTarget))) { lkOverPath = null; lkHoverT = setTimeout(() => { lkHover = null; lkRedraw(); }, 260); } });
+lkSvg.addEventListener("click", e => {
+  const g = e.target.closest("g.lkl"); if (!g || e.target.classList.contains("lkend")) return;
+  const l = LKS.find(x => lkId(x) === g.dataset.lk); if (l) lkPopOpen([l], {x: e.clientX, y: e.clientY});
+});
+// ---- 拖：锚点 → 新建；线端小圆圈 → 改连到别的会话 ----
+function lkRowAt(x, y){ const el = document.elementFromPoint(x, y), r = el && el.closest && el.closest(".srow:not(.xp)"); return r && (r.dataset.agent === "claude" || r.dataset.agent === "codex") ? {agent: r.dataset.agent, sid: r.dataset.sid} : null; }
+function lkStart(e, o){
+  e.preventDefault(); e.stopPropagation();
+  lkDrag = Object.assign({sx: e.clientX, sy: e.clientY, moved: false, pt: null, target: null, touch: e.pointerType === "touch"}, o);
+  const mv = ev => {
+    if (!lkDrag) return;
+    if (!lkDrag.moved && Math.hypot(ev.clientX - lkDrag.sx, ev.clientY - lkDrag.sy) < 5) return;
+    lkDrag.moved = true; lkDrag.pt = {x: ev.clientX, y: ev.clientY}; document.body.classList.add("lkdragging");
+    const t = lkRowAt(ev.clientX, ev.clientY);
+    lkDrag.target = t && t.agent === lkDrag.want ? t : null;
+    lkRedraw();
+  };
+  const up = async ev => {
+    window.removeEventListener("pointermove", mv); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+    document.body.classList.remove("lkdragging");
+    const d = lkDrag; lkDrag = null; lkRedraw();
+    if (!d) return;
+    if (!d.moved) { d.click && d.click(ev); return; }
+    if (d.target) await d.drop(d.target);
+  };
+  window.addEventListener("pointermove", mv); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
+}
+function lkAnchorAt(x, y){       // 锚点上压着线也算点到锚点（线的点击区比锚点宽）
+  return $$(".srow:not(.xp) .lanc").find(a => { const r = a.getBoundingClientRect(); return r.width && x >= r.left - 3 && x <= r.right + 3 && y >= r.top - 3 && y <= r.bottom + 3; });
+}
+document.addEventListener("pointerdown", e => {
+  const a = (e.target.closest && e.target.closest(".lanc")) || (e.target.closest && e.target.closest("#lkSvg") && lkAnchorAt(e.clientX, e.clientY));
+  if (!a) return;
+  const row = a.closest(".srow"), agent = row.dataset.agent, sid = row.dataset.sid, other = agent === "claude" ? "codex" : "claude";
+  const p0 = lkPoint(agent, sid);
+  lkStart(e, {from: lkKey(agent, sid), want: other, p0, color: agent === "claude" ? "o" : "g",
+    click: ev => {
+      const ls = lkOf(agent, sid);
+      if (ev.pointerType === "touch" || isMobile()) {           // 手机 / 窄窗口：点锚点切换显示线（线上点一下看详情）
+        const k = lkKey(agent, sid); if (lkPin.has(k)) lkPin.delete(k); else lkPin.add(k); lkRedraw();
+        if (!ls.length) lkPicker(lkSess(agent, sid) || {agent, sid});
+        return;
+      }
+      if (ls.length) lkPopOpen(ls, {x: ev.clientX, y: ev.clientY}, {agent, sid}); else lkPicker(lkSess(agent, sid) || {agent, sid});
+    },
+    drop: async t => {
+      const c = agent === "claude" ? sid : t.sid, x = agent === "codex" ? sid : t.sid;
+      const old = LKS.find(l => l.claude === c && l.codex === x);
+      let dir = agent === "claude" ? "c2x" : "x2c";
+      if (old && old.dir !== dir) dir = "both";                  // 反方向再拉一次 = 互相派
+      await lkOp(`已连线：${lkName("claude", c)} ${dir === "both" ? "⇄" : dir === "c2x" ? "→" : "←"} ${lkName("codex", x)}`, [["link", {claude: c, codex: x, dir}]]);
+    }});
+}, true);
+lkSvg.addEventListener("pointerdown", e => {
+  const end = e.target.closest(".lkend"); if (!end) return;
+  const l = LKS.find(x => lkId(x) === end.parentNode.dataset.lk); if (!l) return;
+  const moving = end.dataset.end, fixed = moving === "claude" ? "codex" : "claude";
+  lkStart(e, {from: lkKey(fixed, l[fixed]), want: moving, p0: lkPoint(fixed, l[fixed]), color: l.dir === "x2c" ? "g" : "o",
+    click: ev => lkPopOpen([l], {x: ev.clientX, y: ev.clientY}),
+    drop: async t => {
+      if (t.sid === l[moving]) return;
+      const nl = Object.assign({}, l, {[moving]: t.sid});
+      await lkOp(`已改连到 ${lkName(moving, t.sid)}`, [["unlink", {claude: l.claude, codex: l.codex}], ["link", {claude: nl.claude, codex: nl.codex, dir: l.dir}]]);
+    }});
+});
+// ---- 改动 + 撤回 ----
+async function lkOp(msg, ops){
+  if (!cur) return;
+  const root = cur.root, before = JSON.parse(JSON.stringify(LKS));
+  try {
+    for (const [op, b] of ops) { const r = await api("/api/" + op, Object.assign({root}, b)); if (r && r.links) LKS = r.links; }
+  } catch(e) { toast("❌ " + (e.message || e), 4000); await lkPoll(); lkRefresh(); return; }
+  lkUndo = {root, links: before, at: Date.now()};
+  lkRefresh();
+  lkToast(msg);
+}
+async function lkUndoNow(){
+  const u = lkUndo; if (!u || !cur || u.root !== cur.root) return toast("没有可以撤回的连线改动");
+  lkUndo = null;
+  try { const r = await api("/api/links/restore", {root: u.root, links: u.links}); LKS = r.links || []; lkRefresh(); toast("已撤回连线改动", 1800); }
+  catch(e) { toast("❌ " + (e.message || e), 4000); }
+}
+function lkToast(msg){
+  const el = $("#toast"); el.innerHTML = `${esc(msg)} <a class="link lkundo" data-lkundo>撤回</a>`; el.style.display = "block";
+  clearTimeout(toastT); toastT = setTimeout(() => el.style.display = "none", 7000);
+}
+document.addEventListener("click", e => { if (e.target.closest && e.target.closest("[data-lkundo]")) { e.preventDefault(); $("#toast").style.display = "none"; lkUndoNow(); } });
+document.addEventListener("keydown", e => {
+  if (!(e.key === "z" || e.key === "Z") || !(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+  const a = document.activeElement; if (a && (a.matches("input,textarea,select,[contenteditable]"))) return;
+  if (!lkUndo || Date.now() - lkUndo.at > 5 * 60e3) return;
+  e.preventDefault(); lkUndoNow();
+});
+function lkRefresh(){ if (typeof renderSessions === "function") renderSessions(); lkHead(); if (lkPop) lkPopRender(); lkRedraw(); }
+// ---- 详情小窗：方向、断开、打开两边的会话 ----
+const lkPopEl = (() => { const d = document.createElement("div"); d.className = "lkpop"; d.id = "lkPop"; document.body.appendChild(d); return d; })();
+function lkPopOpen(links, at, owner){ lkPop = {ids: links.map(lkId), at, owner}; lkPopRender(); lkRedraw(); }
+function lkPopClose(){ lkPop = null; lkPopEl.style.display = "none"; lkRedraw(); }
+function lkPopRender(){
+  if (!lkPop) return;
+  const ls = lkPop.owner ? lkOf(lkPop.owner.agent, lkPop.owner.sid) : LKS.filter(l => lkPop.ids.includes(lkId(l)));
+  if (!ls.length && !lkPop.owner) return lkPopClose();
+  lkPop.ids = ls.map(lkId);
+  const one = l => `<div class="lkit" data-lk="${esc(lkId(l))}">
+      <div class="lkhd"><span class="a-claude">${logo("claude")}${esc(lkName("claude", l.claude))}</span><i class="lkarr d-${l.dir}">${l.dir === "both" ? "⇄" : l.dir === "c2x" ? "→" : "←"}</i><span class="a-codex">${logo("codex")}${esc(lkName("codex", l.codex))}</span></div>
+      <div class="lksub mono">${esc(lkShort("claude", l.claude))} · ${esc(lkShort("codex", l.codex))}</div>
+      <div class="fvseg lkseg">${Object.entries(LK_DIR).map(([d, t]) => `<button data-lkdir="${d}" class="${l.dir === d ? "on" : ""} d-${d}">${t}</button>`).join("")}</div>
+      <div class="lkacts"><button class="danger" data-lkcut>断开</button><button data-lkgo="claude">打开 Claude 会话</button><button data-lkgo="codex">打开 Codex 会话</button></div></div>`;
+  const ow = lkPop.owner;
+  lkPopEl.innerHTML = `<div class="lkpt"><b>连线</b>${ow ? `<span>${esc(lkName(ow.agent, ow.sid))} · ${ls.length} 条</span>` : ""}<button class="spx" data-lkx>✕</button></div>${ls.map(one).join("")}
+    <div class="lkft">${ow ? `<button data-lkadd>${ic("plus")} 再连一个…</button>` : ""}<span class="hint">拖线两端的小圆圈到别的会话上可以改连</span></div>`;
+  lkPopEl.style.display = "block";
+  const w = lkPopEl.offsetWidth, h = lkPopEl.offsetHeight, at = lkPop.at || {x: innerWidth / 2, y: innerHeight / 3};
+  lkPopEl.style.left = Math.max(8, Math.min(innerWidth - w - 8, at.x - w / 2)) + "px";
+  lkPopEl.style.top = Math.max(8, Math.min(innerHeight - h - 8, at.y + 14)) + "px";
+}
+lkPopEl.addEventListener("click", async e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.lkx !== undefined) return lkPopClose();
+  if (b.dataset.lkadd !== undefined) { const o = lkPop.owner; lkPopClose(); return lkPicker(lkSess(o.agent, o.sid) || o); }
+  const it = b.closest(".lkit"), l = it && LKS.find(x => lkId(x) === it.dataset.lk); if (!l) return;
+  if (b.dataset.lkdir) { if (b.dataset.lkdir !== l.dir) await lkOp(`方向改成：${LK_DIR[b.dataset.lkdir]}`, [["link", {claude: l.claude, codex: l.codex, dir: b.dataset.lkdir}]]); }
+  else if (b.dataset.lkcut !== undefined) await lkOp(`已断开：${lkName("claude", l.claude)} — ${lkName("codex", l.codex)}`, [["unlink", {claude: l.claude, codex: l.codex}]]);
+  else if (b.dataset.lkgo) { const x = lkSess(b.dataset.lkgo, l[b.dataset.lkgo]); lkPopClose(); if (x) openSession(x); else toast("那个会话不在列表里（可能很久没动了）"); }
+});
+document.addEventListener("pointerdown", e => { if (lkPop && !lkPopEl.contains(e.target) && !(e.target.closest && e.target.closest("#lkSvg g.lkl,.lanc,#lkBtn"))) lkPopClose(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && lkPop) { e.preventDefault(); lkPopClose(); } });
+// ---- 不用拖的办法：「连接到…」选会话（手机 / 窄窗口只有这个） ----
+function lkPicker(x){
+  if (!cur || !x || (x.agent !== "claude" && x.agent !== "codex")) return toast("先打开一个 Claude 或 Codex 会话");
+  const other = x.agent === "claude" ? "codex" : "claude", list = sessList.filter(s => s.agent === other && !s.ignore);
+  const mine = lkOf(x.agent, x.sid), dirOf = s => { const l = mine.find(l => l[other] === s.sid); return l && l.dir; };
+  const defDir = x.agent === "claude" ? "c2x" : "x2c";
+  openDlg("连线", `<div class="lkpk"><div>把 <b class="a-${x.agent}">${esc(x.alias || x.title || "未命名")}</b> 连到下面的 ${other === "codex" ? "Codex" : "Claude"} 会话（可以选好几个）。
+      连了线，它跑 <code>task --to ${other}</code> 会直接派给连着的会话（几个都连了就挑闲的、都忙就轮流），<code>task --to linked</code> 给每个都派一份。</div>
+    ${list.length ? list.map(s => { const d = dirOf(s); return `<label class="lkpr"><input type="checkbox" data-sid="${esc(s.sid)}" ${d ? "checked" : ""}>${bbAvatar(s, sessState(s)[0], 24)}<span class="grow"><b>${esc(s.alias || s.title || "未命名")}</b><i class="mono">${esc(other)}:${esc(s.short)} · ${esc(sessState(s)[1])}</i></span>
+      <select data-dir="${esc(s.sid)}">${Object.entries(LK_DIR).map(([k, t]) => `<option value="${k}" ${(d || defDir) === k ? "selected" : ""}>${t}</option>`).join("")}</select></label>`; }).join("")
+      : `<div class="grp">这个项目里没有在线的 ${other === "codex" ? "Codex" : "Claude"} 会话</div>`}</div>`,
+    `<button onclick="closeDlg()">取消</button><button class="primary" id="lkOk">保存连线</button>`);
+  $("#lkOk").onclick = async () => {
+    const ops = [];
+    $$(".lkpr input").forEach(cb => { const sid = cb.dataset.sid, d = dirOf({sid}), nd = $(`.lkpr select[data-dir="${CSS.escape(sid)}"]`).value;
+      const c = x.agent === "claude" ? x.sid : sid, xx = x.agent === "codex" ? x.sid : sid;
+      if (cb.checked && d !== nd) ops.push(["link", {claude: c, codex: xx, dir: nd}]);
+      if (!cb.checked && d) ops.push(["unlink", {claude: c, codex: xx}]); });
+    closeDlg();
+    if (ops.length) await lkOp(`连线已更新（${ops.length} 处）`, ops);
+  };
+}
+// ---- 会话顶栏上的「已连线 → …」 ----
+function lkHead(){
+  const b = $("#lkBtn"); if (!b || !view) return;
+  const ls = lkOf(view.agent, view.sid);
+  if (!ls.length) { b.className = "spbtn prhb lkchip"; b.innerHTML = `${ic("link")}<span class="spl">连接到…</span>`; b.title = "把这个会话和另一家的会话连线，指定谁给谁派活"; return; }
+  const other = view.agent === "claude" ? "codex" : "claude";
+  const o = ls.some(l => lkDirFor(view.agent, l).o), i = ls.some(l => lkDirFor(view.agent, l).i);
+  const arr = o && i ? "⇄" : o ? "→" : "←", og = ls.some(l => l.dir !== "x2c"), gr = ls.some(l => l.dir !== "c2x");
+  b.className = `spbtn prhb lkchip on ${og && gr ? "lk-og" : og ? "lk-o" : "lk-g"}`;
+  b.innerHTML = `${ic("link")}<span>已连线 ${arr} ${esc(ls.length === 1 ? lkShort(other, ls[0][other]) : ls.length + " 个会话")}</span>`;
+  b.title = ls.map(l => `${LK_DIR[l.dir]}：${lkName("claude", l.claude)} / ${lkName("codex", l.codex)}`).join("\n") + "\n点开看详情、改方向或断开";
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("#lkBtn"); if (!b || !view) return;
+  const ls = lkOf(view.agent, view.sid), r = b.getBoundingClientRect();
+  if (lkPop) return lkPopClose();
+  if (ls.length) lkPopOpen(ls, {x: r.left + r.width / 2, y: r.bottom - 6}, {agent: view.agent, sid: view.sid}); else lkPicker(lkSess(view.agent, view.sid) || view);
+});
 let codexPause = null;
 let sessMore = new Set();     // 会话列表里「其它」那组展开着的（家 | 项目），每次重画保持
 function renderPauseBanner(){
@@ -2211,6 +2632,7 @@ function placeCards(){
   else { L.appendChild(cx); R.insertBefore(cl, R.firstChild); }
   L.appendChild($("#footL")); R.appendChild($("#footR"));     // 状态说明条永远在栏的最后（贴底）
   if (typeof renderLegend === "function") renderLegend();
+  if (typeof lkRedraw === "function" && typeof cur !== "undefined" && cur && sessList.length) renderSessions();
   // Codex 那一栏用 Codex 桌面版的样子（电脑上一栏只放一家，整栏换；手机上两家叠一起，只换 Codex 那张卡）
   cx.classList.add("cx");
   L.classList.toggle("cx", !isMobile() && cx.parentElement === L); R.classList.toggle("cx", !isMobile() && cx.parentElement === R);
@@ -2313,6 +2735,8 @@ function openSession(x){
   const live = sessList.find(s => s.agent === x.agent && s.sid === x.sid) || x;
   $("#trHead").innerHTML = `<button class="mback" onclick="mBack()" title="返回总线消息">${ic("back")}</button>${bbAvatar(live, sessState(live)[0], 30)}<span class="nm a-${esc(x.agent)}">${logo(x.agent)}${esc(nm)}</span><code>${esc(x.agent)}:${esc(x.short)}</code>
     <button class="spbtn" id="spBtn" style="display:none" title="查看这个会话派出去的子任务">${ic("users")}<span class="spl">子任务</span><span class="spn" id="spN">0</span><span class="spr" id="spRun"></span></button>
+    <button class="spbtn prhb lkchip" id="lkBtn"></button>
+    <button class="spbtn prhb" id="fvBtn" title="浏览这个项目的文件（只读），看文件差异、历史">${ic("folder")}<span class="spl">文件</span></button>
     <button class="spbtn prhb" id="chgBtn" title="看这个项目本地的改动（git status / diff），可以发给会话做代码审查">${ic("gitdiff")}<span class="spl">改动</span></button>
     <button class="spbtn prhb" id="prsBtn" title="这个项目在 GitHub 上的 PR（用本机 gh 只读查看）">${ic("gitpr")}<span class="spl">PR</span></button>
     <button class="rf" id="trRefresh" title="从头重读这个会话的记录">${ic("refresh")}</button>
@@ -2323,6 +2747,8 @@ function openSession(x){
   $("#trRefresh").onclick = e => { spin(e.currentTarget); trOffset = -1; trEntries = []; trResetState(true); pollTranscript(true); };
   if (!same) { trOffset = -1; trEntries = []; trResetState(false); $("#trView").innerHTML = `<div class="empty">正在读会话记录…</div>`; }
   $("#spBtn").onclick = () => spOpenP ? spClose() : spShow();
+  $("#fvBtn").onclick = () => fvOpenP ? fvClose() : fvOpen({});
+  if (x.agent === "claude" || x.agent === "codex") lkHead(); else $("#lkBtn").remove();
   $("#chgBtn").onclick = () => (prOpenP && prCur && prCur.t === "chg") ? prClose() : (prStack = [], prCur = null, chgOpen());
   $("#prsBtn").onclick = () => (prOpenP && prCur && prCur.t === "list") ? prClose() : (prStack = [], prCur = null, prListOpen());
   spOnOpen(x, same);
@@ -2423,7 +2849,8 @@ function toolIcon(n){ n = (n || "").toLowerCase();
 function toolRow(t, kp){
   const name = t.name || t.text.split(" · ")[0], arg = t.arg != null ? t.arg : t.text.split(" · ").slice(1).join(" · ");
   const o = t.id ? trToolOut[t.id] : null, dk = kp + "r" + t.pos;
-  const head = `<span class="tic">${ic(toolIcon(name))}</span><span class="tn">${esc(name)}</span><span class="ta" title="${esc(arg)}">${esc(arg)}</span>${o && o.err ? '<span class="terr">出错</span>' : ""}`;
+  const cf = claudeFileOf(t, kp);
+  const head = `<span class="tic">${ic(toolIcon(name))}</span><span class="tn">${esc(name)}</span>${cf ? `<span class="ta">${fileChip(cf.path, cf.line, cf.path.replace(/\\/g, "/").split("/").slice(-2).join("/"))}${cf.key ? lineBadge(cf.key, cf.add, cf.del) : ""}</span>` : `<span class="ta" title="${esc(arg)}">${esc(arg)}</span>`}${o && o.err ? '<span class="terr">出错</span>' : ""}`;
   if (!t.input && !o) return `<div class="tcall flat"><div class="tsm">${head}</div></div>`;
   return `<details class="tcall" data-dk="${esc(dk)}" ${trDet.has(dk) ? "open" : ""}><summary class="tsm">${head}</summary>
     ${t.input ? `<div class="tio"><div class="tlb">输入</div><pre>${esc(t.input)}</pre></div>` : ""}
@@ -2437,8 +2864,8 @@ function mdInline(s){       // s 已经转义过
   s = s.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>");      // __粗__ 不认：代码里的 __init__ 太常见
   s = s.replace(/(^|[^*\w])\*([^*\s](?:[^*\n]*[^*\s])?)\*(?![*\w])/g, "$1<em>$2</em>");
   s = s.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
-  s = prLinkify(s);
-  return s.replace(/\u0000(\d+)\u0000/g, (m, i) => `<code>${codes[+i]}</code>`);
+  s = frefLinkify(prLinkify(s));
+  return s.replace(/\u0000(\d+)\u0000/g, (m, i) => codeFref(codes[+i]) || `<code>${codes[+i]}</code>`);
 }
 function mdCode(code, lang){
   return `<div class="cb"><div class="cbh"><span>${esc(lang || "")}</span><button class="cpy" data-copy title="复制">复制</button></div><pre><code>${esc(code)}</code></pre></div>`;
@@ -2516,6 +2943,7 @@ function cxOut(o){         // 去掉 Codex 输出前面的 Chunk ID / Wall time 
   const m = s.match(/^[\s\S]{0,400}?\bOutput:\r?\n/);
   if (m) { const h = m[0], c = h.match(/(?:exited with code|Exit code:?)\s*(-?\d+)/i), w = h.match(/Wall time:?\s*([\d.]+)\s*s/i);
     if (c) code = +c[1]; if (w) wall = (+w[1] < 10 ? (+w[1]).toFixed(1) : Math.round(+w[1])) + " 秒"; s = s.slice(h.length); }
+  else { const c = s.match(/^(?:Process exited with code|Exit code:?)\s*(-?\d+)\r?\n/i); if (c) { code = +c[1]; s = s.slice(c[0].length); } }
   return {out: s.replace(/\r/g, ""), code, wall};
 }
 function cxPatch(p){
@@ -2542,9 +2970,10 @@ function cxToolRow(t, kp){
   } else if (k === "edit") {
     const fs = cxPatch(t.input), cut = /…（共 \d+ 字/.test(t.input || ""), A = fs.reduce((a, f) => a + f.add, 0), D = fs.reduce((a, f) => a + f.del, 0);
     const verb = fs.length === 1 && fs[0].op === "Add" ? "新建" : fs.length === 1 && fs[0].op === "Delete" ? "删除" : "编辑";
-    head = `<span class="cxv">${verb}</span><span class="cxf" title="${esc(fs.map(f => f.path).join("\n"))}">${esc(fs.length === 1 ? cxBase(fs[0].path) : fs.length ? fs.length + " 个文件" : "文件")}</span>`
-      + (fs.length ? `<span class="cxa">+${A}${cut ? "…" : ""}</span><span class="cxd">−${D}${cut ? "…" : ""}</span>` : "") + (o && o.err ? '<span class="cxx">出错</span>' : "");
-    body = `<div class="cxdiff">${fs.length > 1 ? `<div class="cxfl">${fs.map(f => `<div>${esc(f.path)} <span class="cxa">+${f.add}</span> <span class="cxd">−${f.del}</span></div>`).join("")}</div>` : ""}<pre>${cxDiff(t.input)}</pre></div>`
+    const pf = codexPatchFiles(t, kp);
+    head = `<span class="cxv">${verb}</span>` + (pf.length === 1 ? fileChip(pf[0].path) + lineBadge(pf[0].key, pf[0].add, pf[0].del)
+      : `<span class="cxf" title="${esc(fs.map(f => f.path).join("\n"))}">${fs.length ? fs.length + " 个文件" : "文件"}</span>` + (fs.length ? `<span class="cxa">+${A}${cut ? "…" : ""}</span><span class="cxd">−${D}${cut ? "…" : ""}</span>` : "")) + (o && o.err ? '<span class="cxx">出错</span>' : "");
+    body = `<div class="cxdiff">${fs.length > 1 ? `<div class="cxfl">${pf.map(f => `<div>${fileChip(f.path, null, f.path)} ${lineBadge(f.key, f.add, f.del)}</div>`).join("")}</div>` : ""}<pre>${cxDiff(t.input)}</pre></div>`
       + (o && (o.err || o.out) ? `<pre class="${o.err ? "err" : ""}" style="margin-top:6px">${esc(cxOut(o.out).out.trim() || "（没有输出）")}</pre>` : "");
   } else if (k === "plan") {
     let items = []; try { items = (JSON.parse(t.input || "{}").plan) || []; } catch(e) {}
@@ -2558,14 +2987,14 @@ function cxToolRow(t, kp){
 }
 // 连着好几个动作：超过 3 个就像 Codex 那样收成一行「运行了 N 条命令 · 编辑了 M 个文件」
 function cxToolsHtml(tools, kp){
-  if (tools.length <= 3) return tools.map(t => cxToolRow(t, kp)).join("");
+  if (tools.length <= 1) return tools.map(t => cxToolRow(t, kp)).join("");
   const n = {run: 0, edit: 0, plan: 0, call: 0}; let files = 0;
   tools.forEach(t => { const k = cxKind(t); n[k]++; if (k === "edit") files += Math.max(1, cxPatch(t.input).length); });
   const parts = [n.run && `运行了 ${n.run} 条命令`, n.edit && `编辑了 ${files} 个文件`, n.plan && `更新了 ${n.plan} 次计划`, n.call && `调用了 ${n.call} 次工具`].filter(Boolean);
   const dk = kp + "t" + tools[0].pos, last = tools[tools.length - 1], lk = cxKind(last);
   const nerr = tools.filter(t => t.id && trToolOut[t.id] && (trToolOut[t.id].err || (cxKind(t) === "run" && (cxOut(trToolOut[t.id].out).code || 0) !== 0))).length;
   const tail = lk === "run" ? cxCmds(last)[0].split("\n")[0] : lk === "edit" ? (cxPatch(last.input).map(f => cxBase(f.path)).join(", ") || "") : (last.name || "");
-  return `<details class="cxg" data-dk="${esc(dk)}" ${trDet.has(dk) ? "open" : ""}><summary>${ic("chev", "cxch")}<span class="cxv">${parts.join(" · ")}</span>${nerr ? `<span class="cxx">${nerr} 个出错</span>` : ""}<span class="cxgs cxw" style="font-family:var(--mono)">${esc(tail)}</span></summary><div class="cxgl">${tools.map(t => cxToolRow(t, kp)).join("")}</div></details>`;
+  return `<details class="cxg" data-dk="${esc(dk)}" ${trDet.has(dk) ? "open" : ""}><summary>${ic("chev", "cxch")}<span class="cxv tsum">${toolGroupSummary(tools, kp, true)}</span>${ic("chev", "cxgo")}</summary><div class="cxgl">${tools.map(t => cxToolRow(t, kp)).join("")}</div></details>`;
 }
 // kp：键前缀（子代理记录里的条目和主记录的字节位置会撞，前面加上子任务 id）；sub：子代理记录（提示词那条带 is_prompt 标记，不再画）
 function trListHtml(entries, kp, sub){
@@ -2576,7 +3005,7 @@ function trListHtml(entries, kp, sub){
     const dk = kp + "t" + tools[0].pos, last = tools[tools.length-1];
     const nerr = tools.filter(t => t.id && trToolOut[t.id] && trToolOut[t.id].err).length;
     html += tools.length === 1 ? `<div class="tools one">${toolRow(tools[0], kp)}</div>`
-      : `<details class="tools" data-dk="${esc(dk)}" ${trDet.has(dk) ? "open" : ""}><summary><span class="tgc">${ic("chev")}</span>${tools.length} 次工具调用${nerr ? `<span class="terr">${nerr} 次出错</span>` : ""}<span class="tgl">${esc((last.name || "") + (last.arg ? " " + last.arg : last.name ? "" : last.text))}</span></summary><div class="tlist">${tools.map(t => toolRow(t, kp)).join("")}</div></details>`;
+      : `<details class="tools" data-dk="${esc(dk)}" ${trDet.has(dk) ? "open" : ""}><summary><span class="tgc">${ic("chev")}</span><span class="tsum">${toolGroupSummary(tools, kp, false)}</span>${nerr && !tools.some(t => /^(Bash|PowerShell)$/.test(t.name || "")) ? `<span class="terr">${nerr} 次出错</span>` : ""}</summary><div class="tlist">${tools.map(t => toolRow(t, kp)).join("")}</div></details>`;
     tools = []; };
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i];
@@ -2596,7 +3025,7 @@ function trListHtml(entries, kp, sub){
     if (e.role !== "user" && e.role !== "assistant") continue;
     const isU = e.role === "user", nl = e.text.split("\n").length;
     const bk = kp + e.pos, long = isU ? e.text.length > 700 || nl > 14 : e.text.length > 3000 || nl > 60, cl = long && !trUnclamp.has(bk);
-    html += `<div class="bub ${isU?"u":"a"} ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bx${isU?"":" md"}">${isU ? prLinkify(esc(e.text)) : mdHtml(e.text)}</div>${prCards(e.text)}
+    html += `<div class="bub ${isU?"u":"a"} ${cl?"clamp":""}" data-bk="${esc(bk)}"><div class="bx${isU?"":" md"}">${isU ? frefLinkify(prLinkify(esc(e.text))) : mdHtml(e.text)}</div>${prCards(e.text)}
       ${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}${e.ts?`<div class="bt">${hm(e.ts)}</div>`:""}</div>`;
   }
   flush();
@@ -3044,12 +3473,17 @@ function diffHtml(text, truncated){
   if (!diffFiles.length) return `<div class="empty">没有改动</div>`;
   const ta = diffFiles.reduce((a, f) => a + f.add, 0), td = diffFiles.reduce((a, f) => a + f.del, 0);
   const many = diffFiles.length > 25;
-  return `<div class="dfsum">${diffFiles.length} 个文件 · <span class="pradd">+${ta}</span> <span class="prdel">-${td}</span>${truncated ? " · 太大，只显示了前一部分" : ""}<span class="dfall"><a class="link" data-dfx="1">全部展开</a> · <a class="link" data-dfx="0">全部收起</a></span></div>` +
+  return `<div class="dfsum">${diffFiles.length} 个文件 · <span class="pradd">+${ta}</span> <span class="prdel">-${td}</span>${truncated ? " · 太大，只显示了前一部分" : ""}<span class="dfall"><span class="fvseg"><button data-psplit="0" class="${prSplit ? "" : "on"}">统一</button><button data-psplit="1" class="${prSplit ? "on" : ""}">并排</button></span> <a class="link" data-dfx="1">全部展开</a> · <a class="link" data-dfx="0">全部收起</a></span></div>` +
     diffFiles.map((f, i) => { const open = (!many || i < 3) && f.lines.length < 1500;
       const tag = f.meta.some(x => x.startsWith("new file")) ? '<span class="dftag add">新增</span>' : f.meta.some(x => x.startsWith("deleted")) ? '<span class="dftag del">删除</span>' : f.meta.some(x => x.startsWith("rename")) ? '<span class="dftag">改名</span>' : "";
       return `<details class="dff" data-i="${i}" ${open ? "open" : ""}><summary><span class="tgc">${ic("chev")}</span><span class="dfp" title="${esc(f.path)}">${esc(f.path)}</span>${tag}<span class="pradd">+${f.add}</span><span class="prdel">-${f.del}</span></summary><div class="dfb">${open ? diffFileHtml(f) : ""}</div></details>`; }).join("");
 }
+let prSplit = store.get("msgbus.prSplit") === "1";
 function diffFileHtml(f){
+  if (f.lines.length) { const out = diffRowsHtml(patchRows(f.lines.slice(0, 5000)), langOf(f.path), prSplit); return out.html + (f.lines.length > 5000 ? `<div class="dfmeta">（这个文件改得太多，只显示前 5000 行）</div>` : ""); }
+  return diffFileHtmlOld(f);
+}
+function diffFileHtmlOld(f){
   const ext = (f.path.match(/\.([\w]+)$/) || ["", f.path.split("/").pop().toLowerCase()])[1].toLowerCase();
   const lang = /^(py|js|mjs|cjs|ts|tsx|jsx|java|kt|go|rs|c|h|cc|cpp|hpp|cs|rb|php|swift|sh|ps1|lua|gd|toml|yaml|yml|json|html|css|scss|vue|svelte|sql|r|pl|cfg|ini|dockerfile|cmake|mk|iss)$/.test(ext) ? ext : "";
   if (!f.lines.length) return `<div class="dfmeta">${esc(f.meta.join(" · ") || "没有文本改动")}</div>`;
@@ -3068,6 +3502,9 @@ function diffFileHtml(f){
 function diffBind(B){
   B.querySelectorAll("details.dff").forEach(d => d.ontoggle = () => { const b = d.querySelector(".dfb"); if (d.open && !b.innerHTML) b.innerHTML = diffFileHtml(diffFiles[+d.dataset.i]); });
   B.querySelectorAll("[data-dfx]").forEach(a => a.onclick = () => B.querySelectorAll("details.dff").forEach(d => d.open = a.dataset.dfx === "1"));
+  B.querySelectorAll("[data-psplit]").forEach(a => a.onclick = () => { prSplit = a.dataset.psplit === "1"; store.set("msgbus.prSplit", prSplit ? "1" : "0");
+    B.querySelectorAll("[data-psplit]").forEach(x => x.classList.toggle("on", x === a));
+    B.querySelectorAll("details.dff").forEach(d => { const b = d.querySelector(".dfb"); b.innerHTML = d.open ? diffFileHtml(diffFiles[+d.dataset.i]) : ""; }); });
 }
 
 // ---------- 项目的 PR 列表（git 远程 → gh pr list） ----------
@@ -3116,9 +3553,12 @@ function chgRender(){
   const CODE = {"M": "改", "A": "增", "D": "删", "R": "名", "C": "复", "U": "冲", "?": "新"};
   B.innerHTML = `<div class="chgst">${esc(d.status || "")}${d.shortstat ? " · " + esc(d.shortstat) : ""}${d.untracked ? ` · ${d.untracked} 个没跟踪的新文件` : ""}</div>
     ${d.commits && d.commits.length ? `<div class="lbl">分支上的提交（${d.commits.length}）</div><div class="prlist">${d.commits.map(c => `<div class="prcm"><code>${esc(c.slice(0, 7))}</code><span class="prcmh">${esc(c.slice(8))}</span></div>`).join("")}</div>` : ""}
-    ${d.files.length ? `<div class="lbl">工作区（git status）</div><div class="chgfiles">${d.files.map(f => { const c = (f.code.trim()[0] || "M"); return `<div class="chgf"><span class="chgc c${esc(c === "?" ? "N" : c)}" title="${esc(f.code)}">${CODE[c] || esc(c)}</span><span>${esc(f.path)}</span></div>`; }).join("")}</div>` : ""}
+    ${d.files.length ? `<div class="lbl">工作区（git status）</div><div class="chgfiles">${d.files.map(f => { const c = (f.code.trim()[0] || "M"); return `<div class="chgf" data-path="${esc(f.path)}"><span class="chgc c${esc(c === "?" ? "N" : c)}" title="${esc(f.code)}">${CODE[c] || esc(c)}</span><span>${esc(f.path)}</span></div>`; }).join("")}</div>` : ""}
     <div class="lbl">改动</div>${diffHtml(d.diff, d.truncated)}`;
   diffBind(B);
+  const openDiff = p => fvOpen({root, path: p, mode: d.files.some(f => f.path === p && f.code === "??") ? "view" : "diff", a: chgBase === "HEAD" ? "HEAD" : d.against});
+  B.querySelectorAll(".chgf").forEach(r => { r.title = "在文件查看器里看差异"; r.onclick = () => openDiff(r.dataset.path); });
+  B.querySelectorAll("details.dff .dfp").forEach(x => { x.classList.add("lnk"); x.title += " · 点文件名在查看器里看"; x.onclick = e => { e.preventDefault(); e.stopPropagation(); openDiff(x.textContent); }; });
 }
 
 // ---------- 代码审查：选一个会话，经总线（以你本人的名义）发「请只读审查这个 PR / 这些改动」 ----------
@@ -3147,6 +3587,483 @@ function reviewDlg(o){
   };
 }
 
+// ---------- 文件查看 / 文件差异（只读）：右侧面板，左边文件树 + 搜索，右边查看器 / 差异 / 历史 / 追溯 ----------
+// 服务端 /api/files/*（只认已登记的项目目录，路径不许越出项目）；Claude 的 Edit / Write、Codex 的 apply_patch 在本地算差异
+const LANG_EXT = {py: "py", pyw: "py", js: "js", mjs: "js", cjs: "js", ts: "ts", tsx: "ts", jsx: "js", json: "json", md: "md", markdown: "md",
+  lua: "lua", c: "c", h: "c", cc: "c", cpp: "c", hpp: "c", cxx: "c", cs: "c", java: "c", kt: "c", go: "go", rs: "rs", sh: "sh", bash: "sh",
+  zsh: "sh", ps1: "ps1", psm1: "ps1", yaml: "yaml", yml: "yaml", toml: "toml", ini: "ini", cfg: "ini", html: "html", htm: "html", xml: "html",
+  vue: "html", svelte: "html", css: "css", scss: "css", less: "css", sql: "sql", rb: "rb", php: "c", swift: "c", gd: "py", iss: "ini",
+  cmd: "bat", bat: "bat", txt: "", gitignore: "sh", dockerfile: "sh", mk: "sh", cmake: "sh", r: "py", pl: "sh"};
+const HASH_C = /^(py|sh|rb|yaml|toml|ps1|ini)$/, DASH_C = /^(lua|sql)$/, SLASH_C = /^(js|ts|json|c|go|rs|css|html)$/;
+function langOf(path){ const b = String(path || "").split("/").pop().toLowerCase(), e = b.includes(".") ? b.split(".").pop() : b; return LANG_EXT[e] ?? ""; }
+["local", "end", "then", "elseif", "repeat", "until", "goto", "foreach", "param", "begin", "fi", "esac", "done", "echo", "require", "include", "struct", "unsigned", "int", "char", "float", "double", "bool", "string", "auto", "println", "print"].forEach(k => HL_KW.add(k));
+const HL2 = /(--[^\n]*|\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->)|("(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d[\d_.xXa-fA-F]*\b)|([A-Za-z_$][\w$]*)/g;
+function hl2(s, lang){
+  if (!lang || lang === "md" || s.length > 3000) return esc(s);
+  let out = "", last = 0, m; HL2.lastIndex = 0;
+  while ((m = HL2.exec(s))) {
+    if (m[1]) { const c = m[1];
+      const ok = c.startsWith("--") ? DASH_C.test(lang) : c.startsWith("//") ? SLASH_C.test(lang) && !/:$/.test(s.slice(0, m.index)) : c.startsWith("#") ? HASH_C.test(lang) : true;
+      if (!ok) { out += esc(s.slice(last, m.index + 1)); last = m.index + 1; HL2.lastIndex = m.index + 1; continue; } }
+    out += esc(s.slice(last, m.index));
+    const t = esc(m[0]);
+    out += m[1] ? `<i class="hc">${t}</i>` : m[2] ? `<i class="hs">${t}</i>` : m[3] ? `<i class="hn">${t}</i>` : HL_KW.has(m[4]) ? `<i class="hk">${t}</i>` : t;
+    last = m.index + m[0].length;
+  }
+  return out + esc(s.slice(last));
+}
+// 整个文件逐行高亮：跨行的块注释 / 三引号字符串整行标成注释色
+function hlLines(lines, lang){
+  const open = lang === "lua" ? [/--\[=*\[/, /\]=*\]/] : lang === "py" ? [/("""|''')/, null] : /^(js|ts|c|go|rs|css|json)$/.test(lang) ? [/\/\*/, /\*\//] : lang === "html" ? [/<!--/, /-->/] : null;
+  let inside = null;
+  return lines.map(l => {
+    if (inside) { const e = l.search(inside); if (e < 0) return `<i class="hc">${esc(l)}</i>`;
+      const end = e + (l.slice(e).match(inside) || [""])[0].length; inside = null; return `<i class="hc">${esc(l.slice(0, end))}</i>` + hl2(l.slice(end), lang); }
+    if (open) { const m = l.match(open[0]);
+      if (m) { const after = l.slice(m.index + m[0].length), closeRe = open[1] || new RegExp(m[0].replace(/[\\"']/g, c => "\\" + c));
+        const before = l.slice(0, m.index);
+        if (lang === "py" && (before.match(/["']/g) || []).length % 2) return hl2(l, lang);
+        if (!closeRe.test(after)) { inside = closeRe; return hl2(before, lang) + `<i class="hc">${esc(l.slice(m.index))}</i>`; } } }
+    return hl2(l, lang);
+  });
+}
+// ---------- 行级差异（本地算：Claude 的 Edit、Codex 补丁）：去掉首尾相同的行，中间用 LCS；太大就整段算替换 ----------
+function lineDiff(a, b){
+  let s = 0; while (s < a.length && s < b.length && a[s] === b[s]) s++;
+  let ea = a.length, eb = b.length; while (ea > s && eb > s && a[ea - 1] === b[eb - 1]) { ea--; eb--; }
+  const A = a.slice(s, ea), B = b.slice(s, eb), hunks = [];
+  if (!A.length && !B.length) return hunks;
+  if (!A.length || !B.length || A.length * B.length > 4e6) return [{o: s + 1, ol: A.length, n: s + 1, nl: B.length}];
+  const n = A.length, m = B.length, W = m + 1, L = new Uint32Array((n + 1) * W);
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i * W + j] = A[i] === B[j] ? L[(i + 1) * W + j + 1] + 1 : Math.max(L[(i + 1) * W + j], L[i * W + j + 1]);
+  let i = 0, j = 0, cur = null;
+  const push = () => { if (cur) { hunks.push(cur); cur = null; } };
+  while (i < n || j < m) {
+    if (i < n && j < m && A[i] === B[j]) { push(); i++; j++; continue; }
+    if (!cur) cur = {o: s + i + 1, ol: 0, n: s + j + 1, nl: 0};
+    if (j < m && (i >= n || L[i * W + j + 1] >= L[(i + 1) * W + j])) { cur.nl++; j++; } else { cur.ol++; i++; }
+  }
+  push(); return hunks;
+}
+const gitHunks = hs => (hs || []).map(([os, ol, ns, nl]) => ({o: ol ? os : os + 1, ol, n: nl ? ns : ns + 1, nl}));
+const splitLines = t => { const L = String(t ?? "").replace(/\r\n?/g, "\n").split("\n"); if (L.length && L[L.length - 1] === "") L.pop(); return L; };
+function diffCount(o, n){ const hs = lineDiff(splitLines(o), splitLines(n)); return hs.reduce((x, h) => [x[0] + h.nl, x[1] + h.ol], [0, 0]); }
+// 词级差异：一对删 / 增行里只把变了的词标出来
+function wordDiff(a, b){
+  const ta = a.match(/\w+|\s+|[^\w\s]/g) || [], tb = b.match(/\w+|\s+|[^\w\s]/g) || [];
+  if (ta.length * tb.length > 90000) return null;
+  const n = ta.length, m = tb.length, W = m + 1, L = new Uint16Array((n + 1) * W);
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i * W + j] = ta[i] === tb[j] ? L[(i + 1) * W + j + 1] + 1 : Math.max(L[(i + 1) * W + j], L[i * W + j + 1]);
+  const common = L[0]; if (common < Math.min(n, m) * 0.3) return null;     // 差太多就不标词了
+  let i = 0, j = 0, oa = "", ob = "";
+  while (i < n || j < m) {
+    if (i < n && j < m && ta[i] === tb[j]) { oa += esc(ta[i]); ob += esc(tb[j]); i++; j++; }
+    else if (j < m && (i >= n || L[i * W + j + 1] >= L[(i + 1) * W + j])) { ob += `<mark class="wa">${esc(tb[j++])}</mark>`; }
+    else oa += `<mark class="wd">${esc(ta[i++])}</mark>`;
+  }
+  return [oa, ob];
+}
+// old / new 行 + 行块 → 行列表：{t:" "|"-"|"+"|"x", o, n, a(旧文本), b(新文本), wa, wb}；长的相同段折起来
+function diffRows(oldL, newL, hunks, ctx, expanded){
+  const rows = [], C = ctx ?? 3; let oi = 1, ni = 1, xi = 0;
+  const same = (to) => {         // oi..to-1 是相同的
+    const len = to - oi, first = oi === 1, lastSeg = to > oldL.length;
+    const keepA = first ? 0 : C, keepB = lastSeg ? 0 : C, key = "x" + oi;
+    if (len > keepA + keepB + 4 && !expanded.has(key)) {
+      for (let k = 0; k < keepA; k++) rows.push({t: " ", o: oi + k, n: ni + k, a: oldL[oi + k - 1]});
+      rows.push({t: "x", key, n0: len - keepA - keepB, idx: xi++});
+      for (let k = len - keepB; k < len; k++) rows.push({t: " ", o: oi + k, n: ni + k, a: oldL[oi + k - 1]});
+    } else for (let k = 0; k < len; k++) rows.push({t: " ", o: oi + k, n: ni + k, a: oldL[oi + k - 1]});
+    ni += len; oi = to;
+  };
+  hunks.forEach((h, hi) => {
+    same(h.o);
+    const dels = [], adds = [];
+    for (let k = 0; k < h.ol; k++) dels.push({t: "-", o: h.o + k, a: oldL[h.o + k - 1] ?? "", h: hi});
+    for (let k = 0; k < h.nl; k++) adds.push({t: "+", n: h.n + k, b: newL[h.n + k - 1] ?? "", h: hi});
+    for (let k = 0; k < Math.min(dels.length, adds.length); k++) {
+      const w = dels[k].a.length + adds[k].b.length < 2000 ? wordDiff(dels[k].a, adds[k].b) : null;
+      if (w) { dels[k].w = w[0]; adds[k].w = w[1]; }
+      dels[k].pair = adds[k]; adds[k].pair = dels[k];
+    }
+    if (dels.length) dels[0].hs = hi; else if (adds.length) adds[0].hs = hi;
+    rows.push(...dels, ...adds); oi = h.o + h.ol; ni = h.n + h.nl;
+  });
+  same(oldL.length + 1);
+  return rows;
+}
+function diffRowsHtml(rows, lang, split, max){
+  const cell = (r, side) => side === "a" ? (r.w ?? hl2(r.a ?? "", lang)) : (r.w ?? hl2(r.b ?? "", lang));
+  let out = "", n = 0;
+  const lim = max || 8000;
+  if (!split) {
+    for (const r of rows) { if (++n > lim) break;
+      if (r.t === "h") { out += `<div class="dl hh"><span class="ln"></span><span class="ln"></span><span class="dc">${esc(r.a)}</span></div>`; continue; }
+      if (r.t === "x") { out += `<div class="dl dx" data-x="${r.key}"><span class="ln"></span><span class="ln"></span><span class="dc">${ic("chev")} 展开 ${r.n0} 行没改动的</span></div>`; continue; }
+      const id = r.hs != null ? ` id="fvh${r.hs}"` : "";
+      if (r.t === " ") out += `<div class="dl"><span class="ln">${r.o}</span><span class="ln">${r.n}</span><span class="dc"><b> </b>${hl2(r.a, lang)}</span></div>`;
+      else if (r.t === "-") out += `<div class="dl de"${id}><span class="ln">${r.o}</span><span class="ln"></span><span class="dc"><b>-</b>${cell(r, "a")}</span></div>`;
+      else out += `<div class="dl ad"${id}><span class="ln"></span><span class="ln">${r.n}</span><span class="dc"><b>+</b>${cell(r, "b")}</span></div>`;
+    }
+    return { html: `<div class="dft fvd">${out}</div>`, more: rows.length > lim };
+  }
+  // 并排：每个改动块里删和增一一对齐
+  for (let i = 0; i < rows.length; i++) { const r = rows[i]; if (++n > lim) break;
+    if (r.t === "h") { out += `<div class="sl hh"><span class="dc full">${esc(r.a)}</span></div>`; continue; }
+    if (r.t === "x") { out += `<div class="sl dx" data-x="${r.key}"><span class="dc full">${ic("chev")} 展开 ${r.n0} 行没改动的</span></div>`; continue; }
+    if (r.t === " ") { const h = hl2(r.a, lang); out += `<div class="sl"><span class="ln">${r.o}</span><span class="dc">${h}</span><span class="ln">${r.n}</span><span class="dc">${h}</span></div>`; continue; }
+    const dels = [], adds = []; let j = i;
+    while (j < rows.length && rows[j].t === "-" ) dels.push(rows[j++]);
+    while (j < rows.length && rows[j].t === "+" && (!dels.length || rows[j].h === dels[0].h)) adds.push(rows[j++]);
+    i = j - 1;
+    const id = (dels[0] || adds[0]).hs != null ? ` id="fvh${(dels[0] || adds[0]).hs}"` : "";
+    for (let k = 0; k < Math.max(dels.length, adds.length); k++) { const d = dels[k], a = adds[k];
+      out += `<div class="sl"${k === 0 ? id : ""}>${d ? `<span class="ln de">${d.o}</span><span class="dc de">${cell(d, "a")}</span>` : '<span class="ln ex"></span><span class="dc ex"></span>'}${a ? `<span class="ln ad">${a.n}</span><span class="dc ad">${cell(a, "b")}</span>` : '<span class="ln ex"></span><span class="dc ex"></span>'}</div>`; }
+  }
+  return { html: `<div class="dft fvd split">${out}</div>`, more: rows.length > lim };
+}
+
+// ---------- 面板 ----------
+const fvPanel = document.createElement("aside");
+fvPanel.className = "spanel fvpanel"; fvPanel.id = "fvPanel"; fvPanel.setAttribute("aria-hidden", "true");
+fvPanel.innerHTML = `<div class="sph"><button class="spback" id="fvSideBtn" title="显示 / 隐藏文件树">${ic("folder")}</button><div class="spht"><b id="fvTitle">文件</b><span id="fvSub"></span></div><span id="fvActs"></span><button class="spx" id="fvX" title="关闭（Esc）">✕</button></div>
+  <div class="fvwrap"><div class="fvside" id="fvSide"><div class="fvsearch"><input id="fvQ" placeholder="搜文件名（模糊匹配）" autocomplete="off" spellcheck="false"></div><div class="fvtree" id="fvTree"></div></div>
+  <div class="fvmain"><div class="fvbar" id="fvBar"></div><div class="fvbody" id="fvBody"><div class="empty">左边选一个文件</div></div></div></div>`;
+document.body.appendChild(fvPanel);
+let FV = {root: null, path: null, mode: "view", side: true, split: store.get("msgbus.fvSplit") === "1", md: "render", a: "HEAD", b: "WORKTREE",
+  dirs: {}, openDirs: new Set([""]), data: null, diff: null, exp: new Set(), refs: null, blame: null, hist: null, line: null, find: null, edit: null};
+let fvOpenP = false;
+function fvShow(){ fvOpenP = true; fvPanel.classList.add("open"); fvPanel.setAttribute("aria-hidden", "false"); fvPanel.classList.toggle("noside", !FV.side); }
+function fvClose(){ fvOpenP = false; fvPanel.classList.remove("open"); fvPanel.setAttribute("aria-hidden", "true"); }
+$("#fvX").onclick = fvClose;
+$("#fvSideBtn").onclick = () => { FV.side = !FV.side; fvPanel.classList.toggle("noside", !FV.side); if (FV.side) fvTree(); };
+document.addEventListener("keydown", e => {
+  if (!fvOpenP || $("#dlg").classList.contains("open")) return;
+  if (e.key === "Escape") { e.preventDefault(); fvClose(); }
+  else if ((e.key === "n" || e.key === "p") && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) fvJump(e.key === "n" ? 1 : -1);
+});
+const fvQ = (o) => Object.entries(Object.assign({root: FV.root}, o)).map(([k, v]) => `${k}=${encodeURIComponent(v ?? "")}`).join("&");
+// 打开：{root, path, line, mode: view|diff|hist|blame|edit, a, b, edit:{title, chunks:[[old,new]…], content}, find}
+function fvOpen(o){
+  o = o || {};
+  const root = o.root || (cur && cur.root); if (!root) return toast("先选一个项目");
+  if (FV.root !== root) { FV.dirs = {}; FV.openDirs = new Set([""]); FV.refs = null; }
+  Object.assign(FV, {root, mode: o.mode || (o.path ? "view" : FV.mode), line: o.line || null, find: o.find || null, edit: o.edit || null, exp: new Set()});
+  if (o.a) FV.a = o.a; else if (o.mode === "diff") FV.a = "HEAD";
+  FV.b = o.b || "WORKTREE";
+  FV.side = o.side != null ? o.side : !(isMobile() && o.path);     // 看单次编辑的差异不带树；其它时候带（手机上有文件就直接看文件）
+  if (o.path) { FV.path = fvRel(o.path); fvRevealDir(FV.path); }
+  if (typeof prOpenP !== "undefined" && prOpenP) prClose();
+  if (typeof spOpenP !== "undefined" && spOpenP) spClose();
+  fvShow(); if (FV.side) fvTree();
+  if (FV.path || FV.mode === "edit") fvLoad(); else fvHead();
+}
+function fvRel(p){        // 项目目录下的绝对路径 → 相对路径（服务端也会认绝对路径，这里只是让树能展开到它）
+  let s = String(p).replace(/\\/g, "/"); const r = String(FV.root || "").replace(/\\/g, "/").replace(/\/$/, "");
+  if (r && s.toLowerCase().startsWith(r.toLowerCase() + "/")) s = s.slice(r.length + 1);
+  return s.replace(/^\.\//, "");
+}
+function fvRevealDir(p){ if (/^[a-zA-Z]:\/|^\//.test(p)) return; const parts = p.split("/"); let d = ""; for (let i = 0; i < parts.length - 1; i++) { d = d ? d + "/" + parts[i] : parts[i]; FV.openDirs.add(d); } }
+// ---------- 文件树（按目录懒加载）+ 模糊搜索 ----------
+async function fvLs(d){
+  if (FV.dirs[d] && !FV.dirs[d].err) return FV.dirs[d];
+  try { FV.dirs[d] = await api(`/api/files/ls?${fvQ({dir: d})}`); } catch(e) { FV.dirs[d] = {err: String(e.message || e)}; }
+  return FV.dirs[d];
+}
+async function fvTree(){
+  if ($("#fvQ").value.trim()) return fvSearch();
+  const T = $("#fvTree"); if (!FV.dirs[""]) T.innerHTML = `<div class="empty"><span class="spinr"></span> 读文件列表…</div>`;
+  await Promise.all([...FV.openDirs].map(d => fvLs(d)));
+  const r = FV.dirs[""]; if (!r) return;
+  if (r.err) { T.innerHTML = `<div class="prerr">${ic("warn")}<div>${esc(r.err)}</div></div>`; return; }
+  const node = (d, depth) => { const x = FV.dirs[d]; if (!x || x.err) return "";
+    return x.dirs.map(s => { const p = d ? d + "/" + s.name : s.name, op = FV.openDirs.has(p);
+      return `<div class="fvn dir ${op ? "open" : ""}" data-dir="${esc(p)}" style="padding-left:${6 + depth * 14}px">${ic("chev", "fvch")}${ic("folder")}<span>${esc(s.name)}</span><i>${s.n ?? ""}</i></div>` + (op ? (FV.dirs[p] ? node(p, depth + 1) : `<div class="fvn" style="padding-left:${20 + depth * 14}px"><span class="spinr"></span></div>`) : ""); }).join("")
+      + x.files.map(f => { const p = d ? d + "/" + f : f; return `<div class="fvn file ${p === FV.path ? "sel" : ""}" data-file="${esc(p)}" style="padding-left:${20 + depth * 14}px" title="${esc(p)}">${ic("file")}<span>${esc(f)}</span></div>`; }).join("")
+      + (x.more ? `<div class="fvn more" style="padding-left:${20 + depth * 14}px">还有 ${x.more} 个文件，用上面的搜索</div>` : ""); };
+  T.innerHTML = `<div class="fvtot">${r.git ? r.total + " 个文件 · 按 .gitignore" : "不是 git 仓库 · 按目录列（跳过 node_modules / .temp 之类）"}</div>` + node("", 0);
+  const sel = T.querySelector(".fvn.sel"); if (sel && !fvTree.scrolled) { sel.scrollIntoView({block: "center"}); fvTree.scrolled = true; }
+}
+$("#fvTree").onclick = async e => {
+  const d = e.target.closest("[data-dir]"), f = e.target.closest("[data-file]");
+  if (d) { const p = d.dataset.dir; if (FV.openDirs.has(p)) FV.openDirs.delete(p); else { FV.openDirs.add(p); fvTree(); await fvLs(p); } fvTree(); }
+  else if (f) { FV.path = f.dataset.file; FV.mode = FV.mode === "edit" || FV.mode === "hist" ? "view" : FV.mode; FV.line = null; FV.find = null; FV.exp = new Set();
+    $$("#fvTree .fvn.sel").forEach(x => x.classList.remove("sel")); f.classList.add("sel");
+    if (isMobile()) { FV.side = false; fvPanel.classList.add("noside"); }
+    fvLoad(); }
+};
+let fvQT = null;
+$("#fvQ").oninput = () => { clearTimeout(fvQT); fvQT = setTimeout(fvSearch, 160); };
+$("#fvQ").onkeydown = e => { if (e.key === "Enter") { const f = $("#fvTree [data-file]"); if (f) f.click(); } if (e.key === "Escape") { e.stopPropagation(); e.target.value = ""; fvTree(); } };
+async function fvSearch(){
+  const q = $("#fvQ").value.trim(); if (!q) return fvTree();
+  let r; try { r = await api(`/api/files/find?${fvQ({q})}`); } catch(e) { r = {items: [], err: String(e.message || e)}; }
+  if ($("#fvQ").value.trim() !== q) return;
+  $("#fvTree").innerHTML = r.err ? `<div class="prerr">${esc(r.err)}</div>` : (r.items.map(p => { const i = p.lastIndexOf("/");
+    return `<div class="fvn file hit ${p === FV.path ? "sel" : ""}" data-file="${esc(p)}" title="${esc(p)}">${ic("file")}<span>${esc(p.slice(i + 1))}</span><em>${esc(i > 0 ? p.slice(0, i) : "")}</em></div>`; }).join("")
+    + (r.total > r.items.length ? `<div class="fvn more">共 ${r.total} 个匹配，只列前 ${r.items.length} 个</div>` : "")) || `<div class="empty">没有匹配的文件</div>`;
+}
+// ---------- 顶栏 / 工具条 ----------
+function fvHead(){
+  const p = FV.path || "", base = p.split("/").pop(), d = FV.data;
+  $("#fvTitle").textContent = FV.mode === "edit" ? (FV.edit && FV.edit.title) || "这次的改动" : base || "文件";
+  $("#fvTitle").title = p;
+  $("#fvSub").innerHTML = FV.mode === "edit" ? esc(p) : p.includes("/") ? esc(p.slice(0, p.lastIndexOf("/"))) : "";
+  const local = typeof isLocal === "undefined" || isLocal;
+  $("#fvActs").innerHTML = !p ? "" : `<button class="prbtn ic1" data-act="copy" title="复制路径">${ic("clipboard")}</button>`
+    + (local && d && d.vscode ? `<button class="prbtn ic1" data-act="code" title="在 VS Code 里打开">${ic("pencil")}</button>` : "")
+    + (local ? `<button class="prbtn ic1" data-act="reveal" title="在资源管理器里显示">${ic("folder")}</button>` : "");
+  const modes = [["view", "查看"], ["diff", "差异"], ["hist", "历史"], ["blame", "追溯"]];
+  let bar = !p && FV.mode !== "edit" ? "" : `<div class="fvtabs">${FV.mode === "edit" ? `<button class="on">这次的改动</button>` : ""}${modes.map(([k, t]) => `<button data-mode="${k}" class="${FV.mode === k ? "on" : ""}">${t}</button>`).join("")}</div>`;
+  if (FV.mode === "view" && d && d.kind === "text" && langOf(p) === "md") bar += `<div class="fvseg"><button data-md="render" class="${FV.md === "render" ? "on" : ""}">预览</button><button data-md="raw" class="${FV.md === "raw" ? "on" : ""}">原文</button></div>`;
+  if (FV.mode === "diff") {
+    const R = FV.refs || {branches: [], commits: []}, opt = (v, t) => `<option value="${esc(v)}" ${FV.a === v ? "selected" : ""}>${esc(t)}</option>`;
+    const known = ["HEAD", ...R.branches, ...R.commits.map(c => c.h)];
+    bar += `<label class="prbase">对比 <select id="fvBase">${opt("HEAD", "HEAD（没提交的改动）")}${R.branches.length ? `<optgroup label="分支">${R.branches.map(b => opt(b, b)).join("")}</optgroup>` : ""}${R.commits.length ? `<optgroup label="最近的提交">${R.commits.map(c => opt(c.h, c.h + " " + c.s.slice(0, 40))).join("")}</optgroup>` : ""}${known.includes(FV.a) ? "" : opt(FV.a, FV.a)}</select></label>${FV.b !== "WORKTREE" ? `<span class="fvref">→ ${esc(FV.b.slice(0, 10))}</span>` : ""}`;
+  }
+  if (FV.mode === "diff" || FV.mode === "edit") bar += `<div class="fvseg"><button data-split="0" class="${FV.split ? "" : "on"}" title="上下（统一）">统一</button><button data-split="1" class="${FV.split ? "on" : ""}" title="左右并排">并排</button></div>`;
+  if (FV.mode !== "hist" && (FV.mode !== "view" || (d && d.marks && (d.marks.add || []).length + (d.marks.mod || []).length + (d.marks.del || []).length)))
+    bar += `<span class="fvnav"><button class="prbtn ic1" data-jump="-1" title="上一处改动（p）">↑</button><button class="prbtn ic1" data-jump="1" title="下一处改动（n）">↓</button><i id="fvPos"></i></span>`;
+  if (FV.mode === "edit" && FV.path) bar += `<button class="prbtn" data-act="locate" title="在文件里找到这次改的位置">${ic("file")}<span>在文件里看</span></button>`;
+  if (d && d.kind === "text") bar += `<span class="fvinfo">${d.encoding && d.encoding !== "utf-8" ? esc(d.encoding.toUpperCase()) + " · " : ""}${fvSize(d.size)}${d.truncated ? " · 只显示前 1 MB" : ""}</span>`;
+  $("#fvBar").innerHTML = bar;
+}
+const fvSize = n => n == null ? "" : n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(1) + " KB" : (n / 1048576).toFixed(1) + " MB";
+$("#fvBar").onclick = e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.mode) { FV.mode = b.dataset.mode; FV.exp = new Set(); if (FV.mode === "diff") FV.b = "WORKTREE"; fvLoad(); }
+  else if (b.dataset.md) { FV.md = b.dataset.md; fvRender(); }
+  else if (b.dataset.split) { FV.split = b.dataset.split === "1"; store.set("msgbus.fvSplit", FV.split ? "1" : "0"); fvRender(); }
+  else if (b.dataset.jump) fvJump(+b.dataset.jump);
+  else if (b.dataset.act) fvAct(b.dataset.act);
+};
+$("#fvBar").onchange = e => { if (e.target.id === "fvBase") { FV.a = e.target.value; FV.b = "WORKTREE"; FV.exp = new Set(); fvLoad(); } };
+$("#fvActs").onclick = e => { const b = e.target.closest("[data-act]"); if (b) fvAct(b.dataset.act); };
+async function fvAct(a){
+  if (a === "copy") { const full = String(FV.root).replace(/[\\/]$/, "") + (String(FV.root).includes("\\") ? "\\" + FV.path.replace(/\//g, "\\") : "/" + FV.path);
+    copyText(full).then(() => toast("已复制：" + full), () => toast("复制失败")); return; }
+  if (a === "locate") { const t = FV.edit && (FV.edit.chunks || []).map(c => c[1]).find(x => x && x.trim()) || (FV.edit && FV.edit.content) || "";
+    FV.find = (t.split("\n").find(l => l.trim().length > 3) || "").trim(); FV.mode = "view"; FV.edit = null; fvLoad(); return; }
+  try { const r = await api("/api/files/open", {root: FV.root, path: FV.path, how: a, line: FV.line});
+    if (r.ok === false) toast("❌ " + r.error); } catch(e) { toast("❌ " + (e.message || e)); }
+}
+// ---------- 载入 + 画 ----------
+let fvSeq = 0;
+async function fvLoad(){
+  const seq = ++fvSeq, B = $("#fvBody"); FV.data = FV.mode === "view" || FV.mode === "blame" ? null : FV.data; fvHead();
+  if (FV.mode !== "edit" && !FV.path) return;
+  B.innerHTML = `<div class="empty"><span class="spinr"></span> 读取中…</div>`;
+  try {
+    if (FV.mode === "edit") { /* 数据在 FV.edit 里 */ }
+    else if (FV.mode === "view" || FV.mode === "blame") {
+      FV.data = await api(`/api/files/read?${fvQ({path: FV.path})}`);
+      if (FV.data.ok && FV.data.path) FV.path = FV.data.path;
+      if (FV.mode === "blame") FV.blame = await api(`/api/files/blame?${fvQ({path: FV.path})}`);
+    } else if (FV.mode === "diff") {
+      if (!FV.refs || FV.refsP !== FV.path) api(`/api/files/refs?${fvQ({path: FV.path || ""})}`).then(r => { FV.refs = r; FV.refsP = FV.path; if (FV.mode === "diff" && seq === fvSeq) fvHead(); }).catch(() => {});
+      let r = await api(`/api/files/diff?${fvQ({path: FV.path, a: FV.a, b: FV.b})}`);
+      if (!r.ok && /\^$/.test(FV.a)) { FV.a = "EMPTY"; r = await api(`/api/files/diff?${fvQ({path: FV.path, a: "EMPTY", b: FV.b})}`); }   // 第一个提交：跟空文件比
+      FV.diff = r; if (r.path) FV.path = r.path;
+    } else if (FV.mode === "hist") FV.hist = await api(`/api/files/log?${fvQ({path: FV.path})}`);
+  } catch(e) { if (seq === fvSeq) B.innerHTML = `<div class="prerr">${ic("warn")}<div>${esc(e.message || e)}</div></div>`; return; }
+  if (seq !== fvSeq) return;
+  fvRender();
+}
+function fvRender(){
+  fvHead(); const B = $("#fvBody"), lang = langOf(FV.path);
+  if (FV.mode === "edit") return fvRenderEdit(B, lang);
+  if (FV.mode === "diff") { const r = FV.diff;
+    if (!r || !r.ok) { B.innerHTML = `<div class="prerr">${ic("warn")}<div>${esc((r && r.error) || "读不到差异")}</div></div>`; return; }
+    if (r.binary) { B.innerHTML = `<div class="empty">二进制文件，不显示差异</div>`; return; }
+    const hs = gitHunks(r.hunks);
+    if (!hs.length) { B.innerHTML = `<div class="empty">${ic("check")} 跟 ${esc(FV.a === "EMPTY" ? "空文件" : FV.a)} 比没有改动</div>`; return; }
+    const rows = diffRows(splitLines(r.old), splitLines(r.new), hs, 3, FV.exp), out = diffRowsHtml(rows, lang, FV.split);
+    const A = hs.reduce((x, h) => x + h.nl, 0), D = hs.reduce((x, h) => x + h.ol, 0);
+    B.innerHTML = `<div class="dfsum">${hs.length} 处改动 · <span class="pradd">+${A}</span> <span class="prdel">-${D}</span>${r.truncated ? " · 文件太大，只比了前 1 MB" : ""}</div>` + out.html + (out.more ? `<div class="dfmeta">（太长了，只显示前面一部分）</div>` : "");
+    FV.hunkN = hs.length; FV.hunkI = -1; return; }
+  if (FV.mode === "hist") { const h = FV.hist;
+    if (!h || !h.ok) { B.innerHTML = `<div class="prerr">${ic("warn")}<div>${esc((h && h.error) || "读不到历史")}</div></div>`; return; }
+    B.innerHTML = h.items.length ? `<div class="prlist fvhist">${h.items.map(c => `<div class="prcm" data-h="${esc(c.h)}"><code>${esc(c.short)}</code><span class="prcmh">${esc(c.subject)}</span><span class="pradd">+${c.add}</span><span class="prdel">-${c.del}</span><span class="prtm">${esc(c.author)} · ${relT(c.date)}</span></div>`).join("")}</div>` : `<div class="empty">这个文件还没有提交记录</div>`;
+    B.querySelectorAll("[data-h]").forEach(x => x.onclick = () => { FV.mode = "diff"; FV.a = x.dataset.h + "^"; FV.b = x.dataset.h; FV.exp = new Set(); fvLoad(); });
+    return; }
+  const d = FV.data;
+  if (!d || !d.ok) { B.innerHTML = `<div class="prerr">${ic("warn")}<div>${esc((d && d.error) || "读不到文件")}</div></div>`; return; }
+  if (d.kind === "image") { B.innerHTML = d.data ? `<div class="fvimg"><img src="${d.data}" alt=""><div class="prhint">${fvSize(d.size)}</div></div>` : `<div class="empty">${esc(d.error || "")}</div>`; return; }
+  if (d.kind === "binary") { B.innerHTML = `<div class="empty">二进制文件（${fvSize(d.size)}），不显示内容</div>`; return; }
+  if (FV.mode === "view" && lang === "md" && FV.md === "render") { B.innerHTML = `<div class="fvmd md">${mdHtml(d.text)}</div>`; return; }
+  fvRenderText(B, d, lang);
+}
+// 文本：行号 + 改动标记（相对 HEAD）+ 高亮；大文件先画前 3000 行，其余分批接上
+function fvRenderText(B, d, lang){
+  const L = splitLines(d.text), M = d.marks || {}, add = new Set(M.add || []), mod = new Set(M.mod || []), del = new Set(M.del || []);
+  const bl = FV.mode === "blame" && FV.blame && FV.blame.ok ? FV.blame : null;
+  if (FV.mode === "blame" && FV.blame && !FV.blame.ok) toast("追溯不了：" + FV.blame.error, 3500);
+  const H = L.length > 60000 ? null : hlLines(L, lang);
+  const row = i => { const n = i + 1, mk = M.untracked ? "ma" : add.has(n) ? "ma" : mod.has(n) ? "mm" : "", dm = del.has(n) ? " md" : "";
+    let b = ""; if (bl) { const h = bl.lines[i], c = bl.commits[h] || {}, first = !i || bl.lines[i - 1] !== h;
+      b = `<span class="fvbl${first ? " f" : ""}" title="${esc(h + " " + (c.author || "") + "\n" + (c.summary || ""))}">${first ? `<code>${esc((h || "").slice(0, 7))}</code> ${esc((c.author || "").slice(0, 12))}` : ""}</span>`; }
+    return `<div class="vl ${mk}${dm}" id="fvl${n}">${b}<span class="ln">${n}</span><span class="dc">${H ? H[i] : esc(L[i])}</span></div>`; };
+  const first = Math.min(L.length, Math.max(3000, (FV.line || 0) + 200));
+  let html = ""; for (let i = 0; i < first; i++) html += row(i);
+  B.innerHTML = `<div class="dft fvv${bl ? " blame" : ""}${M.untracked ? " untracked" : ""}">${html}</div>`;
+  const box = B.firstElementChild, seq = fvSeq; let i = first;
+  const more = () => { if (seq !== fvSeq || i >= L.length) return; let h = ""; const e = Math.min(L.length, i + 4000); for (; i < e; i++) h += row(i); box.insertAdjacentHTML("beforeend", h); setTimeout(more, 0); };
+  setTimeout(more, 30);
+  FV.marksList = [...new Set([...add, ...mod, ...del])].sort((a, b) => a - b).filter((n, k, s) => !k || n - s[k - 1] > 1); FV.hunkI = -1;
+  let target = FV.line;
+  if (!target && FV.find) { const k = L.findIndex(l => l.includes(FV.find)); if (k >= 0) target = k + 1; else toast("文件里没找到这次改动的内容（可能又改过了）", 3200); }
+  if (target) { const el = B.querySelector("#fvl" + target); if (el) { el.classList.add("hit"); el.scrollIntoView({block: "center"}); } }
+  else B.scrollTop = 0;
+}
+// 这次的改动（Claude 的 Edit / Write、Codex 补丁）：只有这几段，没有完整文件，行号从改动片段里算
+function fvRenderEdit(B, lang){
+  const E = FV.edit || {}, chunks = E.chunks || (E.content != null ? [["", E.content]] : []);
+  if (!chunks.length) { B.innerHTML = `<div class="empty">没有可显示的改动</div>`; return; }
+  let html = "", A = 0, D = 0, hi = 0;
+  chunks.forEach(([o, n], ci) => {
+    const oldL = splitLines(o), newL = splitLines(n), hs = lineDiff(oldL, newL);
+    hs.forEach(h => { A += h.nl; D += h.ol; });
+    const rows = diffRows(oldL, newL, hs, 3, FV.exp).map(r => { if (r.hs != null) r.hs = hi + r.hs; if (r.key) r.key = ci + r.key; return r; });
+    hi += hs.length;
+    html += (chunks.length > 1 ? `<div class="fvchunk">第 ${ci + 1} 处${E.all ? "（全部替换）" : ""}</div>` : "") + (hs.length ? diffRowsHtml(rows, lang, FV.split).html : `<div class="dfmeta">（这一处前后一样）</div>`);
+  });
+  FV.hunkN = hi; FV.hunkI = -1;
+  B.innerHTML = `<div class="dfsum">${E.op === "write" ? (E.created === false ? "改写整个文件" : "新建文件") : chunks.length + " 处编辑"} · <span class="pradd">+${A}</span> <span class="prdel">-${D}</span>${E.cut ? " · 内容太长，只带了前面一段" : ""}${E.src ? ` · ${esc(E.src)}` : ""}</div>` + html;
+}
+$("#fvBody").addEventListener("click", e => {
+  const x = e.target.closest("[data-x]"); if (x) { FV.exp.add(x.dataset.x); const top = $("#fvBody").scrollTop; fvRender(); $("#fvBody").scrollTop = top; }
+});
+function fvJump(dir){
+  const B = $("#fvBody");
+  if (FV.mode === "diff" || FV.mode === "edit") { if (!FV.hunkN) return;
+    FV.hunkI = (FV.hunkI + dir + FV.hunkN) % FV.hunkN; const el = B.querySelector("#fvh" + FV.hunkI);
+    if (el) { el.scrollIntoView({block: "center"}); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 900); }
+    const p = $("#fvPos"); if (p) p.textContent = `${FV.hunkI + 1}/${FV.hunkN}`; return; }
+  const L = FV.marksList || []; if (!L.length) return;
+  FV.hunkI = (FV.hunkI + dir + L.length) % L.length; const el = B.querySelector("#fvl" + L[FV.hunkI]);
+  if (el) { el.scrollIntoView({block: "center"}); el.classList.add("flash"); setTimeout(() => el.classList.remove("flash"), 900); }
+  const p = $("#fvPos"); if (p) p.textContent = `${FV.hunkI + 1}/${L.length}`;
+}
+
+// ---------- 对话里的文件：工具卡片的文件名、+N −M，正文里的 path:line ----------
+let FVD = {};       // key -> 这次改动（点 +N −M 打开）
+function fileChip(path, line, label){ return `<span class="fchip" data-fv="${esc(path)}"${line ? ` data-ln="${line}"` : ""} title="${esc(path + (line ? ":" + line : ""))} · 点开查看">${esc(label || String(path).split(/[\\/]/).pop())}</span>`; }
+function lineBadge(key, add, del){ return `<span class="lbadge" data-fvd="${esc(key)}" title="看这次的改动"><i class="la">+${add}</i><i class="ld">-${del}</i></span>`; }
+// Claude 的工具：Read / Edit / MultiEdit / Write 带了 file
+function claudeFileOf(t, kp){
+  const f = t.file; if (!f) return null;
+  const o = t.id ? trToolOut[t.id] : null, key = kp + "c" + t.pos + (o ? "o" : "");
+  if (f.op === "read") return {path: f.path, op: "read", line: f.line};
+  if (!FVD[key]) {
+    if (f.op === "write") { const created = !(o && /has been updated|updated successfully|已更新/i.test(o.out || ""));
+      FVD[key] = {path: f.path, title: "写入 " + f.path.split(/[\\/]/).pop(), content: f.content, op: "write", created, cut: f.cut, add: splitLines(f.content).length, del: 0}; }
+    else { let a = 0, d = 0; (f.edits || []).forEach(([x, y]) => { const c = diffCount(x, y); a += c[0]; d += c[1]; });
+      FVD[key] = {path: f.path, title: "编辑 " + f.path.split(/[\\/]/).pop(), chunks: f.edits || [], op: "edit", cut: f.cut, all: f.all, add: a, del: d}; }
+  }
+  const v = FVD[key]; return {path: f.path, op: v.op === "write" ? (v.created ? "create" : "edit") : "edit", key, add: v.add, del: v.del, err: o && o.err};
+}
+// Codex 的 apply_patch：按文件拆成一段段 [旧, 新]
+function codexPatchFiles(t, kp){
+  const key0 = kp + "x" + t.pos, out = [], src = String(t.input || "").replace(/\\n/g, "\n");
+  let f = null, chunk = null;
+  const flush = () => { if (chunk && (chunk[0].length || chunk[1].length)) f.chunks.push([chunk[0].join("\n"), chunk[1].join("\n")]); chunk = null; };
+  for (const l of src.split("\n")) {
+    const m = l.match(/^\*\*\* (Update|Add|Delete) File: (.+?)\s*$/);
+    if (m) { if (f) flush(); f = {op: m[1], path: m[2], chunks: [], add: 0, del: 0}; out.push(f); continue; }
+    if (!f) continue;
+    if (/^\*\*\* (End Patch|Move to:)/.test(l)) { flush(); continue; }
+    if (l.startsWith("@@")) { flush(); continue; }
+    if (!chunk) chunk = [[], []];
+    if (l.startsWith("+")) { chunk[1].push(l.slice(1)); f.add++; }
+    else if (l.startsWith("-")) { chunk[0].push(l.slice(1)); f.del++; }
+    else if (l.startsWith(" ") || l === "") { chunk[0].push(l.slice(1)); chunk[1].push(l.slice(1)); }
+  }
+  if (f) flush();
+  const cut = /…（共 \d+ 字/.test(src);
+  return out.map((x, i) => { const key = key0 + "_" + i;
+    FVD[key] = {path: x.path, title: (x.op === "Add" ? "新建 " : x.op === "Delete" ? "删除 " : "编辑 ") + x.path.split(/[\\/]/).pop(), chunks: x.op === "Add" ? [["", x.chunks.map(c => c[1]).join("\n")]] : x.chunks, op: x.op === "Add" ? "write" : "edit", cut, src: "Codex 补丁"};
+    return {path: x.path, op: x.op === "Add" ? "create" : x.op === "Delete" ? "delete" : "edit", key, add: x.add, del: x.del}; });
+}
+const READ_CMD = /(?:^|&&|;|\|\|)\s*(?:cat|type|nl\s+-ba|head(?:\s+-n?\s*\d+)?|tail(?:\s+-n?\s*\d+)?|less|Get-Content(?:\s+-\w+(?:\s+\d+)?)*|gc|sed\s+-n\s+(?:'[^']*'|"[^"]*"|\S+))\s+["']?([\w./\\:-]+\.\w{1,8})["']?/;
+// 一组工具调用 → 「已运行 N 个命令（1 个失败），读取和已编辑 a.py [+3 -1]」
+function toolGroupSummary(tools, kp, codex){
+  let runs = 0, fail = 0, plan = 0, calls = 0; const files = new Map();
+  const rt = String(cur && cur.root || "").replace(/\\/g, "/").replace(/\/$/, "").toLowerCase();
+  const fileOf = (path) => { let k = String(path).replace(/\\/g, "/").replace(/^\.\//, ""); if (rt && k.toLowerCase().startsWith(rt + "/")) k = k.slice(rt.length + 1); if (!files.has(k)) files.set(k, {path, read: false, edit: false, create: false, del: false, add: 0, rm: 0, keys: []}); return files.get(k); };
+  for (const t of tools) {
+    const o = t.id ? trToolOut[t.id] : null;
+    if (codex) { const k = cxKind(t);
+      if (k === "run") { const cmds = cxCmds(t), rd = cmds.map(c => (c.match(READ_CMD) || [])[1]).filter(Boolean);
+        if (rd.length && rd.length === cmds.length) { rd.forEach(p => fileOf(p).read = true); continue; }
+        runs++; if (o && (o.err || (cxOut(o.out).code || 0) !== 0)) fail++; continue; }
+      if (k === "edit") { codexPatchFiles(t, kp).forEach(x => { const f = fileOf(x.path); f[x.op === "create" ? "create" : x.op === "delete" ? "del" : "edit"] = true; f.add += x.add; f.rm += x.del; f.keys.push(x.key); }); continue; }
+      if (k === "plan") plan++; else calls++; continue; }
+    const n = t.name || "";
+    if (/^(Bash|BashOutput|PowerShell|KillShell|KillBash)$/.test(n)) { runs++; if (o && o.err) fail++; continue; }
+    const cf = claudeFileOf(t, kp);
+    if (cf) { const f = fileOf(cf.path); if (cf.op === "read") f.read = true; else { f[cf.op === "create" ? "create" : "edit"] = true; f.add += cf.add; f.rm += cf.del; f.keys.push(cf.key); } continue; }
+    if (/^(TodoWrite|update_plan)$/.test(n)) plan++; else calls++;
+  }
+  const parts = [];
+  if (runs) parts.push(`已运行 ${runs} 个命令${fail ? `<span class="tfail">（${fail} 个失败）</span>` : ""}`);
+  const groups = [["已创建", f => f.create], ["读取和已编辑", f => !f.create && f.edit && f.read], ["已编辑", f => !f.create && f.edit && !f.read], ["已删除", f => f.del && !f.edit && !f.create], ["已读取", f => f.read && !f.edit && !f.create && !f.del]];
+  for (const [verb, pick] of groups) {
+    const fs = [...files.values()].filter(pick); if (!fs.length) continue;
+    const show = fs.slice(0, verb === "已读取" ? 1 : 2);
+    parts.push(`${verb} ` + show.map(f => { const key = f.keys.length ? kp + "g" + f.keys[0] : null;
+      if (key && f.keys.length > 1) FVD[key] = Object.assign({}, FVD[f.keys[0]], {chunks: f.keys.flatMap(k => FVD[k].chunks || (FVD[k].content != null ? [["", FVD[k].content]] : [])), title: "编辑 " + String(f.path).split(/[\\/]/).pop() + `（${f.keys.length} 次）`, op: "edit"});
+      return fileChip(f.path) + (f.keys.length ? lineBadge(f.keys.length > 1 ? key : f.keys[0], f.add, f.rm) : ""); }).join(" ") + (fs.length > show.length ? ` 等 ${fs.length} 个文件` : ""));
+  }
+  if (plan) parts.push(`更新了 ${plan} 次计划`);
+  if (calls) parts.push(`调用了 ${calls} 次工具`);
+  return parts.join("，") || `${tools.length} 次工具调用`;
+}
+// 正文里的文件路径（`a/b.py:12`、src/x.ts、D:\proj\x.lua:30）→ 点开查看器
+const FREF_RE = /(^|[\s(（:：,，、"'\[【])((?:[A-Za-z]:[\\/]|\.{0,2}\/)?(?:[\w.@-]+[\\/])+[\w.@-]+\.[A-Za-z][\w]{0,7}|[\w-]+\.(?:py|js|ts|tsx|jsx|lua|md|json|go|rs|c|cpp|h|java|cs|sh|ps1|toml|yaml|yml|html|css|vue|gd|sql|txt|ini|cfg))(?::(\d+)(?::\d+)?)?(?=$|[\s)）.,，。:：;；!！?？、"'\]】])/g;
+function frefLinkify(s){
+  const keep = [];
+  s = s.replace(/<a\b[\s\S]*?<\/a>|<[^>]+>|\u0000\d+\u0000|https?:\/\/\S+/g, x => { keep.push(x); return "\u0001" + (keep.length - 1) + "\u0001"; });
+  s = s.replace(FREF_RE, (all, pre, path, line) => {
+    if (/^\d+(\.\d+)+$/.test(path) || /^[\w-]+\.(com|org|net|io|cn)$/i.test(path)) return all;
+    return pre + `<span class="fref" data-fv="${path}"${line ? ` data-ln="${line}"` : ""} title="在查看器里打开">${path}${line ? ":" + line : ""}</span>`;
+  });
+  return s.replace(/\u0001(\d+)\u0001/g, (m, i) => keep[+i]);
+}
+function codeFref(c){         // 行内代码整个就是一个路径
+  const m = c.match(/^((?:[A-Za-z]:[\\/]|\.{0,2}\/)?(?:[\w.@-]+[\\/])*[\w.@-]+\.[A-Za-z]\w{0,7})(?::(\d+)(?::\d+)?)?$/);
+  if (!m || /^\d+(\.\d+)+$/.test(m[1]) || (!/[\\/]/.test(m[1]) && !/\.(py|js|ts|tsx|jsx|lua|md|json|go|rs|c|cpp|h|java|cs|sh|ps1|toml|yaml|yml|html|css|vue|gd|sql|txt|ini|cfg)$/i.test(m[1]))) return null;
+  return `<code class="fref" data-fv="${m[1]}"${m[2] ? ` data-ln="${m[2]}"` : ""} title="在查看器里打开">${c}</code>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-fv],[data-fvd]"); if (!t) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!cur) return;
+  if (t.dataset.fvd) { const v = FVD[t.dataset.fvd]; if (!v) return toast("这次改动的数据不在了，刷新一下");
+    return fvOpen({root: cur.root, path: v.path, mode: "edit", edit: v, side: false}); }
+  const p = t.dataset.fv.replace(/&amp;/g, "&");
+  fvOpen({root: cur.root, path: p, line: +t.dataset.ln || null, mode: "view"});
+}, true);
+
+// PR / 本地改动里的统一 diff（一个文件的那些行）→ 行列表，好用同一套画法（统一 / 并排、词级标记）
+function patchRows(lines){
+  const rows = []; let o = 0, n = 0, h = -1, dels = [], adds = [];
+  const flush = () => { for (let k = 0; k < Math.min(dels.length, adds.length); k++) {
+      const w = dels[k].a.length + adds[k].b.length < 2000 ? wordDiff(dels[k].a, adds[k].b) : null; if (w) { dels[k].w = w[0]; adds[k].w = w[1]; } }
+    if (dels.length || adds.length) { h++; (dels[0] || adds[0]).hs = h; dels.forEach(x => x.h = h); adds.forEach(x => x.h = h); rows.push(...dels, ...adds); }
+    dels = []; adds = []; };
+  for (const l of lines) {
+    if (l.startsWith("@@")) { flush(); const m = l.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)/); if (m) { o = +m[1]; n = +m[2]; } rows.push({t: "h", a: l}); continue; }
+    if (l.startsWith("\\")) continue;
+    const c = l[0], body = l.slice(1);
+    if (c === "-") { if (adds.length) flush(); dels.push({t: "-", o: o++, a: body}); }
+    else if (c === "+") adds.push({t: "+", n: n++, b: body});
+    else { flush(); rows.push({t: " ", o: o++, n: n++, a: body}); }
+  }
+  flush(); return rows;
+}
+
+$("#mFiles").onclick = () => fvOpen({});
+$("#mLink").onclick = () => view ? lkPicker(lkSess(view.agent, view.sid) || view) : toast("先在左右的会话列表里打开一个 Claude 或 Codex 会话");
 $("#mPRs").onclick = () => { prStack = []; prCur = null; prListOpen(); };
 $("#mChg").onclick = () => { prStack = []; prCur = null; chgOpen(); };
 // ---------- 轮询 ----------
