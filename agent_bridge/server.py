@@ -1623,6 +1623,22 @@ class Handler(BaseHTTPRequestHandler):
             elif u.path == "/api/apps/status":
                 from . import apps
                 self._json(apps.run_status())
+            elif u.path.startswith("/api/usage/"):
+                # 用量统计：只给本机（局域网 8766 本来就不在 PHONE_GET 里，这里再挡一道）
+                if not self._local():
+                    return self._err("用量统计只能在电脑上看", 403)
+                from . import usage
+                f = {k: q.get(k) for k in ("app", "provider", "model", "from", "to")}
+                if u.path == "/api/usage/summary":
+                    self._json(usage.summary(f))
+                elif u.path == "/api/usage/logs":
+                    self._json(usage.logs(f, int(q.get("offset") or 0), min(500, int(q.get("limit") or 100))))
+                elif u.path == "/api/usage/prices":
+                    self._json(usage.prices_view())
+                elif u.path == "/api/usage/status":
+                    self._json(usage.status())
+                else:
+                    self._err("not found", 404)
             elif u.path == "/api/tray":
                 if not self._local():
                     raise PermissionError("只在本机")
@@ -1813,6 +1829,25 @@ class Handler(BaseHTTPRequestHandler):
                         tray.autostart_set(bool(body["autostart"]), PORT["n"])
                     s["autostart"] = tray.autostart_get()
                 self._json(s)
+            elif path.startswith("/api/usage/"):
+                if not self._local():
+                    return self._err("用量统计只能在电脑上用", 403)
+                from . import usage
+                if path == "/api/usage/sync":
+                    self._json(usage.scan(full=bool(body.get("full"))))
+                elif path == "/api/usage/price":
+                    usage.set_price(str(body["model"]), body.get("price"))
+                    self._json({"ok": True})
+                elif path == "/api/usage/mult":
+                    m = body.get("m")
+                    usage.set_mult(str(body["provider"]), None if m in (None, "") else float(m))
+                    self._json({"ok": True})
+                elif path == "/api/usage/modelsdev":
+                    self._json(usage.refresh_models_dev())
+                elif path == "/api/usage/import_ccswitch":
+                    self._json(usage.import_ccswitch())
+                else:
+                    self._err("not found", 404)
             elif path == "/api/tray/seen":
                 TRAY_FEED.seen()
                 self._json({"ok": True})
@@ -1862,6 +1897,9 @@ def start(port: int = 8765, host: str | None = None, lan_port: int | None = None
     FX_WATCHER.start()      # Claude↔Codex 有消息时放信件动画（只在 Windows 上；设置里可关）
     from . import update    # 后台查一次新版本（6 小时最多一次；设置里可关；断网没关系）
     update.auto_check_later(lambda: load_settings().get("update_auto", True))
+    from . import usage     # 用量统计：后台先全量扫一遍会话日志，之后每分钟增量（设置里可关）
+    if load_settings().get("usage_scan", True):
+        usage.start_background()
     if host and host not in ("127.0.0.1", "localhost", "::1"):
         LAN["bind"] = host
         LAN["bind_port"] = lan_port or (port + 1 if host in ("0.0.0.0", "::") else port)
