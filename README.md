@@ -392,6 +392,7 @@ Cursor（3.x）会读项目 `.claude/settings.json` 里的 Claude 钩子（设�
 - **项目级**：在左栏项目文件夹那一行右键（或悬停时的 ⋯）→「供应商与模型…」：这个项目用哪个供应商、项目的模型和思考强度、用指定供应商开会话。会话标题栏的钥匙按钮也能改这个项目默认用哪个。
 - **key**：存在 Windows 凭据管理器（`CCMsg/key/<名字>`）。Claude 通过 `apiKeyHelper`、Codex 通过 `[model_providers.x.auth]` 运行 `CCMsg.exe key get <名字>` 取 key，配置文件里不留明文。页面和接口只显示打码后的样子，永远不返回完整 key。注意：Claude 用 API key 会按 API 计费，不再走订阅；从订阅登录切到 key 的供应商时会先问一句。
 - **怎么写的**：只改 CC Msg 管的这几项，其它键、注释、顺序原样保留（TOML 用 tomlkit）；每次写之前先备份到 `~/.agent-bridge/backups`，原子写入，写完再读回来核对；⋯ →「备份 / 恢复」一键还原。
+- **测试**：Codex 供应商发 `GET <Base URL>/models`（不花钱），再看模型在不在中转的模型列表里；Claude 供应商发 `POST <Base URL>/v1/messages`（max_tokens=1）。失败时显示 HTTP 状态 + 一句原因（key 不对 / 地址少了或多了 /v1 / 模型不在列表里 / 被 Cloudflare 拦 / 连不上 / 证书…）和能照做的建议；不会显示 key。
 - **明文 key**：切换时如果配置里有明文 key，会先列出来（打码）要你确认；一键迁移是按钮，**不会自动执行**。
 - 「仅命令行」「命令行和桌面版都生效」这类小字提示每处设置对谁生效，鼠标放上去看原因。
 
