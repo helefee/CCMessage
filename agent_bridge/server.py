@@ -1630,6 +1630,11 @@ class Handler(BaseHTTPRequestHandler):
                 from . import modelcfg
                 root = str(proj_root(q["root"])) if q.get("root") else None
                 self._json(modelcfg.overview(root))
+            elif u.path == "/api/modelcfg/proxies":
+                if not self._local():
+                    return self._err("模型与 API 只能在电脑上看", 403)
+                from . import modelcfg
+                self._json(modelcfg.proxies(wait=True))
             elif u.path == "/api/providers":
                 # 供应商：只给本机（返回里只有打码后的 key）
                 if not self._local():
@@ -1974,6 +1979,11 @@ def start(port: int = 8765, host: str | None = None, lan_port: int | None = None
     except OSError:
         return None
     threading.Thread(target=srv.serve_forever, daemon=True, name="http").start()
+    try:                    # 预热：后台先测一次 opencodex / magpie 端口，打开「模型与 API」/「用量统计」时不用等
+        from . import modelcfg
+        modelcfg.proxies()
+    except Exception:
+        pass
     FX_WATCHER.start()      # Claude↔Codex 有消息时放信件动画（只在 Windows 上；设置里可关）
     from . import update    # 后台查一次新版本（6 小时最多一次；设置里可关；断网没关系）
     update.auto_check_later(lambda: load_settings().get("update_auto", True))

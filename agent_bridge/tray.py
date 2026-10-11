@@ -414,7 +414,8 @@ class Tray:
         d = self.state
         s = d.get("settings") or {}
         vis = self.app.visible()
-        items = [(1, "隐藏窗口" if vis else "显示窗口", {"default": True}), (2, "在浏览器中打开", {})]
+        items = [(1, "隐藏窗口" if vis else "显示窗口", {"default": True}), (2, "在浏览器中打开", {}),
+                 (3, "模型与 API…", {}), (4, "用量统计…", {})]
         ss = d.get("sessions") or []
         mark = {"active": "● 活跃", "stand": "○ 待命", "idle": "· 空闲"}
         sub = [(100 + i, f"{x['name'][:24]}　{'Claude' if x['agent'] in ('claude', 'cursor') else 'Codex'} · {x['project']} · {mark.get(x['state'], '')}", {})
@@ -478,6 +479,8 @@ class Tray:
                 self.app.hide() if self.app.visible() else self.app.show()
             elif cmd == 2:
                 self.app.browser()
+            elif cmd in (3, 4):                     # 拉到前面并打开那一页
+                self.app.open({"page": "models" if cmd == 3 else "usage"})
             elif 100 <= cmd < 200:
                 x = (d.get("sessions") or [])[cmd - 100]
                 self.app.open({"root": x["root"], "agent": x["agent"], "sid": x["sid"]})

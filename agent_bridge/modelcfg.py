@@ -13,7 +13,9 @@ import json
 import os
 import re
 import shutil
+import socket
 import sqlite3
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -348,17 +350,61 @@ def _ping(url: str, t: float = 0.8):
         return getattr(e, "code", None)
 
 
-def proxies() -> list[dict]:
+# 本地端口通不通：Windows 上连一个没人听的端口要等将近 1 秒（会重试 SYN），所以不在请求里同步等——
+# 有缓存先用缓存（30 秒），过期了后台线程去测，下一次打开就是新的；从没测过返回 None（界面显示「检测中」）
+_PORTS: dict = {}
+_PEND: set = set()
+_PL = threading.Lock()
+
+
+def _probe(port: int):
+    ok = False
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(1.5)
+    try:
+        ok = s.connect_ex(("127.0.0.1", int(port))) == 0
+    except OSError:
+        ok = False
+    finally:
+        s.close()
+    with _PL:
+        _PORTS[port] = (time.time(), ok)
+        _PEND.discard(port)
+    return ok
+
+
+def port_running(port: int, ttl: float = 30, wait: bool = False):
+    """True / False / None（还没测过）。wait=True 时没缓存就当场测（给「代理」页的刷新按钮用）。"""
+    port = int(port)
+    with _PL:
+        v = _PORTS.get(port)
+        stale = v is None or time.time() - v[0] > ttl
+        go = stale and port not in _PEND
+        if go:
+            _PEND.add(port)
+    if go:
+        if wait:
+            return _probe(port)
+        threading.Thread(target=_probe, args=(port,), daemon=True).start()
+    return v[1] if v else None
+
+
+def ports_invalidate():
+    with _PL:
+        _PORTS.clear()
+
+
+def proxies(wait: bool = False) -> list[dict]:
     home = Path(os.environ.get("OPENCODEX_HOME") or Path.home() / ".opencodex")
     cfg = _read_json(home / "config.json") if (home / "config.json").exists() else {}
     port = int(cfg.get("port") or 10100)
     ocx = {"name": "opencodex", "configured": bool(cfg), "config": str(home / "config.json"), "port": port,
-           "running": _ping(f"http://127.0.0.1:{port}/") is not None,
+           "running": port_running(port, wait=wait),
            "default_provider": cfg.get("defaultProvider"), "providers": sorted((cfg.get("providers") or {}).keys()),
            "subagent_models": cfg.get("subagentModels") or [], "anthropic_base": f"http://127.0.0.1:{port}",
            "openai_base": f"http://127.0.0.1:{port}/v1"}
     mag = {"name": "magpie", "configured": (Path.home() / ".magpie").exists(), "port": 3425,
-           "running": _ping("http://127.0.0.1:3425/") is not None, "anthropic_base": "http://127.0.0.1:3425",
+           "running": port_running(3425, wait=wait), "anthropic_base": "http://127.0.0.1:3425",
            "openai_base": "http://127.0.0.1:3425/v1", "providers": [], "subagent_models": []}
     return [ocx, mag]
 

@@ -317,6 +317,12 @@ _STATUS = {"completed": "done", "failed": "failed", "error": "failed", "killed":
            "cancelled": "stopped", "async_launched": "running", "running": "running"}
 
 
+def _interrupted(content) -> bool:
+    """工具结果是「用户中断」那句（Esc / 停止）：算已结束，不算失败。"""
+    t = _result_text(content) if not isinstance(content, str) else content
+    return bool(re.search(r"interrupted by user|Request interrupted|user doesn't want to proceed|was rejected|tool use was rejected", t or "", re.I))
+
+
 def _task_note(t: str) -> dict | None:
     """<task-notification> 完成通知 → subtask_upd。后台命令也发这个，界面按 id 对不上就不管。"""
     f = dict(_NOTE_RE.findall(t or ""))
@@ -403,7 +409,7 @@ def parse_claude(d: dict, side: bool = False) -> list[dict]:
                 if not (isinstance(x, dict) and x.get("type") == "tool_result"):
                     continue
                 if isinstance(r, dict) and r.get("agentId"):
-                    st = "failed" if x.get("is_error") else _STATUS.get(r.get("status"), "running")
+                    st = ("stopped" if _interrupted(x.get("content")) else "failed") if x.get("is_error") else _STATUS.get(r.get("status"), "running")
                     hb = (r.get("handbackReport") or {}).get("text") if isinstance(r.get("handbackReport"), dict) else None
                     res = hb or (_result_text(x.get("content")) if st != "running" else "")
                     out.append({"ts": ts, "role": "subtask_upd", "id": x.get("tool_use_id"), "agent": r["agentId"],
@@ -416,7 +422,8 @@ def parse_claude(d: dict, side: bool = False) -> list[dict]:
                                 "out": _cut(_result_text(x.get("content")), TOOL_OUT)})
                     if x.get("is_error"):
                         # 不知道是不是子任务：带个 id 发过去，界面对不上就丢
-                        out.append({"ts": ts, "role": "subtask_upd", "id": x.get("tool_use_id"), "status": "failed",
+                        out.append({"ts": ts, "role": "subtask_upd", "id": x.get("tool_use_id"),
+                                    "status": "stopped" if _interrupted(x.get("content")) else "failed",
                                     "result": _clip(_result_text(x.get("content")))[:1500]})
     elif t == "assistant":
         for x in msg.get("content") or []:

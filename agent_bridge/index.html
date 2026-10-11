@@ -606,6 +606,12 @@ code{font-family:var(--mono)}
 .spback,.spx{border:0;background:transparent;color:var(--muted);width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;font-size:15px;cursor:pointer;flex:none}
 .spback:hover,.spx:hover{background:var(--hover);color:var(--text)}
 .spbody{flex:1;overflow:auto;padding:10px 12px 24px;overscroll-behavior:contain}
+.spsg{margin:2px 0 8px}
+.spsgh{display:flex;align-items:center;gap:6px;width:100%;border:0;background:transparent;padding:6px 4px;font-size:12.5px;color:var(--muted);cursor:pointer;border-radius:6px;text-align:left}
+.spsgh:hover{background:var(--hover)}.spsgh b{font-weight:600;color:var(--text)}
+.spsgn{font-size:11px;padding:0 7px;border-radius:9px;background:var(--hover2,var(--hover));color:var(--muted);font-variant-numeric:tabular-nums}
+.g-running .spsgn{background:var(--accent-weak);color:var(--accent)}.g-failed .spsgn{background:color-mix(in srgb,var(--err,#d33) 15%,transparent);color:var(--err,#d33)}
+.spsgc{display:inline-flex;transition:transform .15s;transform:rotate(90deg)}.spsgc .ic{width:12px;height:12px}.spsg.col .spsgc{transform:none}
 .spgrp{margin:4px 0 10px}
 .spgh{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--faint);padding:2px 4px 4px}
 .spgh .ic{width:13px;height:13px}
@@ -759,6 +765,9 @@ code{font-family:var(--mono)}
 :root{color-scheme:light dark}
 :root[data-theme="light"]{color-scheme:light}
 :root[data-theme="dark"]{color-scheme:dark}
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+html.vt-shrink::view-transition-old(root){z-index:2}html.vt-shrink::view-transition-new(root){z-index:1}
+.thov{position:fixed;inset:0;z-index:99999;pointer-events:none}
 .thbtn{border:0;background:transparent;color:var(--muted);padding:4px 6px;display:inline-flex;align-items:center}
 .thbtn:hover{background:var(--hover);color:var(--text)}
 .thbtn .ic{width:17px;height:17px}
@@ -1016,6 +1025,7 @@ body.lg-bottom .sfoot{display:flex;position:sticky;bottom:0;margin-top:auto;z-in
 .setrow .sd{font-size:12px;color:var(--muted);margin-top:1px}
 .setrow .seg{flex:none}
 .setrow .seg button{font-size:12.5px;padding:4px 12px}
+@media (max-width:860px){.tbx{display:none!important}}
 @media (max-width:860px){.setbtn{font-size:19px;padding:4px 8px}.setbtn .ic{width:20px;height:20px}}
 /* ---------- GitHub PR 小标签 / 预览卡片 / PR 面板 / diff 查看器 ---------- */
 :root{--pr-open:#1a7f37;--pr-merged:#8250df;--pr-closed:#cf222e;--pr-draft:#6e7781;--pr-add:#1a7f37;--pr-del:#cf222e;
@@ -1347,6 +1357,21 @@ body.sbresizing .spanel{transition:none}
 @media (prefers-reduced-motion: reduce){.bbw.live svg{animation:none!important}}
 
 /* ---------- 运行中 / 生成中：四个点绕一圈依次亮（像 Claude 桌面端）；Claude 橙，Codex 绿 / 灰 ---------- */
+.trunw{cursor:pointer;border-radius:10px;margin:6px 0 4px;min-width:0}
+.trunw .trun{margin:0;padding:2px 0}
+.trunw:hover .trgo{color:var(--text)}
+.trun .trgo{transition:transform .15s}
+.trunw.open .trgo{transform:rotate(90deg)}
+.trdet{display:none;cursor:default;margin:4px 0 2px 30px;padding:8px 10px;border:1px solid var(--line2);border-radius:10px;background:var(--panel2);font-size:12.5px;max-height:46vh;overflow:auto}
+.trunw.open .trdet{display:block}
+.trdl{font-size:11.5px;color:var(--muted);margin:6px 0 3px}.trdl:first-child{margin-top:0}
+.trpre{margin:0;padding:6px 8px;background:var(--bg);border-radius:6px;font:12px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto}
+.trpre.md{font-family:var(--sans);font-size:13px}
+.trsteps{display:flex;flex-direction:column;gap:3px}
+.trst{display:flex;align-items:center;gap:6px;min-width:0}.trst .ic{width:13px;height:13px;flex:none}.trst .ic.ok{color:var(--ok)}.trst .ic.bad{color:var(--err,#d33)}
+.trst .trsn{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-family:var(--mono);font-size:12px}.trst .trsn b{font-family:var(--sans);font-weight:500}
+.trst.now .trsn{color:var(--text)}.trst .trtm{color:var(--faint);font-size:11px;flex:none}
+.trst .spinr{width:11px;height:11px;flex:none;box-sizing:border-box;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 .trun{display:flex;align-items:center;gap:8px;margin:6px 0 4px;font-size:13px;color:var(--text);min-width:0}
 .trun .trl{flex:none}
 .trun .trc{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
@@ -1520,7 +1545,19 @@ body.noanim .trun .trl.shim{animation:none;background:none;color:var(--text)}
 .pvdd{position:fixed;z-index:1000;display:none;max-height:260px;overflow:auto;background:var(--panel,var(--bg));border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:4px;font-family:var(--mono);font-size:12.5px}
 .pvddi{padding:5px 8px;border-radius:5px;cursor:pointer;display:flex;justify-content:space-between;gap:12px}.pvddi:hover,.pvddi.on{background:var(--hover2,var(--hover))}
 .pvddi .dim{font-family:var(--sans);font-size:11px}.pvddh{padding:4px 8px;font-size:11px;color:var(--faint);font-family:var(--sans)}
-.pvmf{display:flex;gap:6px;align-items:center}.pvmf input{width:220px!important}
+.pvmf{display:flex;gap:6px;align-items:center}
+.pvsub{padding:10px 0 8px;border-top:1px solid var(--line2)}
+.pvsubh{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px;font-size:13px;margin-bottom:6px}.pvsubh .pvh{flex-basis:100%;margin:2px 0 0}
+.pvtag{font:11px var(--mono);padding:0 6px;border-radius:5px;background:var(--hover);color:var(--muted)}.pvtag.warn{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn);font-family:var(--sans)}
+.pvnote{font-size:12px;color:var(--muted);line-height:1.6;margin:0 0 8px}.pvnote code{font-size:11.5px}
+.pvtbl{display:flex;flex-direction:column;gap:5px}
+.pvtr{display:grid;grid-template-columns:1fr 1fr 28px;gap:6px;align-items:center}
+.pvtr[data-ov]{grid-template-columns:1fr 16px 1fr 28px}.pvarr{color:var(--faint);text-align:center}
+.pvcat .pvtr,.pvcat .pvth{grid-template-columns:1.4fr 1fr 110px 110px 28px}
+.pvth{display:grid;gap:6px;font-size:11px;color:var(--faint);padding:0 2px}.pvth:only-child{display:none}
+.pvtr input,.pvtr select{width:100%;min-width:0;box-sizing:border-box}.pvtr .pvmi{font-family:var(--mono);font-size:12.5px}
+.pvrx{padding:2px 0!important;color:var(--faint)}.pvrx:hover{color:var(--err,#d33)}
+.pvtadd{display:flex;gap:8px;align-items:center;margin-top:6px}.pvchk{font-size:12px;color:var(--muted);display:flex;gap:4px;align-items:center}.pvmf input{width:220px!important}
 .pvmst{padding:0 0 4px;font-size:12px}.pvmst:empty{display:none}.pvmst .miss{margin:4px 0}
 .pvmap{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:2px 10px 4px}
 .pvmh{display:flex;align-items:baseline;gap:4px;padding:8px 0 2px;font-size:13px}
@@ -1540,6 +1577,8 @@ body.noanim .trun .trl.shim{animation:none;background:none;color:var(--text)}
     <div class="pills" id="pills"></div>
     <div class="slegend" id="sLegend"></div>
     <div class="topact">
+      <button class="setbtn admin tbx" id="tbModel" title="模型与 API（供应商、key、模型映射）" aria-label="模型与 API"><i data-ic="key"></i></button>
+      <button class="setbtn admin tbx" id="tbUsage" title="用量统计（tokens / 费用）" aria-label="用量统计"><i data-ic="chart"></i></button>
       <button class="thbtn" id="themeBtn" title="主题"></button>
       <button class="setbtn" id="setBtn" title="设置"><i data-ic="gear"></i></button>
       <button class="rf" id="refreshAll" data-refresh title="刷新（会话、消息、当前会话记录）" style="font-size:17px"><i data-ic="refresh"></i></button>
@@ -1720,9 +1759,12 @@ let filter = "all", query = "", unseen = 0;
 // ---------- 基础 ----------
 async function api(path, body){
   const opt = body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-Msgbus":"1"}, body:JSON.stringify(body)};
+  if (body !== undefined && /^\/api\/(modelcfg|providers)\//.test(path) && !/\/(test|models|ccs-preview)$/.test(path)) mcDirty();
   const r = await fetch(path, opt); const j = await r.json();
   if (!r.ok) throw new Error(j.error || r.status); return j;
 }
+// 写过配置：「模型与 API」的缓存作废（下次打开现读）
+function mcDirty(){ try { if (typeof MC !== "undefined") MC.c = null; localStorage.removeItem("msgbus.mccache"); } catch(e){} }
 let toastT; function toast(t, ms=2600){ const el=$("#toast"); el.innerHTML=emoIcons(t); el.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>el.style.display="none", ms); }
 function openDlg(title, html, footer){ $("#dlgTitle").innerHTML=emoIcons(title); $("#dlgBody").innerHTML=html; $("#dlgFt").innerHTML=footer||'<button onclick="closeDlg()">关闭</button>'; $("#dlg").classList.add("open"); }
 function closeDlg(){ $("#dlg").classList.remove("open", "wide"); setOpen = false; }
@@ -1806,7 +1848,7 @@ function renderSettings(){
     <div class="setrow admin"><div class="sl">${ic("refresh")}<div><b>自动检查更新</b><div class="sd">启动后在后台查 GitHub 上的新版本（最多 6 小时一次）</div></div></div>${segHtml("updSeg", [["1", "开"], ["0", "关"]], updAuto ? "1" : "0")}</div>`;
   $("#updCheck").onclick = () => checkUpdate(true);
   $$("#updSeg button").forEach(b => b.onclick = async () => { try { updAuto = (await api("/api/settings", {update_auto: b.dataset.v === "1"})).update_auto; } catch(e){ toast("❌ " + e.message); } renderSettings(); });
-  $$("#themeSeg button").forEach(b => b.onclick = () => setTheme(b.dataset.v));
+  $$("#themeSeg button").forEach(b => b.onclick = () => setTheme(b.dataset.v, b));
   $$("#legSeg button").forEach(b => b.onclick = () => { store.set("msgbus.legend", b.dataset.v); applyLegendPos(); renderSettings(); });
   $$("#webFxSeg button").forEach(b => b.onclick = () => setWebFx(b.dataset.v === "1"));
   $$("#uiAnimSeg button").forEach(b => b.onclick = () => { store.set("msgbus.uianim", b.dataset.v); applyAnim(); renderSettings(); });
@@ -1923,10 +1965,41 @@ $("#mUninst").onclick = doUninstall; $("#mRm").onclick = doRemove;
 const THEMES = [["system", "跟随系统", "monitor"], ["light", "浅色", "sun"], ["dark", "深色", "moon"]];
 const sysDark = matchMedia("(prefers-color-scheme:dark)");
 function themeMode(){ const t = store.get("msgbus.theme"); return t === "light" || t === "dark" ? t : "system"; }
-function setTheme(m){
+function setTheme(m, from){
   const r = document.documentElement;
-  if (m === "light" || m === "dark") r.dataset.theme = m; else { delete r.dataset.theme; m = "system"; }
-  store.set("msgbus.theme", m); renderThemeUi();
+  const apply = () => { if (m === "light" || m === "dark") r.dataset.theme = m; else { delete r.dataset.theme; m = "system"; }
+    store.set("msgbus.theme", m); renderThemeUi(); };
+  const dk = x => x === "dark" || (x !== "light" && sysDark.matches);
+  const was = dk(themeMode()), will = dk(m);
+  if (!from || was === will || matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
+  themeReveal(from, will, apply);
+}
+// 换主题的圆形展开：浅 → 深从按钮处扩散盖满窗口；深 → 浅收回按钮里。优先用 View Transitions，没有就用一层遮罩
+const THEME_MS = 450;
+function themeReveal(el, toDark, apply){
+  const b = el.getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2;
+  const R = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+  const clip = [`circle(0px at ${x}px ${y}px)`, `circle(${R}px at ${x}px ${y}px)`], r = document.documentElement;
+  if (document.startViewTransition) {
+    r.classList.add("vt-theme"); r.classList.toggle("vt-shrink", !toDark);
+    let t;
+    try { t = document.startViewTransition(apply); } catch(e){ r.classList.remove("vt-theme", "vt-shrink"); return apply(); }
+    t.ready.then(() => r.animate({clipPath: toDark ? clip : clip.slice().reverse()},
+      {duration: THEME_MS, easing: "ease-in-out", fill: "both", pseudoElement: toDark ? "::view-transition-new(root)" : "::view-transition-old(root)"})).catch(() => {});
+    t.finished.finally(() => r.classList.remove("vt-theme", "vt-shrink"));
+    return;
+  }
+  // 遮罩版：一块纯色圆（新主题的底色）扩散，换好再撤；收回时先换主题，盖一块旧底色收回按钮
+  const ov = document.createElement("div"); ov.className = "thov";
+  const oldBg = getComputedStyle(document.body).backgroundColor;
+  if (toDark) {
+    ov.style.background = "#131619"; document.body.appendChild(ov);
+    ov.animate({clipPath: clip}, {duration: THEME_MS, easing: "ease-in-out", fill: "forwards"}).finished.then(() => { apply();
+      ov.animate({opacity: [1, 0]}, {duration: 120, fill: "forwards"}).finished.then(() => ov.remove()); });
+  } else {
+    ov.style.background = oldBg; document.body.appendChild(ov); apply();
+    ov.animate({clipPath: clip.slice().reverse()}, {duration: THEME_MS, easing: "ease-in-out", fill: "forwards"}).finished.then(() => ov.remove());
+  }
 }
 function renderThemeUi(){
   const m = themeMode(), th = THEMES.find(x => x[0] === m), b = $("#themeBtn");
@@ -1934,7 +2007,7 @@ function renderThemeUi(){
   b.title = `主题：${th[1]}${m === "system" ? `（系统现在是${sysDark.matches ? "深色" : "浅色"}）` : ""}。点一下换：跟随系统 → 浅色 → 深色`;
   $$("#themeSeg button").forEach(x => x.classList.toggle("on", x.dataset.v === m));
 }
-$("#themeBtn").onclick = () => { const i = THEMES.findIndex(x => x[0] === themeMode()), n = THEMES[(i + 1) % THEMES.length]; setTheme(n[0]); toast("主题：" + n[1], 1200); };
+$("#themeBtn").onclick = e => { const i = THEMES.findIndex(x => x[0] === themeMode()), n = THEMES[(i + 1) % THEMES.length]; setTheme(n[0], e.currentTarget); toast("主题：" + n[1], 1200); };
 sysDark.addEventListener("change", renderThemeUi);       // 跟随系统时 CSS 自己会换，这里只更新按钮上的说明
 renderThemeUi();
 let fxOn = true;
@@ -3207,7 +3280,7 @@ function openSession(x){
 }
 function fmtDur(t){ t = Math.round(t); if (t < 60) return t + " 秒"; if (t < 3600) return Math.floor(t/60) + " 分 " + (t%60) + " 秒";
   return Math.floor(t/3600) + " 小时 " + Math.floor(t%3600/60) + " 分"; }
-const SUB_LABEL = {running: "进行中", done: "完成", failed: "失败", stopped: "已停止", idle: "没动静了"};
+const SUB_LABEL = {running: "进行中", done: "完成", failed: "失败", stopped: "已停止 / 中断", idle: "没动静了（没交回结果）"};
 function subStatus(s){
   if (s.status === "failed" || s.status === "stopped" || s.status === "done") return s.status;
   if (s.info && s.info.done) return "done";
@@ -3557,21 +3630,57 @@ var trCurSt = null;
 // 只在思考 / 生成时：几秒换一句友好的说法
 const PHRASES = {think: ["正在思考", "正在整理思路", "想一想怎么做", "正在琢磨"], gen: ["正在一点点推进", "正在写回复", "马上就好", "正在组织语言"]};
 function trAvatar(){ const x = trLive() || (view ? {agent: view.agent, sid: view.sid} : null); return x ? bbAvatar(x, "active", 22) : ""; }
-function stRowHtml(k, text, t0, codex){
+function stRowHtml(k, text, t0, codex, det){
   const v = (RUN_ST[k] || RUN_ST.other)[0], full = v + (text ? " " + text : "") + "…";
   trCurSt = {k, full};
   const phr = PHRASES[k], label = phr ? `<span class="trl shim" data-phr="${k}">${phr[Math.floor(Date.now() / 3500) % phr.length]}…</span>`
     : `<span class="trl shim">${v}${text ? `<span class="trc"> ${esc(String(text).slice(0, 160))}</span>` : ""}…</span>`;
   const lead = k === "wait" || k === "bus" ? stIcon(k) : trAvatar() + (phr ? "" : stIcon(k, "mini"));
-  return `<div class="trun ${codex ? "k-cx" : "k-cl"} s-${k}" role="status" title="${esc(full)}">${lead}${label}<span class="tsec" data-since="${t0}">${secTxt(t0)}</span>${k === "wait" || k === "bus" ? "" : ic("chev", "trgo")}</div>`;
+  const row = `<div class="trun ${codex ? "k-cx" : "k-cl"} s-${k}" role="status" title="${esc(full)}">${lead}${label}<span class="tsec" data-since="${t0}">${secTxt(t0)}</span>${k === "wait" || k === "bus" ? "" : ic("chev", "trgo")}</div>`;
+  if (!det) return row;
+  const open = trRunOpen === det.key;
+  return `<div class="trunw${open ? " open" : ""}" data-trun="${esc(det.key)}" title="${open ? "收起" : "点开看完整内容和这一轮的最近几步"}">${row}<div class="trdet">${open ? det.html() : ""}</div></div>`;
 }
 setInterval(() => $$(".trl[data-phr]").forEach(el => { const p = PHRASES[el.dataset.phr]; el.textContent = p[Math.floor(Date.now() / 3500) % p.length] + "…"; }), 3500);
-function runRowHtml(t, codex){ const st = toolState(t, codex); return stRowHtml(st.k, st.text, tsSince(t), codex); }
+function runRowHtml(t, codex, entries){ const st = toolState(t, codex); return stRowHtml(st.k, st.text, tsSince(t), codex, entries ? trRunDet(entries, t, codex) : null); }
+// 底部「运行中…」那一行点开：当前这一步的完整命令 / 路径 / 提示词、有输出就显示、这一轮最近几步。同一轮里一直保持展开，这一轮结束就复位
+let trRunOpen = null;
+function trTurnStart(entries){
+  for (let i = entries.length - 1; i >= 0; i--) { const e = entries[i]; if (e.role === "user" && !e.is_prompt) return i; if (e.role === "bus_in") return i; }
+  return 0;
+}
+function trRunDet(entries, cur, codex){
+  const i0 = trTurnStart(entries), u = entries[i0], key = (view ? tabKey(view) : "") + ":" + (u ? u.pos : 0);
+  return {key, html: () => {
+    let h = "";
+    if (cur) {
+      const st = toolState(cur, codex), full = codex && cxKind(cur) === "run" ? cxCmds(cur).join("\n") : (cur.input || cur.text || "");
+      h += `<div class="trdl">${esc((RUN_ST[st.k] || RUN_ST.other)[0])} · ${esc(cur.name || "")}</div><pre class="trpre">${esc(String(full).slice(0, 20000)) || "（没有参数）"}</pre>`;
+      const o = cur.id ? trToolOut[cur.id] : null;
+      h += o && o.out ? `<div class="trdl">输出（到目前为止）</div><pre class="trpre">${esc(String(codex ? cxOut(o.out).text || o.out : o.out).slice(-8000))}</pre>`
+        : `<div class="trdl dim">还没有输出（这一步做完才会写进会话记录）</div>`;
+    }
+    const steps = entries.slice(i0 + 1).filter(e => e.role === "tool" || e.role === "subtask").slice(-8);
+    if (steps.length) {
+      h += `<div class="trdl">这一轮最近 ${steps.length} 步</div><div class="trsteps">` + steps.map(t => {
+        if (t.role === "subtask") { const ss = subStatus(trSubs[t.id] || {ts: t.ts});
+          return `<div class="trst${ss === "running" ? " now" : ""}">${spIcon(ss)}<span class="trsn"><b>${esc(SUB_LABEL[ss] || ss)}</b> 子任务 · ${esc(t.description || t.subagent_type || "")}</span>${t.ts ? `<span class="trtm">${hm(t.ts)}</span>` : ""}</div>`; }
+        const o = t.id ? trToolOut[t.id] : null, st = toolState(t, codex), run = t === cur || (!o && t.id);
+        const bad = o && (o.err || (codex && cxKind(t) === "run" && (cxOut(o.out).code || 0) !== 0));
+        const mk = run ? '<span class="spinr"></span>' : bad ? ic("x", "bad") : ic("check", "ok");
+        const v = (RUN_ST[st.k] || RUN_ST.other)[run ? 0 : 1] || (RUN_ST[st.k] || RUN_ST.other)[0];
+        return `<div class="trst${run ? " now" : ""}">${mk}<span class="trsn"><b>${esc(v)}</b> ${esc(String(st.text || t.name || "").slice(0, 300))}</span>${t.ts ? `<span class="trtm">${hm(t.ts)}</span>` : ""}</div>`;
+      }).join("") + "</div>";
+    } else if (!cur) h += `<div class="trdl dim">这一轮还没有调用工具</div>`;
+    const last = entries.slice(i0 + 1).filter(e => e.role === "assistant").pop();
+    if (!cur && last) h += `<div class="trdl">最近的回复</div><div class="trpre md">${mdHtml(String(last.text).slice(-1500))}</div>`;
+    return h; }};
+}
 function thinkRowHtml(entries, codex){
   const real = entries.filter(e => !e.is_prompt && e.role !== "subtask_upd" && e.role !== "tool_out"), last = real[real.length - 1];
   const t0 = last && last.ts ? last.ts : tsSince(null), live = trLive();
   if (live && (live.waiting_permission || live.perm)) return stRowHtml("wait", "", t0, codex);
-  return stRowHtml(last && last.role === "assistant" ? "gen" : "think", "", t0, codex);
+  return stRowHtml(last && last.role === "assistant" ? "gen" : "think", "", t0, codex, trRunDet(entries, null, codex));
 }
 function busWaitHtml(codex){ trCurSt = {k: "bus", full: "等待总线消息…"}; return `<div class="trun ${codex ? "k-cx" : "k-cl"} s-bus" role="status">${stIcon("bus")}<span class="trl">等待总线消息…</span></div>`; }
 setInterval(() => $$(".tsec[data-since]").forEach(el => { el.textContent = secTxt(+el.dataset.since); }), 1000);
@@ -3584,7 +3693,7 @@ function trListHtml(entries, kp, sub){
   const active = !sub && trActive(), runT = active ? trRunTool(entries) : null;
   const flush = () => { if (!tools.length) return;
     let run = "";
-    if (runT && tools[tools.length - 1] === runT) { tools = tools.slice(0, -1); run = runRowHtml(runT, cxMode || (view && view.agent === "codex")); }
+    if (runT && tools[tools.length - 1] === runT) { tools = tools.slice(0, -1); run = runRowHtml(runT, cxMode || (view && view.agent === "codex"), entries); }
     if (!tools.length) { html += run; return; }
     if (cxMode) { html += cxToolsHtml(tools, kp) + run; tools = []; return; }
     const dk = kp + "t" + tools[0].pos, last = tools[tools.length-1];
@@ -3616,6 +3725,7 @@ function trListHtml(entries, kp, sub){
       ${long?`<a class="link more" data-bmore>${cl ? "展开全文" : "收起"}</a>`:""}${e.ts?`<div class="bt">${hm(e.ts)}</div>`:""}${isU ? msgActs(e, isU) : ""}</div>`;
   }
   flush();
+  if (!sub && !active) trRunOpen = null;     // 这一轮结束：底部那行的展开状态复位
   if (sub || !active) endTurn();            // 还在回复的那一轮先不放（等它答完）
   if (!sub) trCurSt = null;
   if (runT) trCurSt = {k: toolState(runT, cxMode).k, full: (RUN_ST[toolState(runT, cxMode).k] || RUN_ST.other)[0] + " " + runLabel(runT, cxMode) + "…"};
@@ -3712,6 +3822,10 @@ async function handToClaude(x){
 }
 // 会话记录里的点击（主视图和子任务面板共用）：复制代码、展开长文、开合子任务卡片
 function trClick(e, redraw){
+  const rw = e.target.closest(".trunw[data-trun]");
+  if (rw && !e.target.closest(".trdet")) { const k = rw.dataset.trun; trRunOpen = trRunOpen === k ? null : k;
+    const det = rw.querySelector(".trdet"); rw.classList.toggle("open", trRunOpen === k); rw.title = trRunOpen === k ? "收起" : "点开看完整内容和这一轮的最近几步";
+    if (trRunOpen === k) { if (typeof redraw === "function") redraw(); const w = document.querySelector(`.trunw[data-trun="${CSS.escape(k)}"]`); if (w) w.scrollIntoView({block: "nearest"}); } else det.innerHTML = ""; return; }
   const ma = e.target.closest("[data-mact]"); if (ma) { e.preventDefault(); msgAct(ma); return; }
   const pc = e.target.closest("[data-copyp]");
   if (pc) { e.preventDefault(); e.stopPropagation(); const box = pc.closest(".tio,.cxpw,.cxterm"), pre = box && box.querySelector("pre,.cxcmd");
@@ -3798,19 +3912,18 @@ function spRowHtml(i){
       ${st === "running" && i.last_tool ? `<div class="splt">${esc(i.last_tool)}</div>` : ""}</div>
     <span class="spgo">${ic("chev")}</span></div>`;
 }
+// 子任务面板按状态分组：进行中 / 失败 展开，已完成 / 已结束 默认收起；收起状态记住；空组不显示
+const SP_GROUPS = [["running", "进行中", false], ["failed", "失败", false], ["done", "已完成", true], ["ended", "已结束", true]];
+const spGrpOf = st => st === "running" ? "running" : st === "failed" ? "failed" : st === "done" ? "done" : "ended";   // stopped / idle → 已结束
+let spGrpC = (() => { try { return JSON.parse(localStorage.getItem("msgbus.spgrp") || "{}") || {}; } catch(e){ return {}; } })();
+function spGrpCollapsed(k){ const d = SP_GROUPS.find(g => g[0] === k); return k in spGrpC ? !!spGrpC[k] : !!(d && d[2]); }
 function spListHtml(){
   if (!spLoaded) return `<div class="empty">正在读子任务…</div>`;
   if (!spItems.length) return `<div class="empty">这个会话没有派过子任务</div>`;
-  let html = "";
-  for (let k = 0; k < spItems.length; ) {      // 同一条回复里派的（并行）放一组
-    let j = k + 1; while (j < spItems.length && spItems[j].batch === spItems[k].batch) j++;
-    const grp = spItems.slice(k, j);
-    if (grp.length > 1) { const done = grp.filter(i => spSt(i) === "done").length;
-      html += `<div class="spgrp"><div class="spgh">${ic("users")} 并行 ${grp.length} 个 · 完成 ${done}</div>${grp.map(spRowHtml).join("")}</div>`; }
-    else html += spRowHtml(grp[0]);
-    k = j;
-  }
-  return html;
+  const by = {}; for (const i of spItems) (by[spGrpOf(spSt(i))] = by[spGrpOf(spSt(i))] || []).push(i);
+  return SP_GROUPS.filter(([k]) => by[k] && by[k].length).map(([k, t]) => { const c = spGrpCollapsed(k);
+    return `<div class="spsg g-${k}${c ? " col" : ""}"><button class="spsgh" data-spgrp="${k}" aria-expanded="${!c}"><span class="spsgc">${ic("chev")}</span><b>${t}</b><span class="spsgn">${by[k].length}</span></button>
+      ${c ? "" : `<div class="spsgb">${by[k].map(spRowHtml).join("")}</div>`}</div>`; }).join("");
 }
 function spDetailHtml(it){
   const st = spSt(it), id = it.id, tr = trSubTr[id];
@@ -3858,6 +3971,8 @@ $("#spX").onclick = spClose;
 $("#spBack").onclick = () => { spSel = null; spRender(); $("#spBody").scrollTop = spListTop; };
 $("#spBody").addEventListener("click", e => {
   const loc = e.target.closest("[data-sploc]"); if (loc) { e.preventDefault(); spLocate(loc.dataset.sploc); return; }
+  const gh = e.target.closest("[data-spgrp]");
+  if (gh) { const k = gh.dataset.spgrp; spGrpC[k] = !spGrpCollapsed(k); try { localStorage.setItem("msgbus.spgrp", JSON.stringify(spGrpC)); } catch(_){} spRender(); return; }
   const row = e.target.closest("[data-spid]");
   if (row) { spListTop = $("#spBody").scrollTop; spSel = row.dataset.spid; spRender(); $("#spBody").scrollTop = 0;
     const v = view; spDetailFetch(v).then(() => { if (view === v) spRender(); }); return; }
@@ -4689,6 +4804,8 @@ pnApply(); window.addEventListener("resize", pnApply);
 window.ccOpen = async (o) => {
   o = o || {};
   if (o.settings) { openSettings(); return true; }
+  if (o.page === "models") { mcOpen("list"); return true; }          // 托盘菜单「模型与 API」/「用量统计」
+  if (o.page === "usage") { usOpen(); return true; }
   if (o.root && (!cur || cur.root !== o.root) && projects.some(p => p.root === o.root)) await select(o.root);
   if (o.agent && o.sid) {
     const x = sessList.find(s => s.agent === o.agent && s.sid === o.sid) || {agent: o.agent, sid: o.sid, short: shortOfSid(o.agent, o.sid)};
@@ -4730,9 +4847,24 @@ function usOpen(){
   $("#menu").classList.remove("open");
   openDlg("用量统计", `<div class="us" id="usBox"></div>`, '<span class="dim" style="margin-right:auto;font-size:12px">费用按 API 价折算；订阅（Claude / ChatGPT 登录）不是实际账单</span><button onclick="closeDlg()">关闭</button>');
   $("#dlg").classList.add("wide");
-  usRenderShell(); usLoad();
+  usRenderShell();
+  const c = usCacheGet();                       // 上次的数据先画出来（内存 / 本地缓存），后台再刷新
+  if (c) { US.sum = c.sum; US.st = c.st; US.logs = c.logs || []; US.total = c.total || 0; US.off = US.logs.length;
+    try { usHead(); usCards(); usChart(); usOpts(); usMissing(); usTab(true); } catch(e){} usLoad("fresh"); }
+  else usLoad();
   clearInterval(US.timer);
   US.timer = setInterval(() => { if (!$("#usBox")) return clearInterval(US.timer); usLoad(true); }, 60000);
+}
+const US_CK = "msgbus.uscache";
+function usCacheGet(){
+  const qk = usQs().replace(/(from|to)=\d+&?/g, "");           // 时间窗按「7 天」这类选项比，不按具体秒数
+  if (US.c && US.c.q === qk + US.range) return US.c;
+  try { const j = JSON.parse(localStorage.getItem(US_CK) || "null"); if (j && j.q === qk + US.range && j.sum && j.st) return US.c = j; } catch(e){}
+  return null;
+}
+function usCachePut(){
+  US.c = {q: usQs().replace(/(from|to)=\d+&?/g, "") + US.range, sum: US.sum, st: US.st, logs: US.logs.slice(0, 100), total: US.total, at: Date.now()};
+  try { localStorage.setItem(US_CK, JSON.stringify(US.c)); } catch(e){}
 }
 function usRenderShell(){
   const seg = (k, items) => `<span class="seg" data-k="${k}">${items.map(([v, t]) => `<button data-v="${v}" class="${US[k]===v?"on":""}">${t}</button>`).join("")}</span>`;
@@ -4769,7 +4901,7 @@ async function usLoad(quiet){
     if (!$("#usBox")) return;
     US.sum = s; US.st = st; usHead(); usCards(); usChart(); usOpts(); usMissing();
     if (!quiet || US.tab !== "logs") { US.off = 0; US.logs = []; }
-    usTab(quiet);
+    await usTab(quiet); usCachePut();
   } catch(e){ $("#usCards") && ($("#usCards").innerHTML = `<div class="miss">读不到用量数据：${esc(e.message)}</div>`); }
 }
 function usHead(){
@@ -4820,7 +4952,7 @@ function usMissing(){
 async function usTab(quiet){
   const el = $("#usTab"); if (!el) return;
   if (US.tab === "logs") {
-    if (!quiet || !US.logs.length) { const r = await api(`/api/usage/logs?${usQs()}&offset=0&limit=100`); US.logs = r.rows; US.total = r.total; US.off = r.rows.length; }
+    if (!quiet || !US.logs.length || quiet === "fresh") { const r = await api(`/api/usage/logs?${usQs()}&offset=0&limit=100`); US.logs = r.rows; US.total = r.total; US.off = r.rows.length; }
     const row = r => `<tr><td class="l">${new Date(r.ts*1000).toLocaleString()}</td><td class="l">${usApp(r.app)}${r.agent ? ' <span class="tag">子代理</span>' : ""}${r.src === "ccswitch" ? ' <span class="tag" title="从 CC Switch 导入的历史">导入</span>' : ""}</td>
       <td class="l">${esc(r.provider)}</td><td class="l m" title="${esc(r.model)}">${esc(r.model)}</td><td>${fmtN(r.inp)}</td><td>${fmtN(r.cr)}</td>
       <td title="5 分钟 ${r.cw5} · 1 小时 ${r.cw1h}">${fmtN(r.cw5)}${r.cw1h ? " / " + fmtN(r.cw1h) : ""}</td><td>${fmtN(r.out)}</td><td>${fmtC(r.cost)}</td></tr>`;
@@ -4856,7 +4988,7 @@ async function usTab(quiet){
 async function usSources(){
   const st = await api("/api/usage/status");
   const srcs = st.sources.map(s => `<tr><td class="l">${s.src === "log" ? "会话日志" : "CC Switch 导入"}</td><td class="l">${usApp(s.app)}</td><td>${s.n}</td><td class="l dim">${s.from ? new Date(s.from*1000).toLocaleDateString() + " – " + new Date(s.to*1000).toLocaleDateString() : ""}</td></tr>`).join("");
-  const px = st.proxies.map(p => `<li><b>${p.name}</b>（端口 ${p.port}）：${p.running ? '<span style="color:var(--ok)">在运行</span>' : p.configured ? "装了，没在运行" : "没检测到"}</li>`).join("");
+  const px = st.proxies.map(p => `<li><b>${p.name}</b>（端口 ${p.port}）：${p.running ? '<span style="color:var(--ok)">在运行</span>' : p.running == null ? "检测中…" : p.configured ? "装了，没在运行" : "没检测到"}</li>`).join("");
   const imp = st.ccswitch.imported;
   openDlg("数据来源", `<div class="us">
     <div>CC Msg 自己读这些会话日志（只读，不改），每分钟只读新增部分：</div>
@@ -4872,7 +5004,7 @@ async function usSources(){
     try { const r = await api("/api/usage/import_ccswitch", {}); toast(`已导入 ${r.imported} 条，跳过重复 ${r.skipped} 条`); usSources(); }
     catch(e){ toast("导入失败：" + e.message); b.disabled = false; b.textContent = "导入 CC Switch 历史"; } };
 }
-$("#mUsage").onclick = usOpen;
+$("#mUsage").onclick = usOpen; $("#tbUsage").onclick = usOpen;
 // ---------- 模型与 API（0.7.1 简化版：打开就是供应商列表；其余收进 ⋯ 菜单 / 高级；项目覆盖在项目的右键菜单里） ----------
 // 后端：agent_bridge/modelcfg.py + providers.py；只在本机（8766 上 403），key 只显示打码
 const MC = {view:"list", scope:"user", d:null, p:null, sel:new Set(), ban:false};
@@ -4886,13 +5018,31 @@ async function mcOpen(view){
   $("#menu").classList.remove("open");
   if (typeof view === "string") MC.view = view;
   MC.scope = "user";
-  openDlg("模型与 API", `<div class="us mc" id="mcBox"><div class="dim">读取中…</div></div>`, '<span class="dim" style="margin-right:auto;font-size:12px">每次写配置之前都先备份（⋯ → 备份 / 恢复）</span><button onclick="closeDlg()">关闭</button>');
-  $("#dlg").classList.add("wide"); await mcLoad();
+  const c = mcCacheGet();
+  openDlg("模型与 API", `<div class="us mc" id="mcBox">${c ? "" : '<div class="dim">读取中…</div>'}</div>`, '<span class="dim" style="margin-right:auto;font-size:12px">每次写配置之前都先备份（⋯ → 备份 / 恢复）</span><button onclick="closeDlg()">关闭</button>');
+  $("#dlg").classList.add("wide");
+  if (c) { [MC.d, MC.p] = c; mcRender(); }          // 先用上次的（内存 / 本地缓存）立刻画出来，后台再刷新
+  await mcLoad(!!c);
 }
-async function mcLoad(){
+// 上次读到的「模型与 API」状态：内存里一份，localStorage 里一份（只有打码后的 key），重开时先画它
+const MC_CK = "msgbus.mccache";
+function mcCacheKey(){ return cur ? cur.root : ""; }
+function mcCacheGet(){
+  if (MC.c && MC.c.k === mcCacheKey()) return [MC.c.d, MC.c.p];
+  try { const j = JSON.parse(localStorage.getItem(MC_CK) || "null"); if (j && j.k === mcCacheKey() && j.d && j.p) { MC.c = j; return [j.d, j.p]; } } catch(e){}
+  return null;
+}
+function mcCachePut(){ MC.c = {k: mcCacheKey(), d: MC.d, p: MC.p, at: Date.now()}; try { localStorage.setItem(MC_CK, JSON.stringify(MC.c)); } catch(e){} }
+async function mcLoad(bg){
   const qs = cur ? "?root=" + encodeURIComponent(cur.root) : "";
-  try { [MC.d, MC.p] = await Promise.all([api("/api/modelcfg" + qs), api("/api/providers" + qs)]); } catch(e){ $("#mcBox").innerHTML = `<div class="miss">读不到：${esc(e.message)}</div>`; return; }
-  mcRender();
+  let d, p;
+  try { [d, p] = await Promise.all([api("/api/modelcfg" + qs), api("/api/providers" + qs)]); }
+  catch(e){ if (!bg && $("#mcBox")) $("#mcBox").innerHTML = `<div class="miss">读不到：${esc(e.message)}</div>`; else if (bg) toast("刷新失败：" + e.message); return; }
+  MC.d = d; MC.p = p; mcCachePut();
+  if (!$("#mcBox")) return;                          // 已经进了编辑表单 / 关了：只更新数据，不打断
+  const keep = $("#dlgBody").scrollTop; mcRender(); $("#dlgBody").scrollTop = keep;
+  // 代理端口第一次是后台测的：稍后再拉一次，把「检测中」换成结果
+  if ((d.proxies || []).some(x => x.running == null) && !MC.pxRetry) { MC.pxRetry = true; setTimeout(() => { MC.pxRetry = false; if ($("#mcBox")) mcLoad(true); }, 2000); }
 }
 // 有事才显示的一行提示（CC Switch / 要重开会话 / 明文 key / 配置被别的工具改过），点开看详情
 function mcNotes(){
@@ -5018,9 +5168,12 @@ function mcAgents(){
     $("#mcGo").onclick = async () => { try { const r = await api("/api/modelcfg/unify", {files, model: m, root: cur && cur.root}); toast(`改了 ${r.changed.length} 个，跳过 ${r.skipped.length} 个`); MC.sel.clear(); } catch(e){ toast("没改成：" + e.message); } await mcOpen("agents"); }; };
 }
 function mcProxy(){
+  if (MC.d.proxies.some(p => p.running == null) && !MC.pxWait) {     // 端口还没测过：当场测一次再重画（只这一页等）
+    MC.pxWait = true; api("/api/modelcfg/proxies").then(r => { MC.d.proxies = r; MC.pxWait = false; if ($("#mcTab") && MC.view === "proxy") mcProxy(); }).catch(() => { MC.pxWait = false; });
+  }
   const ps = MC.d.proxies, ocxAg = MC.d.agents.filter(a => a.ocx);
   $("#mcTab").innerHTML = `<div class="dim" style="margin:6px 0;font-size:12px">opencodex / magpie 是本地模型网关：把一个模型名路由到真正的供应商和模型（含 Anthropic ↔ OpenAI 格式转换）。CC Msg 不内置代理，只检测它们、显示路由，并能一键把 Claude / Codex 指过去（先备份，你确认才写）。</div>` +
-    ps.map(p => `<div class="ucard" style="margin-bottom:8px"><div class="ufl"><b>${p.name}</b><span class="tag">${p.running ? "在运行" : p.configured ? "装了，没在运行" : "没检测到"}</span><span class="dim">端口 ${p.port}</span><span style="flex:1"></span>
+    ps.map(p => `<div class="ucard" style="margin-bottom:8px"><div class="ufl"><b>${p.name}</b><span class="tag">${p.running ? "在运行" : p.running == null ? "检测中…" : p.configured ? "装了，没在运行" : "没检测到"}</span><span class="dim">端口 ${p.port}</span><span style="flex:1"></span>
       <button data-px="${p.name}" data-t="claude">Claude 指向它</button><button data-px="${p.name}" data-t="codex">Codex 加为供应商</button></div>
       ${p.providers.length ? `<div class="s">上游供应商：${p.providers.map(esc).join("、")}${p.default_provider ? "（默认 " + esc(p.default_provider) + "）" : ""}</div>` : ""}
       ${p.subagent_models.length ? `<div class="s">子代理模型：${p.subagent_models.map(esc).join("、")}</div>` : ""}
@@ -5064,6 +5217,7 @@ function mcSlot(){
 }
 // ---------- 供应商（CC Msg 自己管；CC Switch 可选） ----------
 async function pvApi(act, body){
+  if (!["test", "models", "ccs-preview"].includes(act)) mcDirty();
   const r = await fetch("/api/providers/" + act, {method:"POST", headers:{"Content-Type":"application/json","X-Msgbus":"1"}, body:JSON.stringify(body)});
   const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error(j.error || r.status); e.status = r.status; e.j = j; throw e; } return j;
 }
@@ -5132,7 +5286,29 @@ function pvEdit(tool, p, preset){
   const isNew = !p; p = p || {mode: "key", models: {}, wire_api: "responses"};
   const m = p.models || {}, cl = tool === "claude", login = cl ? "login" : "chatgpt";
   const maps = cl ? [["opus","Opus","opus 别名用哪个模型"],["sonnet","Sonnet","sonnet 别名"],["haiku","Haiku","haiku 别名，也用于后台小任务"],["fable","Fable","fable 别名"],["subagent","子代理","没单独指定模型的子代理 / 队友"]]
-                  : [["review_model","审查（review_model）","/review 用"],["subagent","子代理","[agents] default_subagent_model"]];
+                  : [["review_model","审查","/review 用（review_model）"],["subagent","子代理","派出去的子代理没指定模型时用（[agents] default_subagent_model）"],
+                     ["mem_extract","记忆 · 提取","总结对话写记忆用（[memories] extract_model；开了记忆功能才用得到）"],["mem_consolidate","记忆 · 整合","整理记忆用（[memories] consolidation_model）"]];
+  const cxEf = ["", "minimal", "low", "medium", "high", "xhigh"]; for (const x of [p.effort, p.subagent_effort, ...(p.catalog || []).map(r => r.effort)]) if (x && !cxEf.includes(x)) cxEf.push(x);
+  const efSel = (attr, v) => `<select ${attr}>${cxEf.map(e => `<option value="${e}" ${(v || "") === e ? "selected" : ""}>${e || "（默认）"}</option>`).join("")}</select>`;
+  const ri = (attr, v, ph, w) => `<input ${attr} value="${esc(v || "")}" placeholder="${ph}" autocomplete="off" spellcheck="false"${w ? ` style="width:${w}"` : ""}>`;
+  const rowX = '<button class="pvmini ghost pvrx" data-rx title="删掉这一行">✕</button>';
+  const catRow = r => `<div class="pvtr" data-cat>${ri('data-c="slug" class="pvmi"', r.slug, "真实模型名")}${ri('data-c="name"', r.name, "显示名（可空）")}${efSel('data-c="effort"', r.effort)}${ri('data-c="ctx" inputmode="numeric"', r.ctx, "上下文（可空）")}${rowX}</div>`;
+  const pkRow = r => `<div class="pvtr" data-pk>${ri('data-c="model" class="pvmi"', r.model, "模型 ID 或别名")}${ri('data-c="label"', r.label, "显示名（可空）")}${rowX}</div>`;
+  const ovRow = r => `<div class="pvtr" data-ov>${ri('data-c="from" class="pvmi"', r.from, "Anthropic 模型 ID，如 claude-opus-5-5")}<span class="pvarr">→</span>${ri('data-c="to" class="pvmi"', r.to, "实际发给供应商的模型名")}${rowX}</div>`;
+  const tag = (t, c) => `<span class="pvtag ${c || ""}">${t}</span>`;
+  const extra = cl ? `
+    <div class="pvsub"><div class="pvsubh"><b>/model 选单里加的模型</b>${tag("modelPicker")}${tag("命令行 + VS Code")}<span class="pvh">Claude Code ≥ 2.1.242；只在全局切换和 CC Msg 开的会话里生效（项目层 Claude Code 不认）</span></div>
+      <div class="pvtbl" id="pvPk">${((p.picker || {}).rows || []).map(pkRow).join("")}</div>
+      <div class="pvtadd"><button class="pvmini" data-add="pk">＋ 添加</button><label class="pvchk"><input type="checkbox" id="pvPkR" ${(p.picker || {}).replace ? "checked" : ""}> 只显示这些（隐藏内置的那几行）</label></div></div>
+    <div class="pvsub"><div class="pvsubh"><b>模型 ID 改写</b>${tag("modelOverrides")}${tag("命令行 + VS Code")}<span class="pvh">左边必须是 Anthropic 官方模型 ID；选到它（/model、--model、上面的别名）时实际发出去的是右边的名字。这是真正的映射</span></div>
+      <div class="pvtbl" id="pvOv">${(p.overrides || []).map(ovRow).join("")}</div>
+      <div class="pvtadd"><button class="pvmini" data-add="ov">＋ 添加</button></div></div>`
+  : `
+    <div class="setrow"><div class="sl"><div><b>子代理思考强度</b><div class="sd">[agents] default_subagent_reasoning_effort</div></div></div>${efSel('id="pvSE" style="width:300px"', p.subagent_effort)}</div>
+    <div class="pvsub"><div class="pvsubh"><b>/model 选单（模型目录）</b>${tag("model_catalog_json")}${tag("命令行")}${tag("桌面版要官方登录", "warn")}</div>
+      <div class="pvnote">Codex <b>没有别名</b>：「显示名」只改 /model 里看到的名字，请求里发的永远是左边的真实模型名。有行时 CC Msg 生成 <code>ccmsg-models-${esc(p.id || "<id>")}.json</code> 并在切换时写 <code>model_catalog_json</code>，/model 里就只列这些（每个带默认思考强度和上下文窗口）。Codex 启动时才读，改了要重开。桌面版的选单没检测到官方登录时只显示默认模型（Codex 桌面版自己的限制）；命令行 <code>codex</code> 的 /model 一定生效。空表 = 不管（CC Switch 写的目录不动）。</div>
+      <div class="pvtbl pvcat" id="pvCat"><div class="pvth"><span>真实模型</span><span>显示名</span><span>思考强度</span><span>上下文窗口</span><span></span></div>${(p.catalog || []).map(catRow).join("")}</div>
+      <div class="pvtadd"><button class="pvmini" data-add="cat">＋ 添加</button><button class="pvmini ghost" id="pvCatAll" title="把「获取模型列表」拿到的模型都加进来">把获取到的全部加入</button></div></div>`;
   const efs = cl ? ["", "low", "medium", "high", "xhigh"] : ["", "minimal", "low", "medium", "high", "xhigh"];
   if (p.effort && !efs.includes(p.effort)) efs.push(p.effort);          // 导入来的少见值也留着，保存时不丢
   const nAdv = (p.effort ? 1 : 0) + (!cl && p.wire_api && p.wire_api !== "responses" ? 1 : 0);
@@ -5150,6 +5326,7 @@ function pvEdit(tool, p, preset){
     </div>
     <div class="pvmap"><div class="pvmh"><b>模型映射</b><span class="pvh">留空 = 不设${cl ? "；Claude Code 里的 opus / sonnet / haiku / fable 别名和子代理用哪个模型" : ""}</span></div><div class="setlist">
     ${maps.map(([k, l, hint]) => `<div class="setrow"><div class="sl"><div><b>${l}</b><div class="sd">${hint}</div></div></div>${mi(k, m[k])}</div>`).join("")}
+    ${extra}
     </div></div>
     <details class="pvadv" id="pvAdv"><summary>高级${nAdv ? `<span class="dim">（已设 ${nAdv} 项）</span>` : ""}</summary><div class="setlist">
     <div class="setrow"><div class="sl"><div><b>思考强度</b><div class="sd">${cl ? "effortLevel" : "model_reasoning_effort"}</div></div></div><select id="pvE" style="width:300px">${efs.map(e => `<option value="${e}" ${(p.effort||"")===e?"selected":""}>${e || "（不改）"}</option>`).join("")}</select></div>
@@ -5161,7 +5338,16 @@ function pvEdit(tool, p, preset){
   // 下拉：拿到的模型列表在前，常见名字垫底；输入框照样能随便填
   let got = [];
   const fillDL = list => { got = list || []; };
-  pvCombo($$("#dlgBody [data-pvf]"), () => got);
+  pvCombo($$("#dlgBody [data-pvf], #dlgBody .pvmi"), () => got);
+  const addRow = (box, html) => { box.insertAdjacentHTML("beforeend", html); const r = box.lastElementChild; pvCombo.attach(r.querySelectorAll(".pvmi")); return r; };
+  $$("#dlgBody [data-add]").forEach(b => b.onclick = () => { const k = b.dataset.add;
+    const r = k === "cat" ? addRow($("#pvCat"), catRow({})) : k === "pk" ? addRow($("#pvPk"), pkRow({})) : addRow($("#pvOv"), ovRow({}));
+    r.querySelector("input").focus(); });
+  if (!pvEdit.rx) { pvEdit.rx = 1; $("#dlgBody").addEventListener("click", e => { const x = e.target.closest("[data-rx]"); if (x) { e.preventDefault(); x.closest(".pvtr").remove(); } }); }
+  if ($("#pvCatAll")) $("#pvCatAll").onclick = () => { if (!got.length) return toast("先点「获取模型列表」");
+    const have = new Set($$("#pvCat [data-c=slug]").map(i => i.value.trim())); let n = 0;
+    for (const x of got) if (!have.has(x)) { addRow($("#pvCat"), catRow({slug: x})); n++; }
+    toast(n ? `加了 ${n} 个` : "都已经在表里了"); };
   const showList = (r, cached) => { fillDL(r.models); $("#pvMst").innerHTML = `<span class="pvh" style="margin:0">${cached ? "上次" : "已"}获取 ${r.models.length} 个模型${r.at ? "（" + new Date(r.at * 1000).toLocaleString("zh-CN", {hour12: false}) + "）" : ""}，在下拉里选，也可以直接输入</span>`; };
   fillDL(null);
   const sync = () => { $$("#dlgBody .pvk").forEach(r => r.style.display = mode === "key" ? "" : "none"); $$("#dlgBody .pvlg").forEach(r => r.style.display = mode === "key" ? "none" : "");
@@ -5184,14 +5370,18 @@ function pvEdit(tool, p, preset){
   $("#pvNo").onclick = () => mcOpen("list");
   if ($("#pvDel")) $("#pvDel").onclick = () => pvDelete(tool, p);
   $("#pvSave").onclick = async () => { const models = {}; $$("#dlgBody [data-pvf]").forEach(i => { if (i.value.trim()) models[i.dataset.pvf] = i.value.trim(); });
+    const rows = (sel, keys) => $$(sel).map(r => Object.fromEntries(keys.map(k => [k, (r.querySelector(`[data-c="${k}"]`).value || "").trim()])));
     const prov = {id: p.id, name: $("#pvN").value.trim(), mode, base_url: $("#pvU").value.trim(), wire_api: $("#pvW") ? $("#pvW").value : undefined, models, effort: $("#pvE").value || null, from: p.from};
+    if (cl) { prov.picker = {rows: rows("#pvPk [data-pk]", ["model", "label"]).filter(r => r.model), replace: $("#pvPkR").checked};
+      prov.overrides = rows("#pvOv [data-ov]", ["from", "to"]).filter(r => r.from || r.to); }
+    else { prov.subagent_effort = $("#pvSE").value || null; prov.catalog = rows("#pvCat [data-cat]", ["slug", "name", "effort", "ctx"]).filter(r => r.slug); }
     try { const r = await pvApi("save", {tool, provider: prov, secret: $("#pvK").value || null}); $("#pvK").value = ""; toast(`已保存 ${r.name}${r.key_masked ? "（key …" + r.key_masked.slice(-4) + "）" : ""}`); mcOpen("list"); }
     catch(e){ toast("没保存：" + e.message); } };
 }
 // 模型输入框的下拉：获取到的模型在前（可搜索），常见名字垫底；输入框本身照样能随便填
 function pvCombo(inputs, getList){
   let dd = $("#pvDD"); if (!dd) { dd = document.createElement("div"); dd.id = "pvDD"; dd.className = "pvdd"; document.body.appendChild(dd);
-    document.addEventListener("scroll", e => { if (!dd.contains(e.target)) dd.style.display = "none"; }, true); }
+    document.addEventListener("scroll", e => { if (!dd.contains(e.target)) (pvCombo.onScroll || (() => dd.style.display = "none"))(e); }, true); }
   let cur = null, sel = -1;
   const hide = () => { dd.style.display = "none"; cur = null; sel = -1; };
   const show = inp => { cur = inp; const q = inp.value.trim().toLowerCase(), got = getList(), seen = new Set(), rows = [];
@@ -5202,7 +5392,7 @@ function pvCombo(inputs, getList){
     dd.innerHTML = (got.length ? "" : '<div class="pvddh">还没获取模型列表，下面是常见名字</div>') + rows.slice(0, 80).map(([x, g], i) => `<div class="pvddi${i === sel ? " on" : ""}" data-v="${esc(x)}">${esc(x)}${g ? "" : '<span class="dim">常见</span>'}</div>`).join("");
     const b = dd.getBoundingClientRect(); if (b.bottom > innerHeight - 8) dd.style.top = Math.max(8, r.top - 2 - b.height) + "px"; };
   dd.onmousedown = e => { const it = e.target.closest(".pvddi"); if (!it || !cur) return; e.preventDefault(); cur.value = it.dataset.v; cur.dispatchEvent(new Event("change")); hide(); };
-  for (const inp of inputs) {
+  const attach = list => { for (const inp of list) {
     inp.addEventListener("focus", () => { sel = -1; show(inp); });
     inp.addEventListener("input", () => { sel = -1; show(inp); });
     inp.addEventListener("blur", () => setTimeout(() => { if (cur === inp) hide(); }, 120));
@@ -5210,7 +5400,10 @@ function pvCombo(inputs, getList){
       if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); sel = (sel + (e.key === "ArrowDown" ? 1 : its.length - 1)) % its.length; its.forEach((x, i) => x.classList.toggle("on", i === sel)); its[sel].scrollIntoView({block: "nearest"}); }
       else if (e.key === "Enter" && sel >= 0) { e.preventDefault(); inp.value = its[sel].dataset.v; hide(); }
       else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); hide(); } });
-  }
+  } };
+  attach(inputs);
+  pvCombo.attach = attach;
+  pvCombo.onScroll = e => { if (cur && e.target.contains && e.target.contains(cur) && document.activeElement === cur) show(cur); else { dd.style.display = "none"; } };   // 对话框滚动：跟着输入框走                    // 表格里新加的行也接上同一个下拉
   pvCombo.refresh = () => { if (cur) show(cur); };
   return hide;
 }
@@ -5311,7 +5504,7 @@ async function pvSessLaunch(x){
   $("#pvSBgo").onclick = () => pvProject(t, $("#pvSBp").value, null, root, back);
   $("#pvSBm").onclick = e => { e.preventDefault(); pjOpen(root); };
 }
-$("#mModel").onclick = () => mcOpen("list");
+$("#mModel").onclick = () => mcOpen("list"); $("#tbModel").onclick = () => mcOpen("list");
 </script>
 </body>
 </html>
