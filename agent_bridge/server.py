@@ -880,6 +880,20 @@ def suggest_projects() -> list[str]:
 SETTINGS = DATA / "settings.json"
 
 
+def _claude_autosync_loop() -> None:
+    """切 Claude 账号后自动把会话列表补到当前号（见 claude_sync.auto_tick）；设置里可关。"""
+    from . import claude_sync
+    every = float(os.environ.get("AGENT_BRIDGE_AUTOSYNC_SECS") or 30)
+    time.sleep(min(every, 5))
+    while True:
+        try:
+            if load_settings().get("claude_autosync", True):
+                claude_sync.auto_tick()
+        except Exception:
+            pass
+        time.sleep(every)
+
+
 def load_settings() -> dict:
     s = {"fx": True, "update_auto": True, "tray_close": True, "start_min": False, "notify": True}
     try:
@@ -1528,6 +1542,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"local": self._local(), "device": d and {"id": d["id"], "name": d["name"]},
                             "platform": sys.platform, "fx": sys.platform == "win32",
                             "claude_desktop": claude_sync.claude_app_dir().exists(), "bundled": bundled()})
+            elif u.path == "/api/claude-sync/auto":
+                from . import claude_sync
+                self._json(dict(claude_sync.auto_status(), enabled=load_settings().get("claude_autosync", True)))
             elif u.path == "/api/claude-sync":
                 from . import claude_sync
                 src = q.get("source") or "desktop"
@@ -1838,7 +1855,7 @@ class Handler(BaseHTTPRequestHandler):
                     s["fx"] = bool(body["fx"])
                 if "update_auto" in body:
                     s["update_auto"] = bool(body["update_auto"])
-                for k in ("tray_close", "start_min", "notify", "tray_hint_shown"):
+                for k in ("tray_close", "start_min", "notify", "tray_hint_shown", "claude_autosync"):
                     if k in body:
                         s[k] = bool(body[k])
                 save_settings(s)
@@ -1984,6 +2001,8 @@ def start(port: int = 8765, host: str | None = None, lan_port: int | None = None
         modelcfg.proxies()
     except Exception:
         pass
+    if not os.environ.get("AGENT_BRIDGE_NO_AUTOSYNC"):
+        threading.Thread(target=_claude_autosync_loop, daemon=True, name="claude-autosync").start()
     FX_WATCHER.start()      # Claude↔Codex 有消息时放信件动画（只在 Windows 上；设置里可关）
     from . import update    # 后台查一次新版本（6 小时最多一次；设置里可关；断网没关系）
     update.auto_check_later(lambda: load_settings().get("update_auto", True))
