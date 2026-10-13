@@ -506,8 +506,15 @@ def plan(target: str | None = None, source: str = "desktop") -> dict:
                 skip_tomb=skip_tomb, skip_have=skip_have, tombstones=len(tomb))
 
 
+def _atomic_write(dst: Path, text: str) -> None:
+    """先写同目录的临时文件（名字不以 local_ 开头，桌面端不会当成会话），再一步换上去。"""
+    tmp = dst.with_name(f".ccmsg-tmp-{os.getpid()}-{dst.name}")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, dst)
+
+
 def run(target: str | None = None, dry: bool = False, only: list[str] | None = None,
-        source: str = "desktop") -> dict:
+        source: str = "desktop", what: str = "sync") -> dict:
     """only：只补这几个（local_*.json 文件名）；不给就全补。source：补到桌面端（缺省）还是命令行登的那个号。"""
     p = plan(target, source)
     if p.get("ok") and only is not None:
@@ -522,8 +529,7 @@ def run(target: str | None = None, dry: bool = False, only: list[str] | None = N
         dst = tdir / a["name"]
         if dst.exists():
             continue
-        dst.write_text(json.dumps(_fresh(json.loads(Path(a["src"]).read_text(encoding="utf-8"))),
-                                  ensure_ascii=False), encoding="utf-8")
+        _atomic_write(dst, json.dumps(_fresh(json.loads(Path(a["src"]).read_text(encoding="utf-8"))), ensure_ascii=False))
         done += 1
     updated = 0
     for a in p["update"]:
@@ -533,9 +539,9 @@ def run(target: str | None = None, dry: bool = False, only: list[str] | None = N
         for k in _KEEP:                      # 在当前账号里做过的收藏 / 归档 / 点开时间，留着
             if k in cur:
                 new[k] = cur[k]
-        dst.write_text(json.dumps(new, ensure_ascii=False), encoding="utf-8")
+        _atomic_write(dst, json.dumps(new, ensure_ascii=False))
         updated += 1
-    _write_ledger(bak, tdir, "sync", source=source, added=[a["name"] for a in p["add"]], updated=[a["name"] for a in p["update"]])
+    _write_ledger(bak, tdir, what, source=source, added=[a["name"] for a in p["add"]], updated=[a["name"] for a in p["update"]])
     return dict(p, done=done, updated=updated, dry=False, backup=str(bak))
 
 
@@ -596,6 +602,8 @@ def restore(backup_id: str) -> dict:
     trash = paths.HOME / "trash" / f"claude-restore-{datetime.now():%Y%m%d-%H%M%S}"
     removed = restored = 0
     if led:
+        if led.get("what") in ("sync", "auto-sync") and led.get("added"):
+            _skip_add(led.get("key") or f"{tdir.parent.name}/{tdir.name}", led["added"])   # 撤回过的：自动同步别再补回来
         for n in led.get("added", []):
             f = tdir / n
             if f.exists():
@@ -714,3 +722,139 @@ def main(argv: list[str]) -> int:
         print(f"✓ 已补齐 {r['done']} 个、刷新 {r['updated']} 个，原目录备份在 {r['backup']}（撤回：--restore {Path(r['backup']).name}）。"
               "打开 Claude 桌面端就能在列表里看到。")
     return 0
+
+
+# ---------- 自动同步（无感） ----------
+# 为什么要同步：桌面端的会话列表按「账号 / 组织」分文件夹（claude-code-sessions/<账号>/<组织>/local_*.json），
+# 换号后新文件夹里没有别的号下开过的会话；对话内容（~/.claude/projects）本来就在。同步 = 把别的号文件夹里的登记补 / 刷新到当前号。
+# 自动同步只做和手动一样的事（plan + run，备份 + 账本），另外：
+# - 只在 Claude 桌面端没开时写（开着时它会在退出时把列表盖回去，也可能正写着）；开着就记成「等它退出」，退出后马上补
+# - 账号文件（~/.claude.json、桌面端 Local Storage）或会话文件夹有变化 → 防抖 20 秒后检查；没变化也每 10 分钟查一次
+# - 目标文件夹 15 秒内有写入就先不动；没东西要补就什么都不写（也不备份）
+# - 自动同步的备份只留最近 20 份（手动同步的不动）
+AUTO = {"pending_n": 0, "sig": None, "changed": 0.0, "evaluated": 0.0, "was_running": None, "pending": False, "events": [], "error": None, "last_check": None}
+AUTO_KEEP = 20
+
+
+def _auto_sig() -> tuple:
+    out = []
+    for f in [Path.home() / ".claude.json"]:
+        try:
+            out.append((f.name, f.stat().st_mtime))
+        except Exception:
+            out.append((f.name, 0))
+    ldb = claude_app_dir() / "Local Storage" / "leveldb"
+    try:
+        out += sorted((f.name, f.stat().st_mtime) for f in ldb.iterdir() if f.suffix in (".log", ".ldb"))
+    except Exception:
+        pass
+    try:
+        out += sorted((f"{a.name}/{o.name}", o.stat().st_mtime) for a in sessions_root().iterdir() if a.is_dir()
+                      for o in a.iterdir() if o.is_dir())
+    except Exception:
+        pass
+    return tuple(out)
+
+
+def _prune_auto() -> None:
+    try:
+        autos = [b for b in sorted(BAK_ROOT.iterdir(), reverse=True)
+                 if b.is_dir() and (b / "ledger.json").exists()
+                 and json.loads((b / "ledger.json").read_text(encoding="utf-8")).get("what") == "auto-sync"]
+        for b in autos[AUTO_KEEP:]:
+            shutil.rmtree(b, ignore_errors=True)
+    except Exception:
+        pass
+
+
+def auto_tick(now: float | None = None, force: bool = False, debounce: float = 20, period: float = 600,
+              quiet: float = 15) -> dict | None:
+    """后台每 ~30 秒调一次。返回这次做了的事件（补了 / 刷新了几个），没做事返回 None。"""
+    import time
+    from . import apps
+    now = now or time.time()
+    if not sessions_root().exists():
+        return None
+    sig = _auto_sig()
+    if sig != AUTO["sig"]:
+        first = AUTO["sig"] is None
+        AUTO["sig"] = sig
+        AUTO["changed"] = 0.0 if first else now          # 启动时那次不用等防抖：马上查
+        if not first and not force:
+            return None
+    try:
+        running = bool(apps.running("claude"))
+    except Exception:
+        running = True                                   # 认不出来就当开着：宁可不写
+    quit_now = AUTO["was_running"] is True and not running
+    AUTO["was_running"] = running
+    if AUTO["changed"] and now - AUTO["changed"] < debounce and not force:
+        return None
+    due = force or quit_now or AUTO["changed"] or not AUTO["evaluated"] or now - AUTO["evaluated"] >= period
+    if not due:
+        return None
+    if running:
+        if AUTO["changed"] or not AUTO["evaluated"]:     # 有变化但桌面端开着：只读算一下，有要补的就等它退出
+            try:
+                p = plan(source="desktop")
+                if p.get("ok"):
+                    skip = set(_skip_load().get(p["target"]["key"], []))
+                    p["add"] = [x for x in p["add"] if x["name"] not in skip]
+                AUTO["pending"] = bool(p.get("ok") and (p["add"] or p["update"]))
+                AUTO["pending_n"] = len(p.get("add") or []) + len(p.get("update") or []) if AUTO["pending"] else 0
+            except Exception:
+                pass
+            AUTO["evaluated"] = AUTO["evaluated"] or now
+        AUTO["changed"] = 0.0
+        return None
+    AUTO["changed"], AUTO["evaluated"], AUTO["last_check"] = 0.0, now, now
+    try:
+        p = plan(source="desktop")
+        if not p.get("ok"):
+            AUTO["error"], AUTO["pending"] = p.get("error"), False
+            return None
+        AUTO["error"] = None
+        skip = set(_skip_load().get(p["target"]["key"], []))
+        p["add"] = [a for a in p["add"] if a["name"] not in skip]
+        if not (p["add"] or p["update"]):
+            AUTO["pending"] = False
+            return None
+        tdir = Path(p["target"]["path"])
+        newest = max((f.stat().st_mtime for f in tdir.glob("local_*.json")), default=0)
+        if now - newest < quiet:
+            AUTO["changed"] = now                        # 刚有写入：过一会儿再来
+            return None
+        r = run(p["target"]["key"], source="desktop", what="auto-sync", only=[a["name"] for a in p["add"]])
+        _prune_auto()
+        AUTO["pending"] = False
+        ev = {"id": f"{int(now)}", "time": now, "added": r.get("done", 0), "updated": r.get("updated", 0),
+              "account": _short(p["target"]["key"].partition("/")[0]), "backup": Path(r["backup"]).name if r.get("backup") else None,
+              "titles": [a["title"] for a in p["add"][:5]]}
+        AUTO["events"] = (AUTO["events"] + [ev])[-20:]
+        return ev
+    except Exception as e:
+        AUTO["error"] = f"{type(e).__name__}: {e}"
+        return None
+
+
+SKIP_FILE = paths.HOME / "claude-autosync-skip.json"
+
+
+def _skip_load() -> dict:
+    try:
+        return json.loads(SKIP_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _skip_add(key: str, names: list[str]) -> None:
+    d = _skip_load()
+    d[key] = sorted(set(d.get(key, [])) | set(names))
+    SKIP_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = SKIP_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, SKIP_FILE)
+
+
+def auto_status() -> dict:
+    return {k: AUTO[k] for k in ("pending", "pending_n", "events", "error", "last_check")}

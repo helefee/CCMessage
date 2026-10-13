@@ -1841,6 +1841,7 @@ function renderSettings(){
     <div class="setrow"><div class="sl">${ic("sparkles")}<div><b>界面动画</b><div class="sd">侧栏收起 / 展开、活跃头像的呼吸等（系统设了「减少动画」时也不放）</div></div></div>${segHtml("uiAnimSeg", [["1", "开"], ["0", "关"]], store.get("msgbus.uianim") === "0" ? "0" : "1")}</div>
     <div class="setrow"><div class="sl">${ic("panelL")}<div><b>侧边栏记住上次状态</b><div class="sd">关着时：启动按 Claude / Codex 有没有在跑决定两栏开不开（没在跑的那一栏先收起）</div></div></div>${segHtml("sbRemSeg", [["1", "开"], ["0", "关"]], store.get("msgbus.sbRemember") === "1" ? "1" : "0")}</div>
     ${me && me.platform === "win32" ? trayRows() : ""}
+    ${me && me.claude_desktop ? trayRow("claude_autosync", "refresh", "切 Claude 账号后自动同步会话", "Claude 桌面端换号后，自动把别的号下开过的会话补进当前号的列表（只在桌面端关着时写，写前备份，可在「会话管理 → 同步与还原」撤回）；手动同步照旧在 ⋯ 菜单", (trayCfg || {}).claude_autosync !== false) : ""}
     <div class="setrow"><div class="sl">${ic("sparkles")}<div><b>网页信件动画</b><div class="sd">新消息时网页里飞一封信（只影响这台设备）</div></div></div>${segHtml("webFxSeg", [["1", "开"], ["0", "关"]], webFx ? "1" : "0")}</div>
     <div class="setrow admin needfx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">Windows 桌面上窗口之间飞（电脑上全局）</div></div></div>${segHtml("fxSeg", [["1", "开"], ["0", "关"]], fxOn ? "1" : "0")}</div>
     <div class="setrow admin onlynofx"><div class="sl">${ic("mail")}<div><b>桌面信件动画</b><div class="sd">只有 Windows 上有；这台电脑上不放（网页信件动画照常）</div></div></div></div>
@@ -1859,6 +1860,7 @@ function renderSettings(){
 }
 // 托盘相关的设置（只在 Windows 上显示；和托盘右键菜单里的勾选是同一份，存在服务端）
 let trayCfg = null;
+const trayRow = (k, icn, t, d, on) => `<div class="setrow admin"><div class="sl">${ic(icn)}<div><b>${t}</b><div class="sd">${d}</div></div></div>${segHtml("tray_" + k, [["1", "开"], ["0", "关"]], on ? "1" : "0").replace('class="seg"', `class="seg" data-tray="${k}"`)}</div>`;
 function trayRows(){
   const c = trayCfg || {}, row = (k, icn, t, d, on) => `<div class="setrow admin"><div class="sl">${ic(icn)}<div><b>${t}</b><div class="sd">${d}</div></div></div>${segHtml("tray_" + k, [["1", "开"], ["0", "关"]], on ? "1" : "0").replace('class="seg"', `class="seg" data-tray="${k}"`)}</div>`;
   return row("autostart", "power", "开机自启", "登录 Windows 后自动启动 CC Msg（当前用户，不用管理员）", !!c.autostart)
@@ -1866,11 +1868,25 @@ function trayRows(){
     + row("start_min", "minus", "启动时最小化到托盘", "启动时不弹窗口，点托盘图标再打开", !!c.start_min)
     + row("notify", "bell", "通知", "有发给你的消息 / 任务、你派的任务交回结果、有新版本时弹 Windows 通知（不会刷屏）", c.notify !== false);
 }
+// 自动同步 Claude 会话：后台做，这里只在做了 / 要等桌面端退出时轻轻提示一下
+let ccsAutoSeen = store.get("msgbus.ccsAuto") || "", ccsAutoPend = false;
+async function ccsAutoPoll(){
+  if (!isLocal || !me || !me.claude_desktop) return;
+  let r; try { r = await api("/api/claude-sync/auto"); } catch(e){ return; }
+  if (!r.enabled) return;
+  const ev = (r.events || []).slice(-1)[0];
+  if (ev && ev.id !== ccsAutoSeen) { ccsAutoSeen = ev.id; store.set("msgbus.ccsAuto", ev.id);
+    const parts = [ev.added && `补了 ${ev.added} 个`, ev.updated && `刷新了 ${ev.updated} 个`].filter(Boolean).join("、");
+    if (parts) toast(`已自动同步 Claude 会话到当前账号：${parts}`); }
+  if (r.pending && !ccsAutoPend) toast(`检测到 Claude 换号：${r.pending_n || ""} 个会话会在 Claude 桌面端退出后自动补进来`);
+  ccsAutoPend = !!r.pending;
+}
+setTimeout(ccsAutoPoll, 8000); setInterval(ccsAutoPoll, 60000);
 function openSettings(){
   $("#menu").classList.remove("open");
   openDlg("设置", `<div class="setlist" id="setBody"></div>`, '<button onclick="closeDlg()">完成</button>');
   setOpen = true; renderSettings(); loadUpdate();
-  if (me && me.platform === "win32") api("/api/settings").then(c => { trayCfg = c; renderSettings(); }).catch(() => {});
+  if (me && (me.platform === "win32" || me.claude_desktop)) api("/api/settings").then(c => { trayCfg = c; renderSettings(); }).catch(() => {});
 }
 function renderTop(){
   const p = cur; if (!p) { $("#pills").innerHTML=""; $("#instBtn").style.display="none"; return; }
