@@ -2189,6 +2189,14 @@ function wirePick(goId, label, extra = 0, scope = "#dlg", nid = "pickN"){   // e
 const CS_NAME = {desktop: "桌面端", cli: "命令行（CLI）"}, CS_SHORT = {desktop: "桌面端", cli: "CLI"};
 const csPick = {desktop: true, cli: true};
 const csKey = k => (k || "").split("/").map(x => x.slice(0,8)).join(" / ");
+const CS = {tgt: {desktop: null, cli: null}, readAt: 0, busy: false, ps: null};
+const csAgo = t => { if (!t) return "—"; const d = Math.max(0, Date.now()/1000 - t); return d < 60 ? "刚刚" : d < 3600 ? `${Math.round(d/60)} 分钟前` : d < 86400 ? `${Math.round(d/3600)} 小时前` : fmtDay(t); };
+function csSrcHtml(s, a){
+  if (!a) return "";
+  const src = s === "desktop" ? `来自桌面端 Local Storage${a.via && a.via !== "leveldb" ? "（没认出来，退回）" : ""} · 登录记录 ${a.seen ? csAgo(Date.parse(a.seen)/1000) : "无时间"} · 存储写入 ${csAgo(a.ldb_time)}${a.desktop_running ? " · 桌面端开着" : a.desktop_running === false ? " · 桌面端没开" : ""}`
+    : `来自 ~/.claude.json · 改于 ${csAgo(a.file_time)}`;
+  return `<div class="dim" style="font-size:11.5px;margin:1px 0 0 22px">${esc(src)}</div>`;
+}
 function csAccHtml(a){
   if (!a || !a.key) return '<span style="color:var(--muted)">认不出来</span>';
   const via = a.via === "cli" ? "（没认出来，按 CLI 的号算）" : a.via === "newest-folder" ? "（没认出来，按最近有写入的文件夹算）" : "";
@@ -2198,6 +2206,7 @@ function csAccHtml(a){
     + (via ? `<span style="color:var(--muted);font-size:12px">${via}</span>` : "")
     + (a.exists ? ` <span style="color:var(--muted);font-size:12px">已有 ${a.count} 个</span>` : ' <span class="badge b-wait">还没有会话文件夹</span>');
 }
+let ps_folders = [];
 function csSection(s, p, many){
   const box = `data-cssec="${s}" style="margin-top:12px;padding-top:8px;border-top:1px solid var(--line)"`;
   if (!p.ok) return `<div ${box}><div style="font-weight:600">${CS_NAME[s]}</div><div style="color:var(--warn);margin-top:4px">${esc(p.error)}</div></div>`;
@@ -2205,13 +2214,14 @@ function csSection(s, p, many){
   const skip = [p.skip_missing ? `${p.skip_missing} 个对话记录已不在` : "", p.skip_tomb ? `${p.skip_tomb} 个在这个号里删过（墓碑，不复活）` : ""].filter(Boolean).join("、");
   const rows = p.add.map(a => `<label class="devrow" style="cursor:pointer"><input type="checkbox" data-pickrow value="${esc(a.name)}" ${a.archived?"":"checked"} style="margin-right:8px">
       <div class="grow"><b>${esc(a.title)}</b>${a.archived?' <span class="badge b-wait">已归档</span>':''}
-      <div style="color:var(--muted);font-size:12px">${a.last?fmtDay(a.last):""} · ${esc(a.cwd||"")}</div></div></label>`).join("");
+      <div style="color:var(--muted);font-size:12px">${a.last?fmtDay(a.last):""} · ${esc(a.cwd||"")} · 来自 <code>${esc(csKey(a.from))}</code></div></div></label>`).join("");
+  const fsel = (ps_folders || []).length > 1 ? `<label class="dim" style="font-size:12px;margin-left:8px">补到：<select data-cstgt="${s}">${ps_folders.map(f => `<option value="${esc(f.key)}" ${f.key === p.target.key ? "selected" : ""}>${esc(csKey(f.key))}（${f.count} 个 · ${csAgo(f.latest)}写入）</option>`).join("")}</select></label>` : "";
   return `<div ${box}>
-    <div style="font-weight:600">${CS_NAME[s]}账号 / 组织：<code>${esc(csKey(p.target.key))}</code>（已有 ${p.target.count} 个）</div>
+    <div style="font-weight:600">${CS_NAME[s]}账号 / 组织：<code>${esc(csKey(p.target.key))}</code>（已有 ${p.target.count} 个）${CS.tgt[s] ? ' <span class="badge b-wait">手动选的</span>' : ""}${fsel}</div>
     <div style="margin:6px 0 4px">可以补进来 ${p.add.length} 个${skip ? `（另有 ${skip}，跳过）` : ""}（已归档的缺省不勾）：</div>
     ${upd.length?`<div style="margin:4px 0">另有 <b>${upd.length}</b> 个这个号里已有、但别的号里是更新的版本，会一并刷新成最新：${upd.slice(0,6).map(u=>esc(u.title)).join("、")}${upd.length>6?" 等":""}</div>`:""}
     ${pickBar(p.add.length, "pickN_" + s)}<div style="max-height:${many ? 28 : 46}vh;overflow:auto">${rows || '<div style="color:var(--muted)">没有要补的，别的账号里的会话都已经在了。</div>'}</div>
-    ${p.add.length || upd.length ? `<div style="margin-top:6px;text-align:right"><button class="primary" id="csGo_${s}">补齐到${CS_SHORT[s]}账号 ${p.add.length} 个</button></div>` : ""}</div>`;
+    ${p.add.length || upd.length ? `<div style="margin-top:6px;display:flex;gap:8px;justify-content:flex-end">${p.add.length ? `<button class="ghost" id="csAll_${s}">全部同步（${p.add.length}${upd.length ? ` + 刷新 ${upd.length}` : ""}）</button>` : ""}<button class="primary" id="csGo_${s}">补齐到${CS_SHORT[s]}账号 ${p.add.length} 个</button></div>` : ""}</div>`;
 }
 function csRender(ps){
   const acc = ps.desktop.accounts || ps.cli.accounts || {};
@@ -2219,37 +2229,56 @@ function csRender(ps){
   let srcs = ["desktop", "cli"].filter(s => csPick[s]);
   const merged = same && srcs.length === 2;
   if (merged) srcs = ["desktop"];
-  const head = `<div style="font-size:13px;color:var(--muted)">Claude 桌面端的会话列表按「账号 / 组织」分开记，切换账号后旧会话只是不显示，对话记录一直在本机。
+  ps_folders = ps.desktop.folders || ps.cli.folders || [];
+  const dA = acc.desktop || {};
+  const stale = dA.stale && !CS.tgt.desktop ? `<div class="cswarn" style="margin:8px 0;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--warn) 12%,transparent);font-size:13px">
+      ⚠ 桌面端的号可能还是旧的：${esc(dA.stale_why || "")}。可以先退出 Claude 桌面端（托盘里也退）再点「刷新」，或者直接
+      <button class="ghost" id="csUseSug" data-k="${esc(dA.suggest)}">补到 ${esc(csKey(dA.suggest))}</button>，也可以在下面「补到」里自己选。</div>` : "";
+  const bar = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><button class="ghost" id="csRefresh" title="不用缓存，重新读桌面端和 CLI 现在登的号，重扫所有账号文件夹">${CS.busy ? '<span class="spinr"></span> 读取中…' : "⟳ 刷新"}</button>
+      <span class="dim" style="font-size:12px" id="csReadAt">上次读取 ${CS.readAt ? new Date(CS.readAt).toLocaleTimeString() : "—"}</span></div>`;
+  const head = bar + `<div style="font-size:13px;color:var(--muted)">Claude 桌面端的会话列表按「账号 / 组织」分开记，切换账号后旧会话只是不显示，对话记录一直在本机。
       这里把别的账号里的会话补进选定账号的列表：只补缺的，不覆盖、不删除，写之前整个目录先备份。
       <b>桌面端和命令行（CLI）是两套登录</b>，可以登的不是同一个号，下面分开认、分开查。命令行自己 <code>claude --resume</code> 直接读本机记录，不看这份列表；
       补到 CLI 的号，只有桌面端也登这个号时才看得到。</div>
     <div style="display:flex;flex-direction:column;gap:4px;margin:10px 0 2px">${["desktop", "cli"].map(s => `<label style="cursor:pointer">
-      <input type="checkbox" data-cssrc="${s}" ${csPick[s] ? "checked" : ""} style="margin-right:6px">${CS_NAME[s]}：${csAccHtml(acc[s])}</label>`).join("")}</div>
+      <input type="checkbox" data-cssrc="${s}" ${csPick[s] ? "checked" : ""} style="margin-right:6px">${CS_NAME[s]}：${csAccHtml(acc[s])}</label>${csSrcHtml(s, acc[s])}`).join("")}</div>${stale}
     ${same ? `<div style="font-size:13px;color:var(--muted)">桌面端和 CLI 现在登的是同一个号 / 组织${merged ? "，下面只列一份" : ""}。</div>` : ""}`;
   const body = srcs.length ? srcs.map(s => csSection(s, ps[s], srcs.length > 1)).join("")
     : '<div style="color:var(--muted);margin-top:12px">两个都没勾，勾一个看看。</div>';
   openDlg("🔄 同步 Claude 会话到当前账号", head + body +
     `<div style="margin-top:10px;color:var(--warn);font-size:13px">补完要<b>重启 Claude 桌面端</b>才会出现在列表里（它只在启动时读一次）。</div>`);
   $$("#dlg input[data-cssrc]").forEach(b => b.onchange = () => { csPick[b.dataset.cssrc] = b.checked; csRender(ps); });
+  $("#csRefresh").onclick = () => csLoad();
+  if ($("#csUseSug")) $("#csUseSug").onclick = e => { CS.tgt.desktop = e.target.dataset.k; csLoad(); };
+  $$("#dlg select[data-cstgt]").forEach(x => x.onchange = () => { CS.tgt[x.dataset.cstgt] = x.value; csLoad(); });
   srcs.forEach(s => {
     const p = ps[s]; if (!p.ok) return;
     const upd = (p.update || []).length;
     const picked = wirePick("csGo_" + s, `补齐到${CS_SHORT[s]}账号`, upd, `#dlg [data-cssec="${s}"]`, "pickN_" + s);
     const go = $("#csGo_" + s); if (!go) return;
+    const all = $("#csAll_" + s); if (all) all.onclick = () => { $$(`#dlg [data-cssec="${s}"] input[data-pickrow]`).forEach(x => x.checked = true); go.click(); };
     go.onclick = async () => {
       const only = picked(); if (!only.length && !upd) return toast("一个都没勾");
-      try { const r = await api("/api/claude-sync", {only, source: s}); if (r.deferred) return openDlg("⏳ 已排队", deferHtml(r));
+      try { const r = await api("/api/claude-sync", {only, source: s, target: CS.tgt[s] || p.target.key}); if (r.deferred) return openDlg("⏳ 已排队", deferHtml(r));
         if (r.ok === false) return toast("❌ " + (r.error || "没做成"), 6000);
         openDlg("✅ 已补齐", `<div>${CS_NAME[s]}的号 <code>${esc(csKey(r.target && r.target.key))}</code>：补进来 ${r.done} 个会话${r.updated?`，刷新 ${r.updated} 个`:""}。原目录备份在：</div><code style="word-break:break-all">${esc(r.backup||"")}</code>
         <div style="margin-top:8px">重启 Claude 桌面端就能在列表里看到。</div>`); }
       catch(e){ toast("❌ " + e.message, 5000); } };
   });
 }
-$("#mCSync").onclick = async () => {
+// 每次打开、点「刷新」都重新读（服务端丢掉读缓存），不用上次的结果
+async function csLoad(){
+  if (CS.busy) return; CS.busy = true;
+  if (CS.ps && $("#csRefresh")) { $("#csRefresh").innerHTML = '<span class="spinr"></span> 读取中…'; $("#csRefresh").disabled = true; }
+  try { const [d, c] = await Promise.all(["desktop", "cli"].map(s => api(`/api/claude-sync?source=${s}&fresh=1` + (CS.tgt[s] ? "&target=" + encodeURIComponent(CS.tgt[s]) : ""))));
+    CS.ps = {desktop: d, cli: c}; CS.readAt = Date.now(); }
+  catch(e){ CS.busy = false; if ($("#csRefresh")) { $("#csRefresh").disabled = false; $("#csRefresh").textContent = "⟳ 刷新"; } return toast("❌ " + e.message, 5000); }
+  CS.busy = false; csRender(CS.ps);
+}
+$("#mCSync").onclick = () => {
   csPick.desktop = csPick.cli = true;     // 每次打开都两个都勾上（上次取消的勾不带过来）
-  let ps; try { const [d, c] = await Promise.all(["desktop", "cli"].map(s => api("/api/claude-sync?source=" + s))); ps = {desktop: d, cli: c}; }
-  catch(e){ return toast("❌ " + e.message, 5000); }
-  csRender(ps);
+  CS.tgt = {desktop: null, cli: null}; CS.ps = null;
+  csLoad();
 };
 
 
