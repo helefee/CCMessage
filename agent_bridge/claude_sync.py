@@ -191,7 +191,16 @@ def _ldb_text(f: Path) -> list[bytes]:
         st = f.stat()
     except Exception:
         return []
-    key = (str(f), st.st_mtime_ns, st.st_size)
+    # Windows 上别的进程开着写的文件（桌面端的 .log），目录里记的修改时间 / 大小会迟迟不更新，
+    # 只看 stat 会一直用旧缓存 → 换号后还认成旧号。所以按真正打开后的文件长度来判断有没有变。
+    size = st.st_size
+    if f.suffix == ".log":
+        try:
+            with open(f, "rb") as fh:
+                size = fh.seek(0, 2)
+        except Exception:
+            pass
+    key = (str(f), st.st_mtime_ns, size)
     hit = _LDB_CACHE.get(str(f))
     if hit and hit[0] == key:
         return hit[1]
@@ -206,6 +215,11 @@ def _ldb_text(f: Path) -> list[bytes]:
     parts = [p.replace(b"\x00", b"") for p in parts]
     _LDB_CACHE[str(f)] = (key, parts)
     return parts
+
+
+def forget() -> None:
+    """丢掉所有读缓存：下一次一定重新读桌面端 Local Storage（刷新按钮 / 打开同步弹窗时用）。"""
+    _LDB_CACHE.clear()
 
 
 def _leveldb_pairs() -> list[tuple[str, float, str, str]]:
@@ -392,7 +406,47 @@ def accounts() -> dict:
     c = cli_account()
     if c["key"]:
         c.update(email_from="cli", email_guess=False)
+    try:
+        c["read_from"], c["file_time"] = str(Path.home() / ".claude.json"), (Path.home() / ".claude.json").stat().st_mtime
+    except Exception:
+        pass
+    d = dict(d, **desktop_freshness(d))
     return {"desktop": _with_folder(d), "cli": _with_folder(c)}
+
+
+def _iso(ts: str | None) -> float:
+    if not ts:
+        return 0.0
+    try:
+        return datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return 0.0
+
+
+def desktop_freshness(d: dict) -> dict:
+    """桌面端的号可信不可信：Local Storage 里最新那条记录的时间、桌面端开没开、有没有别的号的文件夹更新得更晚。
+    桌面端开着时它的 Local Storage 不一定马上写盘，最近一次写会话的是另一个号 → 多半是刚换了号还没落盘：标 stale，建议按那个号。"""
+    out = {"read_at": __import__("time").time()}
+    ldb = claude_app_dir() / "Local Storage" / "leveldb"
+    try:
+        out["ldb_time"] = max((f.stat().st_mtime for f in ldb.iterdir() if f.suffix in (".log", ".ldb")), default=0) or None
+    except Exception:
+        out["ldb_time"] = None
+    try:
+        from . import apps
+        out["desktop_running"] = bool(apps.running("claude"))
+    except Exception:
+        out["desktop_running"] = None
+    seen = _iso(d.get("seen"))
+    fs = folders()
+    newest = fs[0] if fs else None
+    if newest and d.get("key") and newest["key"] != d["key"] and newest["latest"] > max(seen, 1) + 60:
+        out.update(stale=True, suggest=newest["key"],
+                   stale_why=("桌面端开着，它的登录信息可能还没写到磁盘" if out["desktop_running"] else "认出的号比最近一次写会话的号旧")
+                   + f"；最近有会话写入的是另一个号（{_short(newest['key'].partition('/')[0])}）")
+    else:
+        out["stale"] = False
+    return out
 
 
 def current_key(source: str = "desktop") -> str | None:

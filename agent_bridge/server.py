@@ -1550,7 +1550,12 @@ class Handler(BaseHTTPRequestHandler):
                 src = q.get("source") or "desktop"
                 if src not in claude_sync.SOURCES:
                     raise ValueError("source 只能是 desktop / cli")
-                self._json(dict(claude_sync.plan(source=src), accounts=claude_sync.accounts()))
+                if q.get("fresh"):
+                    claude_sync.forget()                 # 刷新 / 打开弹窗：不用任何读缓存
+                tgt = q.get("target") or None
+                if tgt and not any(f["key"] == tgt for f in claude_sync.folders()):
+                    raise ValueError("没有这个账号 / 组织文件夹")
+                self._json(dict(claude_sync.plan(tgt, source=src), accounts=claude_sync.accounts(), folders=claude_sync.folders()))
             elif u.path == "/api/codex-sync":
                 from . import codex_sync
                 self._json(codex_sync.plan(float(q.get("days", 14)), q.get("root") or None))
@@ -1813,9 +1818,13 @@ class Handler(BaseHTTPRequestHandler):
                 src = body.get("source") or "desktop"
                 if src not in claude_sync.SOURCES:
                     raise ValueError("source 只能是 desktop / cli")
-                # 目标号现在就定下来：排队等桌面端退出时不用再认一遍
+                # 目标号现在就定下来：排队等桌面端退出时不用再认一遍；弹窗里手动选了目标文件夹就用它
+                claude_sync.forget()
+                tgt = body.get("target") or None
+                if tgt and not any(f["key"] == tgt for f in claude_sync.folders()):
+                    raise ValueError("没有这个账号 / 组织文件夹")
                 self._json(apps.run_or_defer("claude", "claude-sync",
-                                             {"target": claude_sync.current_key(src), "only": body.get("only"), "source": src},
+                                             {"target": tgt or claude_sync.current_key(src), "only": body.get("only"), "source": src},
                                              f"同步 Claude 会话到{claude_sync.SOURCES[src]}当前账号"))
             elif path == "/api/codex-sync":
                 from . import apps
