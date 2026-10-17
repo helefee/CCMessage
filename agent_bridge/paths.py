@@ -52,7 +52,19 @@ def _set_dir(k: str) -> str | None:
 
 
 CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or _set_dir("claude_dir") or Path.home() / ".claude")
-CODEX_HOME = Path(os.environ.get("CODEX_HOME") or _set_dir("codex_dir") or Path.home() / ".codex")
+def _codex_store_home() -> str | None:
+    """~/.codex 里没有会话、而商店版 Codex 的虚拟化目录里有 → 用那边（见 detect.codex_store_homes）。"""
+    if os.name != "nt" or (Path.home() / ".codex" / "sessions").is_dir():
+        return None
+    try:
+        from .detect import codex_store_homes
+        h = [x for x in codex_store_homes() if (x / "sessions").is_dir()]
+        return str(h[0]) if h else None
+    except Exception:
+        return None
+
+
+CODEX_HOME = Path(os.environ.get("CODEX_HOME") or _set_dir("codex_dir") or _codex_store_home() or Path.home() / ".codex")
 
 
 def codex_exe() -> str | None:

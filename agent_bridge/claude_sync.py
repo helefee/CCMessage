@@ -27,28 +27,138 @@ import os
 import re
 import shutil
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
 from . import paths
 
 
-def claude_app_dir() -> Path:
+def _real_app_dir() -> Path:
     if sys.platform == "win32":
-        d = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Claude"
-        if not d.exists():                       # 商店版（MSIX）桌面端：写到虚拟化目录 %LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude
-            from . import detect
-            m = [x for x in detect.msix_claude_dirs() if x.exists()]
-            if m:
-                return m[0]
-        return d
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Claude"
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "Claude"
     return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "Claude"
 
 
+# ---------- 桌面端数据目录：%APPDATA%\Claude 还是商店版（MSIX）的虚拟化目录 ----------
+# 商店版桌面端看到的是「合并视图」：%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude 里有的文件 / 文件夹盖过 %APPDATA%\Claude 里的。
+# 哪些写进了虚拟化目录因机器而异（2026-10-17 实测：会话列表和 Local Storage 还在 %APPDATA%，config.json 等在 LocalCache），
+# 所以按子目录分别判断：只有一边有 → 用那边；两边都有 → 用最近写过的（打平时桌面端是商店版就用虚拟化目录）。设置里可手动指定。
+APP_PARTS = {"sessions": "claude-code-sessions", "ldb": "Local Storage/leveldb", "idb": "IndexedDB"}
+_APP_RES: dict = {"t": 0.0, "v": None}
+
+
+def _activity(p: Path, part: str) -> float:
+    try:
+        if part == "sessions":
+            return max((f.stat().st_mtime for f in p.glob("*/*/*.json")), default=0.0) or p.stat().st_mtime
+        if part == "ldb":
+            return max((f.stat().st_mtime for f in p.iterdir() if f.is_file()), default=0.0)
+        return max((f.stat().st_mtime for f in p.glob("*/*") if f.is_file()), default=0.0) or p.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _desktop_msix() -> bool | None:
+    """桌面端在跑、而且是从 WindowsApps（商店版）起的？没在跑 → None。"""
+    try:
+        from . import detect
+        ps = [p for p in detect.processes() if detect.classify(p.get("name", ""), p.get("exe", ""), p.get("cmd", "")) == [("claude", "desktop")]]
+    except Exception:
+        return None
+    if not ps:
+        return None
+    return any("/windowsapps/claude_" in (p.get("exe") or "").replace("\\", "/").lower() for p in ps)
+
+
+def app_dir_candidates() -> list[dict]:
+    from . import detect
+    out = [{"id": "appdata", "label": "%APPDATA%\\Claude", "path": _real_app_dir()}]
+    if sys.platform == "win32" or os.environ.get("LOCALAPPDATA"):
+        for d in detect.msix_claude_dirs():
+            out.append({"id": "msix:" + d.parent.parent.parent.name, "label": "商店版虚拟化目录（" + d.parent.parent.parent.name + "）", "path": d})
+    return out
+
+
+def _app_override() -> Path | None:
+    try:
+        v = json.loads((paths.HOME / "settings.json").read_text(encoding="utf-8")).get("claude_app_dir") or ""
+    except Exception:
+        return None
+    return Path(v) if v and Path(v).is_dir() else None
+
+
+def app_resolve(max_age: float = 20) -> dict:
+    """{part: {path, base, why, cands: [{label, path, exists, activity}]}, override, msix_running}，20 秒内用缓存（forget() 清掉）。"""
+    now = time.time()
+    if _APP_RES["v"] is not None and now - _APP_RES["t"] < max_age:
+        return _APP_RES["v"]
+    ov = _app_override()
+    cands = app_dir_candidates()
+    msix = _desktop_msix() if len(cands) > 1 else None
+    res: dict = {"override": str(ov) if ov else None, "msix_running": msix, "parts": {}}
+    for part, rel in APP_PARTS.items():
+        rows = []
+        for c in cands:
+            p = c["path"] / rel
+            ex = p.exists()
+            rows.append({"id": c["id"], "label": c["label"], "base": str(c["path"]), "path": str(p), "exists": ex,
+                         "activity": _activity(p, part) if ex else 0.0})
+        if ov:
+            pick, why = {"base": str(ov), "path": str(ov / rel)}, "设置里手动指定的"
+        else:
+            have = [r for r in rows if r["exists"]]
+            if not have:
+                pick, why = rows[0], "两边都还没有，用缺省位置"
+            elif len(have) == 1:
+                pick, why = have[0], "只有这边有"
+            else:
+                best = max(have, key=lambda r: r["activity"])
+                tie = [r for r in have if best["activity"] - r["activity"] < 2]
+                if len(tie) > 1:
+                    pick = next((r for r in tie if r["id"].startswith("msix:")), tie[0]) if msix else next((r for r in tie if r["id"] == "appdata"), tie[0])
+                    why = "两边一样新，" + ("桌面端是商店版，用虚拟化目录" if msix else "用 %APPDATA%")
+                else:
+                    pick, why = best, "两边都有，这边最近写过"
+        res["parts"][part] = {"path": pick["path"], "base": pick["base"], "why": why, "cands": rows}
+    _APP_RES.update(t=now, v=res)
+    return res
+
+
+def app_path(part: str) -> Path:
+    try:
+        return Path(app_resolve()["parts"][part]["path"])
+    except Exception:
+        return _real_app_dir() / APP_PARTS[part]
+
+
+def app_dirs_brief() -> dict:
+    """给页面 / 诊断：每个子目录用的哪边、为什么，和可选的目录。"""
+    r = app_resolve()
+    names = {"sessions": "会话列表", "ldb": "Local Storage（账号）", "idb": "IndexedDB（头像 / 名字）"}
+    return {"override": r["override"], "msix_running": r["msix_running"],
+            "choices": [{"id": c["id"], "label": c["label"], "path": str(c["path"]), "exists": Path(c["path"]).exists()} for c in app_dir_candidates()],
+            "parts": [{"part": k, "name": names[k], "path": v["path"], "base": v["base"], "why": v["why"],
+                       "cands": [{"label": c["label"], "exists": c["exists"], "activity": c["activity"] or None} for c in v["cands"]]}
+                      for k, v in r["parts"].items()]}
+
+
+def claude_app_dir() -> Path:
+    """桌面端数据目录（以 Local Storage 所在的那边为准；会话列表 / IndexedDB 各自用 app_path() 单独判断）。"""
+    try:
+        r = app_resolve()
+        if r["override"]:
+            return Path(r["override"])
+        b = Path(r["parts"]["ldb"]["base"])
+        return b if b.exists() else next((Path(c["path"]) for c in app_dir_candidates() if Path(c["path"]).exists()), _real_app_dir())
+    except Exception:
+        return _real_app_dir()
+
+
 def sessions_root() -> Path:
-    return claude_app_dir() / "claude-code-sessions"
+    return app_path("sessions")
 
 
 def folders() -> list[dict]:
@@ -226,11 +336,12 @@ def _ldb_text(f: Path) -> list[bytes]:
 def forget() -> None:
     """丢掉所有读缓存：下一次一定重新读桌面端 Local Storage（刷新按钮 / 打开同步弹窗时用）。"""
     _LDB_CACHE.clear()
+    _APP_RES["v"] = None
 
 
 def _leveldb_pairs() -> list[tuple[str, float, str, str]]:
     """桌面端 Local Storage 里所有（时间戳, 文件修改时间, 账号, 组织）。"""
-    d = claude_app_dir() / "Local Storage" / "leveldb"
+    d = app_path("ldb")
     out = []
     try:
         files = [f for f in d.iterdir() if f.suffix in (".log", ".ldb")]
@@ -318,7 +429,7 @@ def _field(b: bytes, start: int, name: bytes, span: int = 400) -> str | None:
 
 
 def _idb_profile(acct: str) -> dict | None:
-    d = claude_app_dir() / "IndexedDB"
+    d = app_path("idb")
     files = []
     for sub in ("https_claude.ai_0.indexeddb.blob", "https_claude.ai_0.indexeddb.leveldb"):
         try:
@@ -433,7 +544,7 @@ def desktop_freshness(d: dict) -> dict:
     """桌面端的号可信不可信：Local Storage 里最新那条记录的时间、桌面端开没开、有没有别的号的文件夹更新得更晚。
     桌面端开着时它的 Local Storage 不一定马上写盘，最近一次写会话的是另一个号 → 多半是刚换了号还没落盘：标 stale，建议按那个号。"""
     out = {"read_at": __import__("time").time()}
-    ldb = claude_app_dir() / "Local Storage" / "leveldb"
+    ldb = app_path("ldb")
     try:
         out["ldb_time"] = max((f.stat().st_mtime for f in ldb.iterdir() if f.suffix in (".log", ".ldb")), default=0) or None
     except Exception:
@@ -803,7 +914,7 @@ def _auto_sig() -> tuple:
             out.append((f.name, f.stat().st_mtime))
         except Exception:
             out.append((f.name, 0))
-    ldb = claude_app_dir() / "Local Storage" / "leveldb"
+    ldb = app_path("ldb")
     try:
         out += sorted((f.name, f.stat().st_mtime) for f in ldb.iterdir() if f.suffix in (".log", ".ldb"))
     except Exception:

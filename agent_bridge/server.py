@@ -1555,7 +1555,8 @@ class Handler(BaseHTTPRequestHandler):
                 tgt = q.get("target") or None
                 if tgt and not any(f["key"] == tgt for f in claude_sync.folders()):
                     raise ValueError("没有这个账号 / 组织文件夹")
-                self._json(dict(claude_sync.plan(tgt, source=src), accounts=claude_sync.accounts(), folders=claude_sync.folders()))
+                self._json(dict(claude_sync.plan(tgt, source=src), accounts=claude_sync.accounts(), folders=claude_sync.folders(),
+                                app_dirs=claude_sync.app_dirs_brief()))
             elif u.path == "/api/codex-sync":
                 from . import codex_sync
                 self._json(codex_sync.plan(float(q.get("days", 14)), q.get("root") or None))
@@ -1651,7 +1652,12 @@ class Handler(BaseHTTPRequestHandler):
                 from . import detect
                 detect.forget()
                 r = detect.report()
-                self._json({"report": r, "text": detect.text(r)})
+                from . import claude_sync
+                try:
+                    ad = claude_sync.app_dirs_brief()
+                except Exception:
+                    ad = None
+                self._json({"report": r, "text": detect.text(r), "app_dirs": ad})
             elif u.path == "/api/modelcfg":
                 # 模型与 API：只给本机（局域网 / 手机一律 403；返回里只有打码后的 key）
                 if not self._local():
@@ -1883,15 +1889,16 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ("claude_show", "codex_show"):            # auto = 按检测；always = 总是显示那一栏
                     if k in body:
                         s[k] = "always" if body[k] == "always" else "auto"
-                for k in ("claude_dir", "codex_dir"):              # 手动指定数据目录（空 = 不指定）
+                for k in ("claude_dir", "codex_dir", "claude_app_dir"):   # 手动指定数据目录（空 = 不指定；claude_app_dir = 桌面端的）
                     if k in body:
                         v = os.path.expanduser(str(body[k] or "").strip().strip('"'))
                         if v and not Path(v).is_dir():
                             return self._err(f"这个文件夹不存在：{v}")
                         s[k] = v
                 save_settings(s)
-                from . import detect
+                from . import detect, claude_sync
                 detect.forget()
+                claude_sync.forget()
                 if sys.platform == "win32":
                     from . import tray
                     if "autostart" in body:
