@@ -360,7 +360,10 @@ Cursor（3.x）会读项目 `.claude/settings.json` 里的 Claude 钩子（设�
 - 点窗口的 × 缺省只是藏到托盘（第一次会提示「仍在后台运行」）；真要退出用托盘菜单的「退出」。这几个开关在 设置（齿轮）里也有
 - 通知：有发给你的消息 / 任务、你派出去的任务交回结果、有新版本时弹 Windows 通知，点通知打开对应会话；15 秒最多一条，多的合并；窗口就在前面时不弹
 - 再启动一次 CC Msg 会把已经开着（包括藏在托盘里）的窗口拉到前面；安装 / 升级 / 卸载时会先让藏在托盘里的 CC Msg 退出，卸载时顺带删掉开机自启项
-- 启动时检查 Claude / Codex 有没有在跑：没在跑的那一栏先收起，之后它启动了会自动展开（这次手动收起过的不动）；想按上次的开合来，设置里开「侧边栏记住上次状态」
+- 启动时检查这台电脑上有没有 Claude Code / Codex（0.7.8 起）：认得进程——原生安装的 `claude.exe`（`~/.local/bin`）、npm 装的（`node.exe … @anthropic-ai/claude-code/cli.js`）、Claude 桌面端（AnthropicClaude / 商店版 WindowsApps）和它自带的 claude-code、VS Code / Cursor 扩展、WSL（只能看到 WSL 在跑，再查 WSL 里的 `~/.claude`）；Codex 同理（`codex.exe`、npm 的 `@openai/codex`、桌面端、VS Code 扩展）。不分大小写，读不到别的进程命令行（权限）也不出错。
+  **没匹配到进程不会再把那一栏藏起来**：只要数据目录在（`CLAUDE_CONFIG_DIR` / `~/.claude` / `~/.claude.json` / `%APPDATA%\Claude` / 商店版的 `%LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude`；Codex 是 `CODEX_HOME` / `~/.codex`）就照样显示。进程、目录全都没有才先收起那一栏，栏里写明查了哪些路径；之后每 15 秒（和切回窗口时）再查一次，检测到了自动展开（这次手动收起过的不动）。想按上次的开合来，设置里开「侧边栏记住上次状态」
+- 以前（0.4.2–0.7.7）只认 `claude.exe` 进程：npm 装的 Claude Code 跑起来是 `node.exe`，WSL / 编辑器扩展里的也认不出，于是那一栏被收起、提示「未运行」。
+- **诊断**：⋯ 菜单 →「诊断：Claude / Codex 检测…」（或 设置 →「Claude / Codex 检测」）列出结论、匹配到的进程、查过的每个目录（✓ / ✗、最近会话时间）；可设「总是显示」、手动指定数据目录（Windows 上有「浏览…」，检测马上生效，会话列表等重启 CC Msg 后全面换过去），「复制诊断报告」得到一段文字（家目录写成 `~`，不含 key / 账号 / 命令行参数）可以直接发给开发者
 
 ## 会话记录里的小东西
 

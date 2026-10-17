@@ -3274,7 +3274,13 @@ function diagBind(){
 }
 async function diagCopy(){
   if (!DG) await diagLoad();
-  try { await copyText(DG.text); toast("已复制诊断报告，可以直接粘贴发给开发者"); } catch(e) { const t = $("#dgText"); if (t) { t.select(); } toast("请手动复制下面的文字", 4000); }
+  const ok = () => toast("已复制诊断报告，可以直接粘贴发给开发者");
+  try { await copyText(DG.text); ok(); }
+  catch(e) {                                   // 剪贴板 API 被拒（窗口没焦点 / 权限）：退回选中文本框 + execCommand
+    const t = $("#dgText"); let done = false;
+    if (t) { t.focus(); t.select(); try { done = document.execCommand("copy"); } catch(_) {} }
+    done ? ok() : toast("请手动复制下面的文字（已选中）", 4000);
+  }
 }
 function diagOpen(){
   openDlg("诊断：Claude / Codex 检测", `<div id="dgBody"><div class="grp"><span class="spinr"></span> 正在检测…</div></div>`,
