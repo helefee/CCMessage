@@ -56,6 +56,9 @@ jobs:
         run: |
           $v = ([regex]'__version__\s*=\s*"([^"]+)"').Match((Get-Content agent_bridge\__init__.py -Raw)).Groups[1].Value
           if ("v$v" -ne "${{ github.ref_name }}") { throw "tag ${{ github.ref_name }} != __version__ $v" }
+      - name: Claude / Codex detection against real Windows processes (look-alike install types)
+        shell: pwsh
+        run: python tools\ci_detect.py
       - name: Build (Nuitka app + bus.exe, smoke test, Inno Setup installer, zip)
         shell: cmd
         run: build_desktop.cmd -Zip

@@ -35,7 +35,13 @@ from . import paths
 
 def claude_app_dir() -> Path:
     if sys.platform == "win32":
-        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Claude"
+        d = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming") / "Claude"
+        if not d.exists():                       # 商店版（MSIX）桌面端：写到虚拟化目录 %LOCALAPPDATA%\Packages\Claude_*\LocalCache\Roaming\Claude
+            from . import detect
+            m = [x for x in detect.msix_claude_dirs() if x.exists()]
+            if m:
+                return m[0]
+        return d
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Application Support" / "Claude"
     return Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "Claude"

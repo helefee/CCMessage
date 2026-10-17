@@ -1643,8 +1643,15 @@ class Handler(BaseHTTPRequestHandler):
                     s["autostart"] = tray.autostart_get()
                 self._json(s)
             elif u.path == "/api/apps/status":
-                from . import apps
+                from . import apps, detect
+                if q.get("fresh"):
+                    detect.forget()
                 self._json(apps.run_status())
+            elif u.path == "/api/apps/diag":
+                from . import detect
+                detect.forget()
+                r = detect.report()
+                self._json({"report": r, "text": detect.text(r)})
             elif u.path == "/api/modelcfg":
                 # 模型与 API：只给本机（局域网 / 手机一律 403；返回里只有打码后的 key）
                 if not self._local():
@@ -1858,6 +1865,12 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(install(norm_root(body["root"])))
             elif path == "/api/uninstall":
                 self._json(uninstall(norm_root(body["root"]), bool(body.get("purge"))))
+            elif path == "/api/apps/pickdir":
+                # 设置里「数据目录」的「浏览…」：Windows 弹系统选文件夹框（只给本机）；别的系统让用户手填
+                if not self._local():
+                    return self._err("只能在电脑上选", 403)
+                from . import detect
+                self._json(detect.pick_folder(str(body.get("start") or "")))
             elif path == "/api/settings":
                 s = load_settings()
                 if "fx" in body:
@@ -1867,7 +1880,18 @@ class Handler(BaseHTTPRequestHandler):
                 for k in ("tray_close", "start_min", "notify", "tray_hint_shown", "claude_autosync"):
                     if k in body:
                         s[k] = bool(body[k])
+                for k in ("claude_show", "codex_show"):            # auto = 按检测；always = 总是显示那一栏
+                    if k in body:
+                        s[k] = "always" if body[k] == "always" else "auto"
+                for k in ("claude_dir", "codex_dir"):              # 手动指定数据目录（空 = 不指定）
+                    if k in body:
+                        v = os.path.expanduser(str(body[k] or "").strip().strip('"'))
+                        if v and not Path(v).is_dir():
+                            return self._err(f"这个文件夹不存在：{v}")
+                        s[k] = v
                 save_settings(s)
+                from . import detect
+                detect.forget()
                 if sys.platform == "win32":
                     from . import tray
                     if "autostart" in body:
