@@ -61,11 +61,13 @@ def classify(name: str, exe: str = "", cmd: str = "") -> list[tuple[str, str]]:
             out.append(("codex", "vscode"))
         elif "@openai/codex" in p:
             out.append(("codex", "npm"))
+        elif "/windowsapps/openai.codex" in p:
+            out.append(("codex", "desktop"))              # 商店版 Codex 桌面端（WindowsApps\OpenAI.Codex_…）
         elif "openai.codex" in p or "/openai/codex/bin/" in p or "codex.app/contents/" in p:
             out.append(("codex", "desktop" if "app-server" in c else "desktop-cli"))
         else:
             out.append(("codex", "cli"))
-    elif n == "chatgpt" and "openai.codex" in p:
+    elif n in ("chatgpt", "codex") and "openai.codex" in p:
         out.append(("codex", "desktop"))
     elif n in ("wsl", "wslhost", "wslrelay", "vmmemwsl"):
         out += [("claude", "wsl"), ("codex", "wsl")]
@@ -247,6 +249,29 @@ def msix_claude_dirs() -> list[Path]:
         return []
 
 
+CODEX_STORE_SUBS = ("LocalCache/Roaming/.codex", "LocalCache/Local/.codex", "LocalCache/Roaming/Codex", "LocalCache/Local/Codex", "LocalState/.codex")
+
+
+def codex_store_homes(only_real: bool = True) -> list[Path]:
+    """商店版 Codex（%LOCALAPPDATA%\\Packages\\OpenAI.Codex_*）的虚拟化目录里像 CODEX_HOME 的（有 sessions/ 或 config.toml）。
+    2026-10-17 实测那台机器上只有 Logs 和网页缓存，会话照旧在 ~/.codex。"""
+    out = []
+    for pk in codex_store_installed():
+        for sub in CODEX_STORE_SUBS:
+            h = pk / sub
+            if not only_real or (h / "sessions").is_dir() or (h / "config.toml").is_file():
+                out.append(h)
+    return out
+
+
+def codex_store_installed() -> list[Path]:
+    local = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    try:
+        return sorted((local / "Packages").glob("OpenAI.Codex_*"))
+    except OSError:
+        return []
+
+
 def candidates(agent: str, settings: dict | None = None, wsl: list[str] | None = None) -> list[dict]:
     """要查的数据目录：[{label, path, kind: config|app, sessions: [(base, glob)]}]。"""
     s = settings if settings is not None else _settings()
@@ -287,11 +312,8 @@ def candidates(agent: str, settings: dict | None = None, wsl: list[str] | None =
             add("环境变量 CODEX_HOME", env["CODEX_HOME"], "config")
         add("~/.codex", home / ".codex", "config")
         if win:
-            try:
-                for pk in sorted((local / "Packages").glob("OpenAI.Codex_*")):
-                    add("商店版 Codex 桌面端", pk, "app")
-            except OSError:
-                pass
+            for h in codex_store_homes():
+                add("商店版 Codex 的虚拟化目录", h, "config")
     for d in wsl or []:
         try:
             root = Path(env["AGENT_BRIDGE_WSL_ROOT"]) if env.get("AGENT_BRIDGE_WSL_ROOT") else Path("\\\\wsl.localhost")
@@ -362,7 +384,24 @@ def report() -> dict:
             why = f"没检测到 {LABEL[a]}：没有匹配的进程，查过的目录都不在（{'、'.join(_mask(d['path']) for d in dirs)}）"
         if wsl_on and state != "running":
             why += "；WSL 在跑，里面的进程看不到" + ("，已查 WSL 里的目录" if distros else "")
-        out[a] = {"available": avail, "running": bool(real), "state": state, "kinds": kinds, "why": why,
+        extra = []
+        if a == "claude":
+            try:
+                from . import claude_sync
+                ad = claude_sync.app_dirs_brief()
+                extra = [f"桌面端{x['name']}：用 {_mask(x['path'])}（{x['why']}）" for x in ad["parts"]]
+                if ad["msix_running"] is not None:
+                    extra.append("桌面端在跑：" + ("商店版（WindowsApps）" if ad["msix_running"] else "安装版"))
+                if ad["override"]:
+                    extra.append("桌面端目录：设置里手动指定 " + _mask(ad["override"]))
+            except Exception as e:
+                extra = [f"桌面端目录判断出错：{type(e).__name__}"]
+        else:
+            st_ = codex_store_installed()
+            if st_:
+                homes = codex_store_homes()
+                extra.append(f"商店版 Codex 已安装（{st_[0].name}）；虚拟化目录里" + ("有会话 / 配置：" + "、".join(_mask(str(h)) for h in homes) if homes else "没有会话 / 配置，用 ~/.codex"))
+        out[a] = {"available": avail, "notes": extra, "running": bool(real), "state": state, "kinds": kinds, "why": why,
                   "recent": recent or None, "force": force, "procs": real[:12],
                   "dirs": [dict(d, path=_mask(d["path"])) for d in dirs]}
     return out
@@ -376,6 +415,13 @@ def text(r: dict | None = None) -> str:
     L = [f"CC Msg {__version__} 诊断 · {time.strftime('%Y-%m-%d %H:%M:%S')} · {r['platform']}",
          f"进程：共 {st['total']} 个，打不开 {st['denied']} 个，读不到命令行 {st['cmd_denied']} 个" + ("（测试用假进程）" if st.get("fake") else "")
          + (f"；错误：{'；'.join(st['errors'])}" if st["errors"] else "")]
+    try:
+        from . import apps
+        ds = apps.status()
+        L.append("桌面端在不在跑（会话管理 / 等它退出再改 / 自动同步用）：" + " · ".join(f"{LABEL[a]} {'开着' if ds.get(a) else '没开'}" for a in AGENTS)
+                 + f"（{apps.LAST.get('via')}{'；' + apps.LAST['error'] if apps.LAST.get('error') else ''}）")
+    except Exception as e:
+        L.append(f"桌面端在不在跑：查不了（{type(e).__name__}）")
     if r.get("wsl"):
         L.append("WSL：在跑" + ("，发行版 " + "、".join(r["wsl_distros"]) if r.get("wsl_distros") else "（没列出在跑的发行版）"))
     for a in AGENTS:
@@ -387,6 +433,8 @@ def text(r: dict | None = None) -> str:
             L.append("  进程：没有匹配的")
         for d in x["dirs"]:
             L.append(f"  {'✓' if d['exists'] else '✗'} {d['label']}: {d['path']}" + (f"  最近会话 {_ago(d['recent'])}" if d.get("recent") else ""))
+        for n_ in x.get("notes") or []:
+            L.append("  " + n_)
         L.append(f"  设置：{'总是显示' if x['force'] else '按检测'}")
     return "\n".join(L)
 
@@ -428,7 +476,7 @@ def pick_folder(start: str = "") -> dict:
           "$d.SelectedPath=$env:CCMSG_PICK_START;$d.ShowNewFolderButton=$false;"
           "[Console]::OutputEncoding=[Text.Encoding]::UTF8;if($d.ShowDialog($f) -eq 'OK'){$d.SelectedPath}")
     try:
-        r = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", ps], capture_output=True, timeout=600,
+        r = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", ps], capture_output=True, timeout=600, stdin=subprocess.DEVNULL,
                            creationflags=NOWIN, env=dict(os.environ, CCMSG_PICK_START=start))
         p = r.stdout.decode("utf-8", "replace").strip()
         return {"ok": True, "path": p} if p else {"ok": False, "cancel": True}

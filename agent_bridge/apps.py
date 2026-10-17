@@ -29,17 +29,37 @@ NAMES = {"claude": "Claude 桌面端", "codex": "Codex 桌面端"}
 
 # ---------- 进程 ----------
 
+LAST = {"via": None, "error": None}
+
+
 def _procs() -> list[dict]:
-    """[{pid, name, exe, cmd}]，只列可能相关的几种。"""
+    """[{pid, name, exe, cmd}]，只列可能相关的几种。
+    Windows：0.7.9 起先用进程快照（ctypes，detect._win_procs），不行才退回 PowerShell。
+    以前只用 PowerShell 的 Get-CimInstance：在安装版 CCMsg.exe 里它有时什么都拿不到（2026-10-17 那台电脑上：同一时刻
+    /api/apps/status 认出商店版桌面端在跑，/api/jobs 的 apps.status() 却说「没开」），于是「会话管理」里显示 Claude 桌面端「没开」，
+    「等它退出再改」和自动同步也会以为它没开。"""
+    if os.name == "nt" and not os.environ.get("AGENT_BRIDGE_PS_PROCS"):
+        try:
+            from . import detect
+            st = {"total": 0, "denied": 0, "cmd_denied": 0, "errors": []}
+            ps_ = detect._win_procs(st)
+            if st["total"] > 0:
+                LAST.update(via="snapshot", error=None)
+                return [{"pid": p["pid"], "name": p["name"], "exe": p["exe"] or "", "cmd": p["cmd"] or ""} for p in ps_]
+            LAST.update(error="进程快照是空的")
+        except Exception as e:
+            LAST.update(error=f"进程快照失败：{type(e).__name__}")
     if os.name == "nt":
         ps = ("Get-CimInstance Win32_Process -Filter \"Name='Claude.exe' OR Name='claude.exe' OR Name='ChatGPT.exe' "
               "OR Name='Codex.exe' OR Name='codex.exe'\" | Select-Object ProcessId,Name,ExecutablePath,CommandLine "
               "| ConvertTo-Json -Compress")
         try:
-            r = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, timeout=30,
-                               creationflags=NOWIN)
+            r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", ps], capture_output=True, timeout=30,
+                               stdin=subprocess.DEVNULL, creationflags=NOWIN)
             raw = json.loads(r.stdout.decode("utf-8", "replace") or "[]")
-        except Exception:
+            LAST.update(via="powershell", error=(r.stderr.decode("utf-8", "replace").strip()[:200] or None) if not r.stdout.strip() else None)
+        except Exception as e:
+            LAST.update(via="powershell", error=f"PowerShell 失败：{type(e).__name__}")
             return []
         raw = raw if isinstance(raw, list) else [raw]
         return [{"pid": p.get("ProcessId"), "name": p.get("Name") or "", "exe": p.get("ExecutablePath") or "",

@@ -1356,6 +1356,8 @@ body.sbresizing .spanel{transition:none}
 /* 0.7.8：没检测到 Claude / Codex 时栏里写清楚为什么，带「诊断」「总是显示」 */
 .appwhy{font-size:12px;line-height:1.5;color:var(--muted);background:var(--warn-weak);border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);border-radius:8px;padding:6px 9px;margin:0 0 6px}
 .appwhy .awb{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}.appwhy button{font-size:11.5px;padding:2px 8px}
+.adbox{font-size:12.5px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin:0 0 8px;display:flex;flex-direction:column;gap:3px}
+.adbox code{font-size:11.5px;word-break:break-all}.adbox select{margin-left:6px}
 .dgag{border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:0 0 10px}
 .dgag h4{margin:0 0 4px;font-size:13.5px;display:flex;align-items:center;gap:8px}.dgag .why{font-size:12.5px;margin:0 0 6px}
 .dgst{font-size:11px;padding:1px 7px;border-radius:9px;background:var(--accent-weak);color:var(--accent)}.dgst.none{background:var(--warn-weak);color:var(--warn)}
@@ -2236,6 +2238,19 @@ function csSection(s, p, many){
     ${pickBar(p.add.length, "pickN_" + s)}<div style="max-height:${many ? 28 : 46}vh;overflow:auto">${rows || '<div style="color:var(--muted)">没有要补的，别的账号里的会话都已经在了。</div>'}</div>
     ${p.add.length || upd.length ? `<div style="margin-top:6px;display:flex;gap:8px;justify-content:flex-end">${p.add.length ? `<button class="ghost" id="csAll_${s}">全部同步（${p.add.length}${upd.length ? ` + 刷新 ${upd.length}` : ""}）</button>` : ""}<button class="primary" id="csGo_${s}">补齐到${CS_SHORT[s]}账号 ${p.add.length} 个</button></div>` : ""}</div>`;
 }
+// 0.7.9：桌面端数据目录（%APPDATA%\Claude 还是商店版虚拟化目录）用的哪边、为什么；可手动选
+function appDirsHtml(ad){
+  if (!ad) return "";
+  const multi = (ad.choices || []).length > 1 || ad.override;
+  const sel = multi ? `<select id="adPick" class="admin" style="font-size:12px;max-width:340px"><option value="">自动（按哪边最近写过）</option>${(ad.choices || []).map(c =>
+      `<option value="${esc(c.path)}" ${ad.override && ad.override.toLowerCase() === c.path.toLowerCase() ? "selected" : ""} ${c.exists ? "" : "disabled"}>${esc(c.label)}${c.exists ? "" : "（不存在）"}</option>`).join("")}</select>` : "";
+  return `<div class="adbox"><div><b>桌面端数据目录</b>${ad.override ? ' <span class="tag">手动选的</span>' : ""}${ad.msix_running ? ' <span class="tag">桌面端是商店版</span>' : ""} ${sel}</div>
+    ${(ad.parts || []).map(x => `<div class="dim">${esc(x.name)}：<code>${esc(x.path)}</code> · ${esc(x.why)}${x.cands.length > 1 ? "（" + x.cands.map(c => `${esc(c.label)} ${c.exists ? (c.activity ? csAgo(c.activity) : "有") : "无"}`).join(" / ") + "）" : ""}</div>`).join("")}</div>`;
+}
+function appDirsBind(after){
+  const x = $("#adPick"); if (!x) return;
+  x.onchange = async () => { try { await api("/api/settings", {claude_app_dir: x.value}); toast(x.value ? "已手动指定桌面端数据目录" : "桌面端数据目录改回自动"); after && after(); } catch(e) { toast("❌ " + e.message, 5000); } };
+}
 function csRender(ps){
   const acc = ps.desktop.accounts || ps.cli.accounts || {};
   const dk = acc.desktop && acc.desktop.key, same = !!dk && dk === (acc.cli && acc.cli.key);
@@ -2249,7 +2264,7 @@ function csRender(ps){
       <button class="ghost" id="csUseSug" data-k="${esc(dA.suggest)}">补到 ${esc(csKey(dA.suggest))}</button>，也可以在下面「补到」里自己选。</div>` : "";
   const bar = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><button class="ghost" id="csRefresh" title="不用缓存，重新读桌面端和 CLI 现在登的号，重扫所有账号文件夹">${CS.busy ? '<span class="spinr"></span> 读取中…' : "⟳ 刷新"}</button>
       <span class="dim" style="font-size:12px" id="csReadAt">上次读取 ${CS.readAt ? new Date(CS.readAt).toLocaleTimeString() : "—"}</span></div>`;
-  const head = bar + `<div style="font-size:13px;color:var(--muted)">Claude 桌面端的会话列表按「账号 / 组织」分开记，切换账号后旧会话只是不显示，对话记录一直在本机。
+  const head = bar + appDirsHtml(ps.desktop.app_dirs || ps.cli.app_dirs) + `<div style="font-size:13px;color:var(--muted)">Claude 桌面端的会话列表按「账号 / 组织」分开记，切换账号后旧会话只是不显示，对话记录一直在本机。
       这里把别的账号里的会话补进选定账号的列表：只补缺的，不覆盖、不删除，写之前整个目录先备份。
       <b>桌面端和命令行（CLI）是两套登录</b>，可以登的不是同一个号，下面分开认、分开查。命令行自己 <code>claude --resume</code> 直接读本机记录，不看这份列表；
       补到 CLI 的号，只有桌面端也登这个号时才看得到。</div>
@@ -2262,6 +2277,7 @@ function csRender(ps){
     `<div style="margin-top:10px;color:var(--warn);font-size:13px">补完要<b>重启 Claude 桌面端</b>才会出现在列表里（它只在启动时读一次）。</div>`);
   $$("#dlg input[data-cssrc]").forEach(b => b.onchange = () => { csPick[b.dataset.cssrc] = b.checked; csRender(ps); });
   $("#csRefresh").onclick = () => csLoad();
+  appDirsBind(() => csLoad());
   if ($("#csUseSug")) $("#csUseSug").onclick = e => { CS.tgt.desktop = e.target.dataset.k; csLoad(); };
   $$("#dlg select[data-cstgt]").forEach(x => x.onchange = () => { CS.tgt[x.dataset.cstgt] = x.value; csLoad(); });
   srcs.forEach(s => {
@@ -3247,6 +3263,8 @@ function dgHtml(){
       <div class="why">${esc(x.why)}</div>
       <div class="dgls">${(x.procs || []).map(p => `<div>进程 ${esc(p.name)}（${esc(p.kind)}）${esc(p.exe || "")}</div>`).join("") || "<div>进程：没有匹配的</div>"}
       ${(x.dirs || []).map(d => `<div>${d.exists ? "✓" : "✗"} ${esc(d.label)}：${esc(d.path)}${d.recent ? " · 最近会话 " + csAgo(d.recent) : ""}</div>`).join("")}</div>
+      ${(x.notes || []).length ? `<div class="dgls">${x.notes.map(n => `<div>${esc(n)}</div>`).join("")}</div>` : ""}
+      ${ag === "claude" && DG.ad ? appDirsHtml(DG.ad) : ""}
       <div class="dgrow admin">显示这一栏：${segHtml("dgShow_" + ag, [["auto", "按检测"], ["always", "总是显示"]], cfg[ag + "_show"] === "always" ? "always" : "auto")}</div>
       <div class="dgrow admin">数据目录：<input id="dgDir_${ag}" placeholder="${ag === "claude" ? "缺省 ~/.claude（或 CLAUDE_CONFIG_DIR）" : "缺省 ~/.codex（或 CODEX_HOME）"}" value="${esc(cfg[ag + "_dir"] || "")}">
         ${me && me.platform === "win32" ? `<button data-dgpick="${ag}">浏览…</button>` : ""}<button data-dgsave="${ag}">保存</button></div></div>`; };
@@ -3257,12 +3275,13 @@ function dgHtml(){
     <textarea id="dgText" readonly>${esc(DG.text)}</textarea>`;
 }
 async function diagLoad(){
-  try { const [d, c] = await Promise.all([api("/api/apps/diag"), api("/api/settings").catch(() => ({}))]); DG = Object.assign(d, {cfg: c}); }
+  try { const [d, c] = await Promise.all([api("/api/apps/diag"), api("/api/settings").catch(() => ({}))]); DG = Object.assign(d, {cfg: c, ad: d.app_dirs}); }
   catch(e) { $("#dlgBody").innerHTML = `<div class="miss">诊断失败：${esc(e.message)}</div>`; return; }
   if (!$("#dgBody")) return;
   $("#dgBody").innerHTML = dgHtml(); diagBind();
 }
 function diagBind(){
+  appDirsBind(() => diagLoad());
   const set = async (body, msg) => { try { await api("/api/settings", body); toast(msg); await diagLoad(); appsPoll(false, true); } catch(e) { toast("❌ " + e.message, 5000); } };
   ["claude", "codex"].forEach(ag => {
     $$(`#dgShow_${ag} button`).forEach(b => b.onclick = () => set({[ag + "_show"]: b.dataset.v}, b.dataset.v === "always" ? `${AGN[ag]} 那一栏总是显示` : "按检测结果显示"));
