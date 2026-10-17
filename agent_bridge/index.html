@@ -1353,6 +1353,15 @@ body.sbresizing .spanel{transition:none}
 .sbtg .sdot{width:8px;height:8px;top:3px;right:3px;box-shadow:0 0 0 2px var(--ring)}
 .sbtg .sdot,.sbtg.ping .sdot,body.sbanim .sbtg.off.has .sdot.s-active{animation:none!important}
 .sbtg.appoff .sdot.s-app{display:block;background:var(--faint)}
+/* 0.7.8：没检测到 Claude / Codex 时栏里写清楚为什么，带「诊断」「总是显示」 */
+.appwhy{font-size:12px;line-height:1.5;color:var(--muted);background:var(--warn-weak);border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);border-radius:8px;padding:6px 9px;margin:0 0 6px}
+.appwhy .awb{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}.appwhy button{font-size:11.5px;padding:2px 8px}
+.dgag{border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin:0 0 10px}
+.dgag h4{margin:0 0 4px;font-size:13.5px;display:flex;align-items:center;gap:8px}.dgag .why{font-size:12.5px;margin:0 0 6px}
+.dgst{font-size:11px;padding:1px 7px;border-radius:9px;background:var(--accent-weak);color:var(--accent)}.dgst.none{background:var(--warn-weak);color:var(--warn)}
+.dgls{font-size:11.5px;color:var(--muted);margin:4px 0;font-family:var(--mono,monospace);word-break:break-all}.dgls div{padding:1px 0}
+.dgrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0 2px;font-size:12.5px}.dgrow input{flex:1;min-width:180px;font-size:12px;padding:4px 7px}
+#dgText{width:100%;height:120px;font-size:11px;font-family:var(--mono,monospace);margin-top:6px}
 .sbtg.appup{color:var(--ok)}
 @media (prefers-reduced-motion: reduce){.bbw.live svg{animation:none!important}}
 
@@ -1598,6 +1607,7 @@ body.noanim .trun .trl.shim{animation:none;background:none;color:var(--text)}
           <button id="mPRs"><i data-ic="gitpr"></i>GitHub PR 列表…</button>
           <button id="mChg"><i data-ic="gitdiff"></i>本地改动 / 代码审查…</button>
           <button id="mInst" class="admin"><i data-ic="wrench"></i>安装 / 升级 / 修复</button>
+          <button id="mDiag"><i data-ic="activity"></i>诊断：Claude / Codex 检测…</button>
           <button id="mTest" class="admin"><i data-ic="activity"></i>自检</button>
           <button id="mRm" class="admin"><i data-ic="listx"></i>从列表移除</button>
           <button id="mUninst" class="danger admin"><i data-ic="trash"></i>卸载…</button>
@@ -1647,10 +1657,12 @@ body.noanim .trun .trl.shim{animation:none;background:none;color:var(--text)}
     <aside class="side" id="colR">
       <div class="card sesscard" id="cardClaude">
         <h3><span class="a-claude"><i data-ic="claude" data-cls="logo"></i>Claude</span> 会话 <span id="nClaude"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><button class="rf admin" data-addproj title="添加项目…"><i data-ic="plus"></i></button><span class="sp winpos" id="posClaude"></span></h3>
+        <div class="appwhy" id="whyClaude" hidden></div>
         <div id="sessClaude"><div class="grp">加载中…</div></div>
       </div>
       <div class="card sesscard" id="cardCodex">
         <h3><span class="a-codex"><i data-ic="codex" data-cls="logo"></i>Codex</span> 会话 <span id="nCodex"></span><button class="rf" data-refresh title="刷新会话列表"><i data-ic="refresh"></i></button><button class="rf admin" data-addproj title="添加项目…"><i data-ic="plus"></i></button><span class="sp winpos" id="posCodex"></span></h3>
+        <div class="appwhy" id="whyCodex" hidden></div>
         <div id="codexSt" class="grp" style="margin:0 0 4px"></div>
         <div id="sessCodex"><div class="grp">加载中…</div></div>
       </div>
@@ -1839,7 +1851,8 @@ function renderSettings(){
     <div class="setrow"><div class="sl">${ic("contrast")}<div><b>主题</b><div class="sd">只影响这台设备</div></div></div>${segHtml("themeSeg", [["light", "浅色"], ["dark", "深色"], ["system", "跟随系统"]], themeMode())}</div>
     <div class="setrow"><div class="sl">${ic("activity")}<div><b>状态说明位置</b><div class="sd">待命 / 活跃 / 空闲 和各有几个会话</div></div></div>${segHtml("legSeg", LEGEND_POS, legendPos())}</div>
     <div class="setrow"><div class="sl">${ic("sparkles")}<div><b>界面动画</b><div class="sd">侧栏收起 / 展开、活跃头像的呼吸等（系统设了「减少动画」时也不放）</div></div></div>${segHtml("uiAnimSeg", [["1", "开"], ["0", "关"]], store.get("msgbus.uianim") === "0" ? "0" : "1")}</div>
-    <div class="setrow"><div class="sl">${ic("panelL")}<div><b>侧边栏记住上次状态</b><div class="sd">关着时：启动按 Claude / Codex 有没有在跑决定两栏开不开（没在跑的那一栏先收起）</div></div></div>${segHtml("sbRemSeg", [["1", "开"], ["0", "关"]], store.get("msgbus.sbRemember") === "1" ? "1" : "0")}</div>
+    <div class="setrow"><div class="sl">${ic("activity")}<div><b>Claude / Codex 检测</b><div class="sd">没认出来时：查看查了哪些进程和目录、设「总是显示」、手动指定数据目录、复制诊断报告</div></div></div><button onclick="diagOpen()">诊断…</button></div>
+    <div class="setrow"><div class="sl">${ic("panelL")}<div><b>侧边栏记住上次状态</b><div class="sd">关着时：启动按检测到的 Claude / Codex 决定两栏开不开（进程、数据目录都没有的那一栏先收起；有数据就照样展开）</div></div></div>${segHtml("sbRemSeg", [["1", "开"], ["0", "关"]], store.get("msgbus.sbRemember") === "1" ? "1" : "0")}</div>
     ${me && me.platform === "win32" ? trayRows() : ""}
     ${me && me.claude_desktop ? trayRow("claude_autosync", "refresh", "切 Claude 账号后自动同步会话", "Claude 桌面端换号后，自动把别的号下开过的会话补进当前号的列表（只在桌面端关着时写，写前备份，可在「会话管理 → 同步与还原」撤回）；手动同步照旧在 ⋯ 菜单", (trayCfg || {}).claude_autosync !== false) : ""}
     <div class="setrow"><div class="sl">${ic("sparkles")}<div><b>网页信件动画</b><div class="sd">新消息时网页里飞一封信（只影响这台设备）</div></div></div>${segHtml("webFxSeg", [["1", "开"], ["0", "关"]], webFx ? "1" : "0")}</div>
@@ -3100,18 +3113,31 @@ var SB = {L: store.get("msgbus.sbL") !== "0", R: store.get("msgbus.sbR") !== "0"
 const sess = {get(k){ try { return sessionStorage.getItem(k); } catch(e) { return null; } }, set(k, v){ try { sessionStorage.setItem(k, v); } catch(e) {} }};
 let APPS = null;
 function sbManual(agent){ const v = sess.get("msgbus.sbManual." + agent); return v == null ? null : v === "1"; }
-async function appsPoll(first){
-  let a; try { a = await api("/api/apps/status"); } catch(e) { return; }
-  const prev = APPS; APPS = a;
+const AGN = {claude: "Claude Code", codex: "Codex"};
+function appWhy(){
+  for (const ag of ["claude", "codex"]) {
+    const el = $(ag === "claude" ? "#whyClaude" : "#whyCodex"); if (!el) continue;
+    const d = APPS && APPS.detail && APPS.detail[ag];
+    const show = d && (d.state === "none" || d.state === "forced" || d.state === "error");
+    el.hidden = !show; if (!show) { el.innerHTML = ""; continue; }
+    el.innerHTML = `${esc(d.why)}<div class="awb"><button data-diag="${ag}">诊断…</button>${d.force ? "" : `<button class="admin" data-alwaysshow="${ag}">总是显示</button>`}</div>`;
+  }
+}
+async function appsPoll(first, fresh){
+  let a; try { a = await api("/api/apps/status" + (fresh ? "?fresh=1" : "")); } catch(e) { return; }
+  const prev = APPS; APPS = a; appWhy();
   if (!isMobile()) ["L", "R"].forEach(k => {
     const ag = sbAgent(k), man = sbManual(ag), was = prev ? !!prev[ag] : null;
     if (first) {
       if (man != null) SB[k] = man;
-      else if (store.get("msgbus.sbRemember") !== "1") SB[k] = !!a[ag];
+      else if (store.get("msgbus.sbRemember") !== "1") {
+        SB[k] = !!a[ag];
+        if (!a[ag]) setTimeout(() => toast(`没检测到 ${AGN[ag]}，先收起了它那一栏（为什么？⋯ →「诊断」）`, 4200), 1200);
+      }
     } else if (a[ag] && was === false && man !== false && !SB[k]) {
       SB[k] = true;                                           // 刚启动的那一家：自动展开（这次没手动收起过才展开）
       const b = $("#tg" + k); b.classList.add("appup"); setTimeout(() => b.classList.remove("appup"), 6000);
-      toast(`${ag === "claude" ? "Claude" : "Codex"} 已经在运行，展开了它那一栏`, 2600);
+      toast(`检测到 ${AGN[ag]}，展开了它那一栏`, 2600);
     }
   });
   sbApply(!first);
@@ -3157,7 +3183,7 @@ function sbDots(){
     btn.classList.toggle("off", !SB[k]); btn.classList.toggle("has", mail || n.active + n.stand > 0); btn.classList.toggle("appoff", appOff);
     btn.setAttribute("aria-pressed", SB[k] ? "true" : "false");
     const stat = [n.active && `活跃 ${n.active}`, n.stand && `待命 ${n.stand}`].filter(Boolean).join(" · ");
-    btn.title = `${SB[k] ? "收起" : "展开"}${side}栏（${sbName(k)}）  ${key}` + (!SB[k] && stat ? `\n收起中：${stat}` : "") + (appOff ? `\n${a === "claude" ? "Claude" : "Codex"} 未运行` : "");
+    btn.title = `${SB[k] ? "收起" : "展开"}${side}栏（${sbName(k)}）  ${key}` + (!SB[k] && stat ? `\n收起中：${stat}` : "") + (APPS && APPS.detail && APPS.detail[a] && !APPS.detail[a].running ? `\n${APPS.detail[a].why}` : appOff ? `\n${AGN[a]} 未检测到` : "");
     btn.setAttribute("aria-label", btn.title);
   });
 }
@@ -3211,7 +3237,59 @@ function sbFit(){
 window.addEventListener("resize", sbFit);
 $(".body").addEventListener("transitionend", e => { if (e.target === $(".body")) lkRedraw(); });
 sbApply(false);
-appsPoll(true); setInterval(() => appsPoll(false), 30000);
+// ---------- 诊断：Claude / Codex 检测（0.7.8） ----------
+let DG = null;
+const DG_ST = {running: "在运行", recent: "最近在用", data: "数据在", forced: "总是显示", none: "没检测到", error: "检测出错"};
+function dgHtml(){
+  const r = DG.report, cfg = DG.cfg || {};
+  const sec = ag => { const x = r[ag]; if (!x) return "";
+    return `<div class="dgag"><h4>${AGN[ag]}<span class="dgst ${x.available ? "" : "none"}">${DG_ST[x.state] || x.state}</span></h4>
+      <div class="why">${esc(x.why)}</div>
+      <div class="dgls">${(x.procs || []).map(p => `<div>进程 ${esc(p.name)}（${esc(p.kind)}）${esc(p.exe || "")}</div>`).join("") || "<div>进程：没有匹配的</div>"}
+      ${(x.dirs || []).map(d => `<div>${d.exists ? "✓" : "✗"} ${esc(d.label)}：${esc(d.path)}${d.recent ? " · 最近会话 " + csAgo(d.recent) : ""}</div>`).join("")}</div>
+      <div class="dgrow admin">显示这一栏：${segHtml("dgShow_" + ag, [["auto", "按检测"], ["always", "总是显示"]], cfg[ag + "_show"] === "always" ? "always" : "auto")}</div>
+      <div class="dgrow admin">数据目录：<input id="dgDir_${ag}" placeholder="${ag === "claude" ? "缺省 ~/.claude（或 CLAUDE_CONFIG_DIR）" : "缺省 ~/.codex（或 CODEX_HOME）"}" value="${esc(cfg[ag + "_dir"] || "")}">
+        ${me && me.platform === "win32" ? `<button data-dgpick="${ag}">浏览…</button>` : ""}<button data-dgsave="${ag}">保存</button></div></div>`; };
+  const st = r.procs || {};
+  return `<div class="dim" style="font-size:12px;margin-bottom:8px">查了 ${st.total || 0} 个进程（${st.denied || 0} 个没权限打开，${st.cmd_denied || 0} 个读不到命令行）${r.wsl ? "，WSL 在跑" : ""} · ${new Date(r.ts * 1000).toLocaleTimeString()}</div>
+    ${sec("claude")}${sec("codex")}
+    <div class="dim" style="font-size:12px">指定的数据目录：检测马上用上；会话列表等要重启 CC Msg 后才全面换过去。还是不对就点下面「复制诊断报告」发给开发者（只有路径和进程名，家目录写成 ~，不含 key / 账号）。</div>
+    <textarea id="dgText" readonly>${esc(DG.text)}</textarea>`;
+}
+async function diagLoad(){
+  try { const [d, c] = await Promise.all([api("/api/apps/diag"), api("/api/settings").catch(() => ({}))]); DG = Object.assign(d, {cfg: c}); }
+  catch(e) { $("#dlgBody").innerHTML = `<div class="miss">诊断失败：${esc(e.message)}</div>`; return; }
+  if (!$("#dgBody")) return;
+  $("#dgBody").innerHTML = dgHtml(); diagBind();
+}
+function diagBind(){
+  const set = async (body, msg) => { try { await api("/api/settings", body); toast(msg); await diagLoad(); appsPoll(false, true); } catch(e) { toast("❌ " + e.message, 5000); } };
+  ["claude", "codex"].forEach(ag => {
+    $$(`#dgShow_${ag} button`).forEach(b => b.onclick = () => set({[ag + "_show"]: b.dataset.v}, b.dataset.v === "always" ? `${AGN[ag]} 那一栏总是显示` : "按检测结果显示"));
+  });
+  $$("[data-dgsave]").forEach(b => b.onclick = () => { const ag = b.dataset.dgsave; set({[ag + "_dir"]: $("#dgDir_" + ag).value.trim()}, $("#dgDir_" + ag).value.trim() ? "已保存数据目录（重启 CC Msg 后全面生效）" : "已清除，按缺省目录"); });
+  $$("[data-dgpick]").forEach(b => b.onclick = async () => { const ag = b.dataset.dgpick; b.disabled = true;
+    try { const r = await api("/api/apps/pickdir", {start: $("#dgDir_" + ag).value.trim()}); if (r.ok) $("#dgDir_" + ag).value = r.path; else if (r.error) toast(r.error); }
+    catch(e) { toast("❌ " + e.message); } b.disabled = false; });
+}
+async function diagCopy(){
+  if (!DG) await diagLoad();
+  try { await copyText(DG.text); toast("已复制诊断报告，可以直接粘贴发给开发者"); } catch(e) { const t = $("#dgText"); if (t) { t.select(); } toast("请手动复制下面的文字", 4000); }
+}
+function diagOpen(){
+  openDlg("诊断：Claude / Codex 检测", `<div id="dgBody"><div class="grp"><span class="spinr"></span> 正在检测…</div></div>`,
+    '<button id="dgCopy" class="primary">复制诊断报告</button><button id="dgRe">重新检测</button><button onclick="closeDlg()">关闭</button>');
+  $("#dgCopy").onclick = diagCopy; $("#dgRe").onclick = () => { $("#dgBody").innerHTML = '<div class="grp"><span class="spinr"></span> 正在检测…</div>'; diagLoad(); };
+  diagLoad();
+}
+$("#mDiag").onclick = () => { $("#menu").classList.remove("open"); diagOpen(); };
+document.addEventListener("click", async e => {
+  const d = e.target.closest && e.target.closest("[data-diag]"); if (d) { diagOpen(); return; }
+  const a = e.target.closest && e.target.closest("[data-alwaysshow]");
+  if (a) { const ag = a.dataset.alwaysshow; try { await api("/api/settings", {[ag + "_show"]: "always"}); toast(`${AGN[ag]} 那一栏总是显示`); appsPoll(false, true); } catch(err) { toast("❌ " + err.message); } }
+});
+appsPoll(true); setInterval(() => appsPoll(false), 15000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) appsPoll(false, true); });
 
 // ---------- 网页里的信件动画：从发件会话那一栏飞到收件会话那一栏 ----------
 let webFx = store.get("msgbus.webfx") !== "0", flying = 0;

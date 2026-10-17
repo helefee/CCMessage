@@ -41,8 +41,18 @@ def self_cmd(*args: str) -> list[str]:
 HOME = Path(os.environ.get("AGENT_BRIDGE_HOME") or Path.home() / ".agent-bridge")
 HOME.mkdir(parents=True, exist_ok=True)
 
-CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or Path.home() / ".claude")
-CODEX_HOME = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+def _set_dir(k: str) -> str | None:
+    """设置里手动指定的 Claude / Codex 数据目录（设置 → 「Claude / Codex 检测」；改了重启 CC Msg 后全面生效）。环境变量优先。"""
+    try:
+        import json
+        v = json.loads((HOME / "settings.json").read_text(encoding="utf-8")).get(k) or ""
+        return v if v and Path(v).is_dir() else None
+    except Exception:
+        return None
+
+
+CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or _set_dir("claude_dir") or Path.home() / ".claude")
+CODEX_HOME = Path(os.environ.get("CODEX_HOME") or _set_dir("codex_dir") or Path.home() / ".codex")
 
 
 def codex_exe() -> str | None:

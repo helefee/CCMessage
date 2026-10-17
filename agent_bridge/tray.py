@@ -189,7 +189,7 @@ class Tray:
         a = d.get("apps") or {}
         off = [n for k, n in (("claude", "Claude"), ("codex", "Codex")) if a and not a.get(k)]
         if off:
-            t += "\n" + "、".join(off) + " 未运行"
+            t += "\n" + "、".join(off) + " 未检测到"
         return t[:127]
 
     # --- Win32 ---
@@ -428,7 +428,9 @@ class Tray:
         items.append(("sub", f"最近总线消息（{d.get('unread', 0)} 未读）", msub))
         a = d.get("apps") or {}
         if a:
-            items.append((0, f"Claude {'运行中' if a.get('claude') else '未运行'} · Codex {'运行中' if a.get('codex') else '未运行'}", {"gray": True}))
+            det = a.get("detail") or {}
+            st = lambda k: "运行中" if (det.get(k) or {}).get("running", a.get(k)) else "没在跑（数据在）" if a.get(k) else "未检测到"
+            items.append((0, f"Claude {st('claude')} · Codex {st('codex')}", {"gray": True}))
         items += [("-",),
                   (10, "开机自启", {"check": autostart_get()}),
                   (11, "关闭窗口时最小化到托盘", {"check": s.get("tray_close", True)}),

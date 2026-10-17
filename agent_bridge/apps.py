@@ -365,7 +365,11 @@ def _detect() -> dict:
 
 
 def run_status(max_age: float = 10) -> dict:
-    """{"claude": bool, "codex": bool, "ts": …}；10 秒内重复问用缓存。"""
+    """{"claude": bool, "codex": bool, "ts": …, "detail": …}：bool = 该不该显示那一栏（0.7.8 起看进程 + 数据目录 + 设置，见 detect.py；
+    以前只看 claude.exe，npm 装的 node.exe、WSL、编辑器扩展都认不出，就把那一栏收起了）。AGENT_BRIDGE_FAKE_APPS（老测试用）照旧。"""
+    if not os.environ.get("AGENT_BRIDGE_FAKE_APPS"):
+        from . import detect
+        return detect.brief()
     now = time.time()
     if _ST["v"] is None or now - _ST["t"] > max_age or os.environ.get("AGENT_BRIDGE_FAKE_APPS"):
         try:
