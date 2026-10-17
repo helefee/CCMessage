@@ -415,6 +415,13 @@ def text(r: dict | None = None) -> str:
     L = [f"CC Msg {__version__} 诊断 · {time.strftime('%Y-%m-%d %H:%M:%S')} · {r['platform']}",
          f"进程：共 {st['total']} 个，打不开 {st['denied']} 个，读不到命令行 {st['cmd_denied']} 个" + ("（测试用假进程）" if st.get("fake") else "")
          + (f"；错误：{'；'.join(st['errors'])}" if st["errors"] else "")]
+    try:
+        from . import apps
+        ds = apps.status()
+        L.append("桌面端在不在跑（会话管理 / 等它退出再改 / 自动同步用）：" + " · ".join(f"{LABEL[a]} {'开着' if ds.get(a) else '没开'}" for a in AGENTS)
+                 + f"（{apps.LAST.get('via')}{'；' + apps.LAST['error'] if apps.LAST.get('error') else ''}）")
+    except Exception as e:
+        L.append(f"桌面端在不在跑：查不了（{type(e).__name__}）")
     if r.get("wsl"):
         L.append("WSL：在跑" + ("，发行版 " + "、".join(r["wsl_distros"]) if r.get("wsl_distros") else "（没列出在跑的发行版）"))
     for a in AGENTS:
@@ -469,7 +476,7 @@ def pick_folder(start: str = "") -> dict:
           "$d.SelectedPath=$env:CCMSG_PICK_START;$d.ShowNewFolderButton=$false;"
           "[Console]::OutputEncoding=[Text.Encoding]::UTF8;if($d.ShowDialog($f) -eq 'OK'){$d.SelectedPath}")
     try:
-        r = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", ps], capture_output=True, timeout=600,
+        r = subprocess.run(["powershell", "-NoProfile", "-STA", "-Command", ps], capture_output=True, timeout=600, stdin=subprocess.DEVNULL,
                            creationflags=NOWIN, env=dict(os.environ, CCMSG_PICK_START=start))
         p = r.stdout.decode("utf-8", "replace").strip()
         return {"ok": True, "path": p} if p else {"ok": False, "cancel": True}
